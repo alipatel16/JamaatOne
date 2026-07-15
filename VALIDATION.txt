@@ -1,0 +1,2 @@
+
+Syntax validation completed on all .js files.
