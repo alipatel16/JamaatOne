@@ -26,6 +26,10 @@ export const endpoints = {
   payments: "/accounts/payments",
   paymentById: id => `/accounts/payments/${id}`,
   paymentReceipt: id => `/accounts/payments/${id}/receipt`,
+  daybook: "/accounts/daybook",
+  daybookEntryById: id => `/accounts/daybook/${id}`,
+  ledgers: "/accounts/ledgers",
+  userLedger: id => `/accounts/ledgers/${id}`,
 
   users: "/admin/users",
   userById: id => `/admin/users/${id}`,

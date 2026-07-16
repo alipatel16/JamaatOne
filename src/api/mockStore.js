@@ -3,6 +3,7 @@ import {
   mockFmbMenus,
   mockPauses,
   mockPayments,
+  mockDaybookEntries,
   mockUsers,
   prayerItems
 } from "./mockData";
@@ -13,6 +14,7 @@ let announcements = [...mockAnnouncements];
 let fmbMenus = [...mockFmbMenus];
 let pauses = [...mockPauses];
 let payments = [...mockPayments];
+let daybookEntries = [...mockDaybookEntries];
 
 const wait = value =>
   new Promise(resolve => setTimeout(() => resolve(value), 120));
@@ -300,15 +302,41 @@ export async function mockApiRequest(path, options = {}) {
   }
 
   if (path === "/accounts/summary") {
-    const totalReceived = payments.reduce(
-      (sum, item) => sum + Number(item.amount || 0),
-      0
-    );
-    return wait({
-      totalReceived,
-      monthReceived: totalReceived,
-      paymentCount: payments.length
-    });
+    const paymentIncome = payments.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+    const otherCredit = daybookEntries.filter(item => item.entryType === "CREDIT").reduce((sum, item) => sum + Number(item.amount || 0), 0);
+    const totalDebit = daybookEntries.filter(item => item.entryType === "DEBIT").reduce((sum, item) => sum + Number(item.amount || 0), 0);
+    const totalReceived = paymentIncome + otherCredit;
+    return wait({ totalReceived, monthReceived: totalReceived, totalDebit, balance: totalReceived - totalDebit, paymentCount: payments.length });
+  }
+
+  if (path === "/accounts/daybook" && method === "GET") {
+    return wait([...daybookEntries].sort((a, b) => b.entryDate.localeCompare(a.entryDate)));
+  }
+
+  if (path === "/accounts/daybook" && method === "POST") {
+    const created = { id: `entry-${Date.now()}`, ...body, createdByName: currentUser.name };
+    daybookEntries = [created, ...daybookEntries];
+    return wait(created);
+  }
+
+  if (path.startsWith("/accounts/daybook/") && method === "DELETE") {
+    const id = path.split("/").pop();
+    daybookEntries = daybookEntries.filter(item => item.id !== id);
+    return wait({ success: true });
+  }
+
+  if (path === "/accounts/ledgers") {
+    return wait(users.map(member => {
+      const memberPayments = payments.filter(item => item.userId === member.id);
+      return { userId: member.id, userName: member.name, itsId: member.itsId, phoneNumber: member.phoneNumber, grade: member.grade, paymentCount: memberPayments.length, totalPaid: memberPayments.reduce((sum, item) => sum + Number(item.amount || 0), 0), lastPaymentDate: memberPayments.sort((a,b) => b.paymentDate.localeCompare(a.paymentDate))[0]?.paymentDate || null };
+    }).sort((a,b) => b.totalPaid - a.totalPaid));
+  }
+
+  if (path.startsWith("/accounts/ledgers/")) {
+    const userId = path.split("/").pop();
+    const member = getUser(userId);
+    const entries = payments.filter(item => item.userId === userId).map(enrichPayment).sort((a,b) => b.paymentDate.localeCompare(a.paymentDate));
+    return wait({ user: member, entries, totalPaid: entries.reduce((sum,item) => sum + Number(item.amount || 0), 0), paymentCount: entries.length });
   }
 
   if (path === "/accounts/payments/me") {

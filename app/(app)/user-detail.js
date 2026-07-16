@@ -10,7 +10,7 @@ import Input from "../../src/components/Input";
 import LoadingView from "../../src/components/LoadingView";
 import Screen from "../../src/components/Screen";
 import Select from "../../src/components/Select";
-import { USER_GRADES } from "../../src/constants/accounts";
+import { PAYMENT_TYPES, USER_GRADES, getOptionLabel } from "../../src/constants/accounts";
 import { ROLES } from "../../src/constants/roles";
 import {
   USER_RELATIONS,
@@ -44,6 +44,7 @@ export default function UserDetailScreen() {
   const [candidateSearch, setCandidateSearch] = useState("");
   const [selectedCandidateId, setSelectedCandidateId] = useState("");
   const [selectedRelation, setSelectedRelation] = useState("SON");
+  const [ledger, setLedger] = useState(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -53,11 +54,12 @@ export default function UserDetailScreen() {
   async function loadAll() {
     try {
       setError("");
-      const [userResult, familyResult, candidateResult] =
+      const [userResult, familyResult, candidateResult, ledgerResult] =
         await Promise.all([
           apiRequest(endpoints.userById(userId)),
           apiRequest(endpoints.familyMembers(userId)),
-          apiRequest(endpoints.familyCandidates(userId))
+          apiRequest(endpoints.familyCandidates(userId)),
+          apiRequest(endpoints.userLedger(userId))
         ]);
 
       setUser(userResult);
@@ -76,6 +78,7 @@ export default function UserDetailScreen() {
       });
       setFamilyMembers(familyResult);
       setCandidates(candidateResult);
+      setLedger(ledgerResult);
     } catch (e) {
       setError(e.message);
     }
@@ -304,6 +307,23 @@ export default function UserDetailScreen() {
       </Card>
 
       <Card>
+        <Text style={styles.sectionTitle}>Customer ledger</Text>
+        <Text style={styles.help}>Complete payment history linked to this member profile.</Text>
+        <ReadOnlyRow label="Total paid" value={new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(Number(ledger?.totalPaid || 0))} />
+        <ReadOnlyRow label="Payment entries" value={String(ledger?.paymentCount || 0)} />
+        {(ledger?.entries || []).map(item => (
+          <View key={item.id} style={styles.familyMember}>
+            <View style={styles.familyIdentity}>
+              <Text style={styles.familyName}>{getOptionLabel(PAYMENT_TYPES, item.paymentFor)}</Text>
+              <Text style={styles.familyMeta}>{item.paymentDate} · Receipt {item.receiptNumber || "Pending"}</Text>
+            </View>
+            <Text style={styles.ledgerAmount}>{new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(Number(item.amount || 0))}</Text>
+          </View>
+        ))}
+        {!ledger?.entries?.length ? <Text style={styles.help}>No payment entries found for this member.</Text> : null}
+      </Card>
+
+      <Card>
         <Text style={styles.sectionTitle}>Family members</Text>
         <Text style={styles.help}>
           Members linked to the same HOF are shown here. Relations can
@@ -505,5 +525,6 @@ const styles = StyleSheet.create({
   candidateName: {
     color: colors.text,
     fontWeight: "800"
-  }
+  },
+  ledgerAmount: { fontWeight: "800", color: colors.primary },
 });

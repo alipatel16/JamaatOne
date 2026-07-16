@@ -190,6 +190,31 @@ export const mockPayments = [
   }
 ];
 
+export const mockDaybookEntries = [
+  {
+    id: "entry-1",
+    entryType: "DEBIT",
+    category: "Jamaatkhana electricity bill",
+    amount: 4200,
+    entryDate: new Date().toISOString().slice(0, 10),
+    paymentMethod: "BANK_TRANSFER",
+    referenceNumber: "ELEC-0726",
+    notes: "Monthly electricity expense",
+    createdByName: "Aliasgar Yusuf Patel"
+  },
+  {
+    id: "entry-2",
+    entryType: "CREDIT",
+    category: "General Jamaat income",
+    amount: 10000,
+    entryDate: new Date().toISOString().slice(0, 10),
+    paymentMethod: "CASH",
+    referenceNumber: "",
+    notes: "Opening cash deposit",
+    createdByName: "Aliasgar Yusuf Patel"
+  }
+];
+
 export const prayerItems = [
   { name: "Sihori End", time: "04:49", group: "MORNING" },
   { name: "Sunrise", time: "06:04", group: "MORNING" },
