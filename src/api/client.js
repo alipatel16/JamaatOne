@@ -1,13 +1,7 @@
 import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
 import { mockApiRequest } from "./mockStore";
-
-const API_BASE_URL =
-  process.env.EXPO_PUBLIC_API_BASE_URL || "https://api.example.com/api";
-
-const MOCK_MODE =
-  String(process.env.EXPO_PUBLIC_USE_MOCK_API || "true").toLowerCase() ===
-  "true";
+import { API_CONFIG } from "./apiConfig";
 
 const TOKEN_KEY = "jamaat_access_token";
 
@@ -35,26 +29,49 @@ export async function clearToken() {
 }
 
 export async function apiRequest(path, options = {}) {
-  if (MOCK_MODE) return mockApiRequest(path, options);
+  if (API_CONFIG.useMock) {
+    return mockApiRequest(path, options);
+  }
 
   const token = await getStoredToken();
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...options,
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...options.headers,
-    },
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(
+    () => controller.abort(),
+    API_CONFIG.timeoutMs
+  );
 
-  const isJson = response.headers
-    .get("content-type")
-    ?.includes("application/json");
-  const body = isJson ? await response.json() : null;
+  try {
+    const response = await fetch(`${API_CONFIG.baseUrl}${path}`, {
+      ...options,
+      signal: controller.signal,
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...options.headers
+      }
+    });
 
-  if (!response.ok) {
-    throw new Error(body?.message || `Request failed (${response.status})`);
+    const isJson = response.headers
+      .get("content-type")
+      ?.includes("application/json");
+    const body = isJson ? await response.json() : null;
+
+    if (!response.ok) {
+      throw new Error(
+        body?.message ||
+          body?.title ||
+          `Request failed with status ${response.status}`
+      );
+    }
+
+    return body;
+  } catch (error) {
+    if (error.name === "AbortError") {
+      throw new Error("The API request timed out. Please try again.");
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
   }
-  return body;
 }

@@ -1,127 +1,55 @@
 # JamaatOne
 
-Expo React Native JavaScript frontend for Android, iOS, and web.
+Expo React Native frontend for mobile and web.
 
-## Mock mode
+## Design
 
-The included `.env` contains:
+- Light, low-glare theme
+- Responsive layouts for web and mobile
+- Mozilla Text on web through Google Fonts
+- System fallback on native until the font is bundled by the app team
+- Shared design tokens for cards, inputs, buttons, spacing, and navigation
+
+Mozilla Text is intentionally referenced remotely rather than included in this
+archive.
+
+## API modes
+
+Mock mode:
 
 ```env
 EXPO_PUBLIC_USE_MOCK_API=true
 ```
 
-Any password works:
+Backend mode:
 
-- `12345678` — Admin
-- `22345678` — Normal user
-- `32345678` — Committee member
-
-## V4 frontend flow
-
-### Namaaz
-
-The Namaaz screen displays these backend-provided values exactly:
-
-- Sihori End
-- Sunrise
-- Zawal
-- Zuhr End
-- Asr End
-- Maghrib
-- Nisf Ul Layl Start
-- Nisf Ul Layl End
-
-```text
-GET /prayer-times?latitude={latitude}&longitude={longitude}&date={YYYY-MM-DD}
+```env
+EXPO_PUBLIC_USE_MOCK_API=false
+EXPO_PUBLIC_API_BASE_URL=http://YOUR_API_HOST:5058/api
 ```
 
-### Calendar
+## Accounts updates
 
-```text
-GET /calendar?year={year}&month={month}
-GET /calendar/day?date={YYYY-MM-DD}
-```
-
-The month response supplies the Gregorian grid, Bohra/Misri Hijri month,
-Hijri day, event markers, and month navigation data. The selected-day API
-supplies announcements and prayer summary.
-
-### Users
-
-The main user list is searchable and read-only.
-
-```text
-GET /admin/users
-GET /admin/users/{userId}
-PUT /admin/users/{userId}
-```
-
-All editing happens in the user detail screen.
-
-### Family linking
-
-No standalone household creation screen is used. Family members are linked
-from a selected user's detail screen.
-
-```text
-GET    /admin/users/{userId}/family-members
-GET    /admin/users/{userId}/family-candidates?search={text}
-POST   /admin/users/{userId}/family-members
-PATCH  /admin/users/{userId}/family-members/{memberUserId}
-DELETE /admin/users/{userId}/family-members/{memberUserId}
-```
-
-POST body:
-
-```json
-{
-  "memberUserId": "user-guid",
-  "relationToHof": "SON"
-}
-```
-
-The backend should ensure one HOF per linked family and maintain family
-integrity when the HOF or relation changes.
-
-### Announcements
-
-Admin and committee members can manage up to five active dashboard
-announcements.
-
-```text
-GET    /announcements
-POST   /announcements
-PUT    /announcements/{announcementId}
-DELETE /announcements/{announcementId}
-```
-
-The backend must enforce a maximum of five active announcements per Jamaat.
-
-### FMB enrollment
-
-FMB enrollment is edited from user details:
-
-```text
-PATCH /admin/users/{userId}/fmb
-```
-
-Normal users can pause and resume their own enrolled thali using the existing
-FMB endpoints.
+- `Others` payment category
+- Madrasa fee beneficiary selection from the payer's linked family
+- Four fixed Axis Bank accounts
+- Payment recorder name, internal user ID, and ITS ID
+- Redesigned printable and downloadable PDF receipt
+- Dedicated `src/api/accountsApi.js` service
+- Existing mock support retained
 
 ## Run
 
 ```bash
 npm install
-npx expo start --offline --clear --port 8082
+npx expo start --clear
 ```
 
+## Receipt-only web printing and PDF
 
-## Responsive calendar and namaaz screens
+Web receipt printing now renders the standalone receipt HTML inside an isolated
+iframe. The application header, hamburger menu, screen controls, and bottom
+navigation are never part of the print document.
 
-The Namaaz and Calendar tabs now use responsive React Native layouts rather
-than image-like replicas.
-
-- Mobile: stacked cards, compact calendar cells, touch-friendly navigation
-- Web/tablet: wider panels, side-by-side detail views, monthly tables
-- All values remain data-driven through the API client and mock layer
-- Namaaz month view uses `/prayer-times/month`
+Web PDF download uses a dedicated A4 PDF generator based only on receipt data.
+Native Android and iOS continue to use Expo Print and Expo Sharing.

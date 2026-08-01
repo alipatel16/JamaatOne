@@ -4,6 +4,7 @@ import {
   mockPauses,
   mockPayments,
   mockDaybookEntries,
+  mockBankDeposits,
   mockUsers,
   prayerItems
 } from "./mockData";
@@ -15,6 +16,7 @@ let fmbMenus = [...mockFmbMenus];
 let pauses = [...mockPauses];
 let payments = [...mockPayments];
 let daybookEntries = [...mockDaybookEntries];
+let bankDeposits = [...mockBankDeposits];
 
 const wait = value =>
   new Promise(resolve => setTimeout(() => resolve(value), 120));
@@ -46,11 +48,25 @@ const updateUserRecord = (id, updates) => {
 
 const enrichPayment = payment => {
   const member = getUser(payment.userId);
+  const paidFor = payment.paidForUserId
+    ? getUser(payment.paidForUserId)
+    : null;
+  const recorder =
+    getUser(payment.recordedByUserId || payment.createdById) || currentUser;
+
   return {
     ...payment,
     userName: member?.name || payment.userName,
     itsId: member?.itsId || payment.itsId,
-    userGrade: member?.grade || payment.userGrade
+    userGrade: member?.grade || payment.userGrade,
+    paidForUserName: paidFor?.name || payment.paidForUserName || null,
+    paidForItsId: paidFor?.itsId || payment.paidForItsId || null,
+    recordedByUserId:
+      payment.recordedByUserId || payment.createdById || recorder?.id,
+    recordedByItsId:
+      payment.recordedByItsId || payment.createdByItsId || recorder?.itsId,
+    recordedByName:
+      payment.recordedByName || payment.createdByName || recorder?.name
   };
 };
 
@@ -325,6 +341,32 @@ export async function mockApiRequest(path, options = {}) {
     return wait({ success: true });
   }
 
+
+  if (path === "/accounts/bank-deposits" && method === "GET") {
+    return wait([...bankDeposits].sort((a, b) => b.depositDate.localeCompare(a.depositDate)));
+  }
+
+  if (path === "/accounts/bank-deposits" && method === "POST") {
+    const created = {
+      id: `deposit-${Date.now()}`,
+      ...body,
+      createdById: currentUser.id,
+      createdByItsId: currentUser.itsId,
+      createdByName: currentUser.name,
+      recordedByUserId: body.recordedByUserId || currentUser.id,
+      recordedByItsId: body.recordedByItsId || currentUser.itsId,
+      recordedByName: body.recordedByName || currentUser.name
+    };
+    bankDeposits = [created, ...bankDeposits];
+    return wait(created);
+  }
+
+  if (path.startsWith("/accounts/bank-deposits/") && method === "DELETE") {
+    const id = path.split("/").pop();
+    bankDeposits = bankDeposits.filter(item => item.id !== id);
+    return wait({ success: true });
+  }
+
   if (path === "/accounts/ledgers") {
     return wait(users.map(member => {
       const memberPayments = payments.filter(item => item.userId === member.id);
@@ -356,7 +398,12 @@ export async function mockApiRequest(path, options = {}) {
       id: `payment-${Date.now()}`,
       ...body,
       receiptNumber: `JMT-2026-${String(payments.length + 1).padStart(4, "0")}`,
-      createdByName: currentUser.name
+      createdById: currentUser.id,
+      createdByItsId: currentUser.itsId,
+      createdByName: currentUser.name,
+      recordedByUserId: body.recordedByUserId || currentUser.id,
+      recordedByItsId: body.recordedByItsId || currentUser.itsId,
+      recordedByName: body.recordedByName || currentUser.name
     });
     payments = [created, ...payments];
     return wait(created);
@@ -369,7 +416,16 @@ export async function mockApiRequest(path, options = {}) {
       ...enrichPayment(payment),
       jamaatName: "Viramgam Jamaat",
       jamaatAddress: "Viramgam, Gujarat",
-      amountInWords: `${Number(payment?.amount || 0)} rupees only`
+      amountInWords: `${Number(payment?.amount || 0)} rupees only`,
+      paidForUserName: payment?.paidForUserId
+        ? getUser(payment.paidForUserId)?.name
+        : null,
+      paidForItsId: payment?.paidForUserId
+        ? getUser(payment.paidForUserId)?.itsId
+        : null,
+      recordedByUserId: payment?.recordedByUserId || payment?.createdById,
+      recordedByItsId: payment?.recordedByItsId || payment?.createdByItsId,
+      recordedByName: payment?.recordedByName || payment?.createdByName
     });
   }
 
@@ -385,6 +441,9 @@ export async function mockApiRequest(path, options = {}) {
   }
 
   if (path.startsWith("/accounts/payments/") && method === "DELETE") {
+    if (currentUser.role !== "ADMIN") {
+      throw new Error("Only an admin can delete payment entries.");
+    }
     const id = path.split("/").pop();
     payments = payments.filter(item => item.id !== id);
     return wait({ success: true });

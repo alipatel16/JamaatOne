@@ -26,10 +26,13 @@ export const endpoints = {
   payments: "/accounts/payments",
   paymentById: id => `/accounts/payments/${id}`,
   paymentReceipt: id => `/accounts/payments/${id}/receipt`,
+  paymentFamilyMembers: id => `/accounts/payments/family-members/${id}`,
   daybook: "/accounts/daybook",
   daybookEntryById: id => `/accounts/daybook/${id}`,
   ledgers: "/accounts/ledgers",
   userLedger: id => `/accounts/ledgers/${id}`,
+  bankDeposits: "/accounts/bank-deposits",
+  bankDepositById: id => `/accounts/bank-deposits/${id}`,
 
   users: "/admin/users",
   userById: id => `/admin/users/${id}`,

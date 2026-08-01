@@ -1,9 +1,13 @@
 import React from "react";
 import { StyleSheet, View } from "react-native";
-import { colors, spacing } from "../theme";
+import { colors, radius, shadows, spacing } from "../theme";
 
-export default function Card({ children, style }) {
-  return <View style={[styles.card, style]}>{children}</View>;
+export default function Card({ children, style, elevated = true }) {
+  return (
+    <View style={[styles.card, elevated && shadows.card, style]}>
+      {children}
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
@@ -11,8 +15,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 14,
-    padding: spacing.md,
-    marginBottom: spacing.md,
-  },
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    marginBottom: spacing.md
+  }
 });

@@ -186,7 +186,12 @@ export const mockPayments = [
     referenceNumber: "UPI-DEMO-001",
     notes: "Monthly FMB payment",
     receiptNumber: "JMT-2026-0001",
-    createdByName: "Aliasgar Yusuf Patel"
+    createdById: "user-1",
+    createdByItsId: "12345678",
+    createdByName: "Aliasgar Yusuf Patel",
+    recordedByUserId: "user-1",
+    recordedByItsId: "12345678",
+    recordedByName: "Aliasgar Yusuf Patel"
   }
 ];
 
@@ -200,7 +205,12 @@ export const mockDaybookEntries = [
     paymentMethod: "BANK_TRANSFER",
     referenceNumber: "ELEC-0726",
     notes: "Monthly electricity expense",
-    createdByName: "Aliasgar Yusuf Patel"
+    createdById: "user-1",
+    createdByItsId: "12345678",
+    createdByName: "Aliasgar Yusuf Patel",
+    recordedByUserId: "user-1",
+    recordedByItsId: "12345678",
+    recordedByName: "Aliasgar Yusuf Patel"
   },
   {
     id: "entry-2",
@@ -211,7 +221,29 @@ export const mockDaybookEntries = [
     paymentMethod: "CASH",
     referenceNumber: "",
     notes: "Opening cash deposit",
-    createdByName: "Aliasgar Yusuf Patel"
+    createdById: "user-1",
+    createdByItsId: "12345678",
+    createdByName: "Aliasgar Yusuf Patel",
+    recordedByUserId: "user-1",
+    recordedByItsId: "12345678",
+    recordedByName: "Aliasgar Yusuf Patel"
+  }
+];
+
+export const mockBankDeposits = [
+  {
+    id: "deposit-1",
+    bankAccount: "AXIS_GENERAL",
+    amount: 1000,
+    depositDate: new Date().toISOString().slice(0, 10),
+    referenceNumber: "CASH-DEP-001",
+    notes: "Demo cash deposit",
+    createdById: "user-1",
+    createdByItsId: "12345678",
+    createdByName: "Aliasgar Yusuf Patel",
+    recordedByUserId: "user-1",
+    recordedByItsId: "12345678",
+    recordedByName: "Aliasgar Yusuf Patel"
   }
 ];
 
