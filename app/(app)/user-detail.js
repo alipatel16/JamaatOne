@@ -1,168 +1,183 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 
-import { apiRequest } from "../../src/api/client";
-import { endpoints } from "../../src/api/endpoints";
+import { mumineenApi } from "../../src/api/mumineenApi";
 import Button from "../../src/components/Button";
 import Card from "../../src/components/Card";
 import Input from "../../src/components/Input";
 import LoadingView from "../../src/components/LoadingView";
 import Screen from "../../src/components/Screen";
 import Select from "../../src/components/Select";
-import { PAYMENT_TYPES, USER_GRADES, getOptionLabel } from "../../src/constants/accounts";
-import { ROLES } from "../../src/constants/roles";
-import {
-  USER_RELATIONS,
-  getRelationLabel
-} from "../../src/constants/users";
 import { colors, spacing } from "../../src/theme";
 
-const ROLE_OPTIONS = [
-  { label: "Normal user", value: ROLES.USER },
-  { label: "Committee member", value: ROLES.COMMITTEE_MEMBER },
-  { label: "Admin", value: ROLES.ADMIN }
+const ACTIVE_OPTIONS = [
+  { label: "Active", value: "true" },
+  { label: "Inactive", value: "false" }
 ];
 
-const GRADE_OPTIONS = USER_GRADES.map(grade => ({
-  label: `Grade ${grade}`,
-  value: grade
-}));
-
-const FMB_OPTIONS = [
-  { label: "Taking FMB thali", value: "YES" },
-  { label: "Not taking FMB thali", value: "NO" }
+const GENDER_OPTIONS = [
+  { label: "Not specified", value: "" },
+  { label: "Male", value: "Male" },
+  { label: "Female", value: "Female" }
 ];
+
+function valueOrEmpty(value) {
+  return value == null ? "" : String(value);
+}
+
+function buildForm(mumin) {
+  return {
+    itsId: valueOrEmpty(mumin.itsId),
+    fullName: valueOrEmpty(mumin.fullName),
+    firstName: valueOrEmpty(mumin.firstName),
+    fatherName: valueOrEmpty(mumin.fatherName),
+    surname: valueOrEmpty(mumin.surname),
+    hofFmType: valueOrEmpty(mumin.hofFmType),
+    hofId: valueOrEmpty(mumin.hofId),
+    familyId: valueOrEmpty(mumin.familyId),
+    mobile: valueOrEmpty(mumin.mobile),
+    whatsAppNo: valueOrEmpty(mumin.whatsAppNo),
+    email: valueOrEmpty(mumin.email),
+    age: valueOrEmpty(mumin.age),
+    gender: valueOrEmpty(mumin.gender),
+    maritalStatus: valueOrEmpty(mumin.maritalStatus),
+    bloodGroup: valueOrEmpty(mumin.bloodGroup),
+    category: valueOrEmpty(mumin.category),
+    occupation: valueOrEmpty(mumin.occupation),
+    qualification: valueOrEmpty(mumin.qualification),
+    address: valueOrEmpty(mumin.address),
+    building: valueOrEmpty(mumin.building),
+    street: valueOrEmpty(mumin.street),
+    area: valueOrEmpty(mumin.area),
+    city: valueOrEmpty(mumin.city),
+    state: valueOrEmpty(mumin.state),
+    pincode: valueOrEmpty(mumin.pincode),
+    isActive: String(mumin.isActive !== false)
+  };
+}
+
+function toNullableNumber(value) {
+  if (value === "" || value == null) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function ReadOnlyRow({ label, value }) {
+  return (
+    <View style={styles.readOnlyRow}>
+      <Text style={styles.readOnlyLabel}>{label}</Text>
+      <Text style={styles.readOnlyValue}>{value || "-"}</Text>
+    </View>
+  );
+}
 
 export default function UserDetailScreen() {
-  const { userId } = useLocalSearchParams();
-  const [user, setUser] = useState(null);
+  const params = useLocalSearchParams();
+  const muminId = Array.isArray(params.muminId)
+    ? params.muminId[0]
+    : params.muminId;
+
+  const [mumin, setMumin] = useState(null);
   const [form, setForm] = useState(null);
   const [editing, setEditing] = useState(false);
-  const [familyMembers, setFamilyMembers] = useState([]);
-  const [candidates, setCandidates] = useState([]);
-  const [candidateSearch, setCandidateSearch] = useState("");
-  const [selectedCandidateId, setSelectedCandidateId] = useState("");
-  const [selectedRelation, setSelectedRelation] = useState("SON");
-  const [ledger, setLedger] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    loadAll();
-  }, [userId]);
+    loadMumin();
+  }, [muminId]);
 
-  async function loadAll() {
-    try {
-      setError("");
-      const [userResult, familyResult, candidateResult, ledgerResult] =
-        await Promise.all([
-          apiRequest(endpoints.userById(userId)),
-          apiRequest(endpoints.familyMembers(userId)),
-          apiRequest(endpoints.familyCandidates(userId)),
-          apiRequest(endpoints.userLedger(userId))
-        ]);
-
-      setUser(userResult);
-      setForm({
-        firstName: userResult.firstName || "",
-        middleName: userResult.middleName || "",
-        lastName: userResult.lastName || "",
-        phoneNumber: userResult.phoneNumber || "",
-        email: userResult.email || "",
-        dateOfBirth: userResult.dateOfBirth || "",
-        address: userResult.address || "",
-        role: userResult.role,
-        grade: userResult.grade,
-        relationToHof: userResult.relationToHof || "HOF",
-        takesFmb: userResult.takesFmb ? "YES" : "NO"
-      });
-      setFamilyMembers(familyResult);
-      setCandidates(candidateResult);
-      setLedger(ledgerResult);
-    } catch (e) {
-      setError(e.message);
-    }
-  }
-
-  const filteredCandidates = useMemo(() => {
-    const normalized = candidateSearch.trim().toLowerCase();
-    if (!normalized) return candidates;
-
-    return candidates.filter(candidate =>
-      [candidate.name, candidate.lastName, candidate.itsId]
-        .filter(Boolean)
-        .some(value => String(value).toLowerCase().includes(normalized))
-    );
-  }, [candidateSearch, candidates]);
-
-  async function saveUser() {
-    try {
-      setError("");
-      const updated = await apiRequest(endpoints.updateUser(userId), {
-        method: "PUT",
-        body: JSON.stringify({
-          ...form,
-          takesFmb: form.takesFmb === "YES"
-        })
-      });
-      setUser(updated);
-      setEditing(false);
-      await loadAll();
-    } catch (e) {
-      setError(e.message);
-    }
-  }
-
-  async function addFamilyMember() {
-    if (!selectedCandidateId) {
-      setError("Select a user to add as a family member.");
+  async function loadMumin() {
+    if (!muminId) {
+      setError("Mumin ID is missing.");
+      setLoading(false);
       return;
     }
 
     try {
-      await apiRequest(endpoints.addFamilyMember(userId), {
-        method: "POST",
-        body: JSON.stringify({
-          memberUserId: selectedCandidateId,
-          relationToHof: selectedRelation
-        })
-      });
-      setSelectedCandidateId("");
-      setCandidateSearch("");
-      await loadAll();
+      setError("");
+      setLoading(true);
+      const result = await mumineenApi.getById(muminId);
+      setMumin(result);
+      setForm(buildForm(result));
     } catch (e) {
       setError(e.message);
+    } finally {
+      setLoading(false);
     }
   }
 
-  async function updateRelation(memberId, relationToHof) {
+  function setField(field, value) {
+    setForm(current => ({ ...current, [field]: value }));
+  }
+
+  async function saveMumin() {
     try {
-      await apiRequest(
-        endpoints.updateFamilyRelation(userId, memberId),
+      setError("");
+      setSaving(true);
+      const payload = {
+        ...mumin,
+        ...form,
+        age: toNullableNumber(form.age),
+        isActive: form.isActive === "true"
+      };
+      const updated = await mumineenApi.update(muminId, payload);
+      setMumin(updated);
+      setForm(buildForm(updated));
+      setEditing(false);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function confirmDelete() {
+    Alert.alert(
+      "Delete Mumin",
+      `Delete ${mumin?.fullName || mumin?.itsId || "this record"}?`,
+      [
+        { text: "Cancel", style: "cancel" },
         {
-          method: "PATCH",
-          body: JSON.stringify({ relationToHof })
+          text: "Delete",
+          style: "destructive",
+          onPress: deleteMumin
         }
-      );
-      await loadAll();
-    } catch (e) {
-      setError(e.message);
-    }
+      ]
+    );
   }
 
-  async function removeFamilyMember(memberId) {
+  async function deleteMumin() {
     try {
-      await apiRequest(
-        endpoints.removeFamilyMember(userId, memberId),
-        { method: "DELETE" }
-      );
-      await loadAll();
+      setError("");
+      setDeleting(true);
+      await mumineenApi.remove(muminId);
+      router.back();
     } catch (e) {
       setError(e.message);
+    } finally {
+      setDeleting(false);
     }
   }
 
-  if (!user || !form) return <LoadingView />;
+  if (loading) return <LoadingView />;
+
+  if (!mumin || !form) {
+    return (
+      <Screen>
+        <Pressable onPress={() => router.back()}>
+          <Text style={styles.back}>‹ Back</Text>
+        </Pressable>
+        <Card>
+          <Text style={styles.error}>{error || "Mumin record not found."}</Text>
+          <Button title="Try again" variant="outline" onPress={loadMumin} />
+        </Card>
+      </Screen>
+    );
+  }
 
   return (
     <Screen>
@@ -171,18 +186,21 @@ export default function UserDetailScreen() {
           <Text style={styles.back}>‹</Text>
         </Pressable>
         <View style={styles.headerContent}>
-          <Text style={styles.title}>{user.name}</Text>
-          <Text style={styles.subtitle}>ITS ID {user.itsId}</Text>
+          <Text style={styles.title}>
+            {mumin.fullName || mumin.firstName || "Mumin details"}
+          </Text>
+          <Text style={styles.subtitle}>
+            ITS {mumin.itsId || "-"} · Mumin #{mumin.muminId}
+          </Text>
         </View>
         <Button
           title={editing ? "Cancel" : "Edit"}
+          variant={editing ? "outline" : "primary"}
+          compact
+          disabled
           onPress={() => {
-            if (editing) {
-              setEditing(false);
-              loadAll();
-            } else {
-              setEditing(true);
-            }
+            if (editing) setForm(buildForm(mumin));
+            setEditing(current => !current);
           }}
         />
       </View>
@@ -190,239 +208,239 @@ export default function UserDetailScreen() {
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
       <Card>
-        <Text style={styles.sectionTitle}>User details</Text>
-
+        <Text style={styles.sectionTitle}>Identity</Text>
         {editing ? (
           <>
             <Input
-              label="First name"
-              value={form.firstName}
-              onChangeText={firstName =>
-                setForm(current => ({ ...current, firstName }))
-              }
+              label="ITS ID"
+              value={form.itsId}
+              onChangeText={value => setField("itsId", value)}
+              keyboardType="number-pad"
             />
             <Input
-              label="Middle name"
-              value={form.middleName}
-              onChangeText={middleName =>
-                setForm(current => ({ ...current, middleName }))
-              }
+              label="Full name"
+              value={form.fullName}
+              onChangeText={value => setField("fullName", value)}
+            />
+            <Input
+              label="First name"
+              value={form.firstName}
+              onChangeText={value => setField("firstName", value)}
+            />
+            <Input
+              label="Father name"
+              value={form.fatherName}
+              onChangeText={value => setField("fatherName", value)}
             />
             <Input
               label="Surname"
-              value={form.lastName}
-              onChangeText={lastName =>
-                setForm(current => ({ ...current, lastName }))
-              }
+              value={form.surname}
+              onChangeText={value => setField("surname", value)}
             />
             <Input
-              label="Phone number"
-              value={form.phoneNumber}
-              keyboardType="phone-pad"
-              onChangeText={phoneNumber =>
-                setForm(current => ({ ...current, phoneNumber }))
-              }
+              label="HOF/FM type"
+              value={form.hofFmType}
+              onChangeText={value => setField("hofFmType", value)}
             />
             <Input
-              label="Email"
-              value={form.email}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              onChangeText={email =>
-                setForm(current => ({ ...current, email }))
-              }
+              label="HOF ITS ID"
+              value={form.hofId}
+              onChangeText={value => setField("hofId", value)}
             />
             <Input
-              label="Date of birth"
-              value={form.dateOfBirth}
-              onChangeText={dateOfBirth =>
-                setForm(current => ({ ...current, dateOfBirth }))
-              }
+              label="Family ID"
+              value={form.familyId}
+              onChangeText={value => setField("familyId", value)}
             />
-            <Input
-              label="Address"
-              value={form.address}
-              multiline
-              onChangeText={address =>
-                setForm(current => ({ ...current, address }))
-              }
-            />
-            <Select
-              label="User role"
-              value={form.role}
-              options={ROLE_OPTIONS}
-              onChange={role =>
-                setForm(current => ({ ...current, role }))
-              }
-            />
-            <Select
-              label="User grade"
-              value={form.grade}
-              options={GRADE_OPTIONS}
-              onChange={grade =>
-                setForm(current => ({ ...current, grade }))
-              }
-            />
-            <Select
-              label="Relation with HOF"
-              value={form.relationToHof}
-              options={USER_RELATIONS}
-              onChange={relationToHof =>
-                setForm(current => ({ ...current, relationToHof }))
-              }
-            />
-            <Select
-              label="FMB thali"
-              value={form.takesFmb}
-              options={FMB_OPTIONS}
-              onChange={takesFmb =>
-                setForm(current => ({ ...current, takesFmb }))
-              }
-            />
-            <Button title="Save user details" onPress={saveUser} />
           </>
         ) : (
           <>
-            <ReadOnlyRow label="Full name" value={user.name} />
-            <ReadOnlyRow label="ITS ID" value={user.itsId} />
-            <ReadOnlyRow label="Phone" value={user.phoneNumber} />
-            <ReadOnlyRow label="Email" value={user.email} />
-            <ReadOnlyRow label="Date of birth" value={user.dateOfBirth} />
-            <ReadOnlyRow label="Address" value={user.address} />
-            <ReadOnlyRow
-              label="Role"
-              value={user.role?.replaceAll("_", " ")}
-            />
-            <ReadOnlyRow label="Grade" value={user.grade} />
-            <ReadOnlyRow
-              label="Relation with HOF"
-              value={getRelationLabel(user.relationToHof)}
-            />
-            <ReadOnlyRow
-              label="FMB thali"
-              value={user.takesFmb ? "Taking thali" : "Not taking thali"}
-            />
+            <ReadOnlyRow label="Full name" value={mumin.fullName} />
+            <ReadOnlyRow label="ITS ID" value={mumin.itsId} />
+            <ReadOnlyRow label="HOF/FM type" value={mumin.hofFmType} />
+            <ReadOnlyRow label="HOF ITS ID" value={mumin.hofId} />
+            <ReadOnlyRow label="Family ID" value={mumin.familyId} />
+            <ReadOnlyRow label="Tanzeem file" value={mumin.tanzeemFileNo} />
           </>
         )}
       </Card>
 
       <Card>
-        <Text style={styles.sectionTitle}>Customer ledger</Text>
-        <Text style={styles.help}>Complete payment history linked to this member profile.</Text>
-        <ReadOnlyRow label="Total paid" value={new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(Number(ledger?.totalPaid || 0))} />
-        <ReadOnlyRow label="Payment entries" value={String(ledger?.paymentCount || 0)} />
-        {(ledger?.entries || []).map(item => (
-          <View key={item.id} style={styles.familyMember}>
-            <View style={styles.familyIdentity}>
-              <Text style={styles.familyName}>{getOptionLabel(PAYMENT_TYPES, item.paymentFor)}</Text>
-              <Text style={styles.familyMeta}>{item.paymentDate} · Receipt {item.receiptNumber || "Pending"}</Text>
-            </View>
-            <Text style={styles.ledgerAmount}>{new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(Number(item.amount || 0))}</Text>
-          </View>
-        ))}
-        {!ledger?.entries?.length ? <Text style={styles.help}>No payment entries found for this member.</Text> : null}
+        <Text style={styles.sectionTitle}>Contact and personal details</Text>
+        {editing ? (
+          <>
+            <Input
+              label="Mobile"
+              value={form.mobile}
+              onChangeText={value => setField("mobile", value)}
+              keyboardType="phone-pad"
+            />
+            <Input
+              label="WhatsApp number"
+              value={form.whatsAppNo}
+              onChangeText={value => setField("whatsAppNo", value)}
+              keyboardType="phone-pad"
+            />
+            <Input
+              label="Email"
+              value={form.email}
+              onChangeText={value => setField("email", value)}
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+            <Input
+              label="Age"
+              value={form.age}
+              onChangeText={value => setField("age", value)}
+              keyboardType="number-pad"
+            />
+            <Select
+              label="Gender"
+              value={form.gender}
+              options={GENDER_OPTIONS}
+              onChange={value => setField("gender", value)}
+            />
+            <Input
+              label="Marital status"
+              value={form.maritalStatus}
+              onChangeText={value => setField("maritalStatus", value)}
+            />
+            <Input
+              label="Blood group"
+              value={form.bloodGroup}
+              onChangeText={value => setField("bloodGroup", value)}
+            />
+            <Input
+              label="Category"
+              value={form.category}
+              onChangeText={value => setField("category", value)}
+            />
+          </>
+        ) : (
+          <>
+            <ReadOnlyRow label="Mobile" value={mumin.mobile} />
+            <ReadOnlyRow label="WhatsApp" value={mumin.whatsAppNo} />
+            <ReadOnlyRow label="Email" value={mumin.email} />
+            <ReadOnlyRow label="Age" value={valueOrEmpty(mumin.age)} />
+            <ReadOnlyRow label="Gender" value={mumin.gender} />
+            <ReadOnlyRow label="Marital status" value={mumin.maritalStatus} />
+            <ReadOnlyRow label="Blood group" value={mumin.bloodGroup} />
+            <ReadOnlyRow label="Category" value={mumin.category} />
+          </>
+        )}
       </Card>
 
       <Card>
-        <Text style={styles.sectionTitle}>Family members</Text>
-        <Text style={styles.help}>
-          Members linked to the same HOF are shown here. Relations can
-          be changed directly from this user detail screen.
-        </Text>
-
-        {familyMembers.map(member => (
-          <View key={member.id} style={styles.familyMember}>
-            <Pressable
-              style={styles.familyIdentity}
-              onPress={() =>
-                router.push({
-                  pathname: "/(app)/user-detail",
-                  params: { userId: member.id }
-                })
-              }
-            >
-              <Text style={styles.familyName}>{member.name}</Text>
-              <Text style={styles.familyMeta}>
-                ITS {member.itsId} · {member.takesFmb ? "FMB" : "No FMB"}
-              </Text>
-            </Pressable>
-
-            <View style={styles.familyRelation}>
-              <Select
-                value={member.relationToHof}
-                options={USER_RELATIONS}
-                onChange={relation =>
-                  updateRelation(member.id, relation)
-                }
-              />
-            </View>
-
-            {member.id !== user.id ? (
-              <Pressable
-                onPress={() =>
-                  Alert.alert(
-                    "Remove family link?",
-                    `${member.name} will become a separate HOF.`,
-                    [
-                      { text: "Cancel", style: "cancel" },
-                      {
-                        text: "Remove",
-                        style: "destructive",
-                        onPress: () => removeFamilyMember(member.id)
-                      }
-                    ]
-                  )
-                }
-              >
-                <Text style={styles.remove}>Remove</Text>
-              </Pressable>
-            ) : null}
-          </View>
-        ))}
-
-        <Text style={styles.subsectionTitle}>Search and add family member</Text>
-        <Input
-          label="Search existing users"
-          value={candidateSearch}
-          onChangeText={setCandidateSearch}
-          placeholder="Name, surname or ITS ID"
-        />
-
-        {filteredCandidates.slice(0, 6).map(candidate => (
-          <Pressable
-            key={candidate.id}
-            onPress={() => setSelectedCandidateId(candidate.id)}
-            style={[
-              styles.candidate,
-              selectedCandidateId === candidate.id &&
-                styles.selectedCandidate
-            ]}
-          >
-            <Text style={styles.candidateName}>{candidate.name}</Text>
-            <Text style={styles.familyMeta}>ITS {candidate.itsId}</Text>
-          </Pressable>
-        ))}
-
-        <Select
-          label="Relation with HOF"
-          value={selectedRelation}
-          options={USER_RELATIONS.filter(
-            relation => relation.value !== "HOF"
-          )}
-          onChange={setSelectedRelation}
-        />
-        <Button title="Add selected family member" onPress={addFamilyMember} />
+        <Text style={styles.sectionTitle}>Work and address</Text>
+        {editing ? (
+          <>
+            <Input
+              label="Occupation"
+              value={form.occupation}
+              onChangeText={value => setField("occupation", value)}
+            />
+            <Input
+              label="Qualification"
+              value={form.qualification}
+              onChangeText={value => setField("qualification", value)}
+            />
+            <Input
+              label="Address"
+              value={form.address}
+              multiline
+              onChangeText={value => setField("address", value)}
+            />
+            <Input
+              label="Building"
+              value={form.building}
+              onChangeText={value => setField("building", value)}
+            />
+            <Input
+              label="Street"
+              value={form.street}
+              onChangeText={value => setField("street", value)}
+            />
+            <Input
+              label="Area"
+              value={form.area}
+              onChangeText={value => setField("area", value)}
+            />
+            <Input
+              label="City"
+              value={form.city}
+              onChangeText={value => setField("city", value)}
+            />
+            <Input
+              label="State"
+              value={form.state}
+              onChangeText={value => setField("state", value)}
+            />
+            <Input
+              label="Pincode"
+              value={form.pincode}
+              onChangeText={value => setField("pincode", value)}
+              keyboardType="number-pad"
+            />
+          </>
+        ) : (
+          <>
+            <ReadOnlyRow label="Occupation" value={mumin.occupation} />
+            <ReadOnlyRow label="Qualification" value={mumin.qualification} />
+            <ReadOnlyRow label="Address" value={mumin.address} />
+            <ReadOnlyRow label="Building" value={mumin.building} />
+            <ReadOnlyRow label="Street" value={mumin.street} />
+            <ReadOnlyRow label="Area" value={mumin.area} />
+            <ReadOnlyRow label="City" value={mumin.city} />
+            <ReadOnlyRow label="State" value={mumin.state} />
+            <ReadOnlyRow label="Pincode" value={mumin.pincode} />
+          </>
+        )}
       </Card>
-    </Screen>
-  );
-}
 
-function ReadOnlyRow({ label, value }) {
-  return (
-    <View style={styles.row}>
-      <Text style={styles.rowLabel}>{label}</Text>
-      <Text style={styles.rowValue}>{value || "-"}</Text>
-    </View>
+      <Card>
+        <Text style={styles.sectionTitle}>Jamaat and record status</Text>
+        <ReadOnlyRow label="Jamaat" value={mumin.jamaatName || mumin.jamaat} />
+        <ReadOnlyRow label="Jamaat ID" value={valueOrEmpty(mumin.jamaatId)} />
+        {editing ? (
+          <Select
+            label="Record status"
+            value={form.isActive}
+            options={ACTIVE_OPTIONS}
+            onChange={value => setField("isActive", value)}
+          />
+        ) : (
+          <ReadOnlyRow
+            label="Status"
+            value={mumin.isActive ? "Active" : "Inactive"}
+          />
+        )}
+        <ReadOnlyRow
+          label="Created at"
+          value={mumin.createdAt ? new Date(mumin.createdAt).toLocaleString() : ""}
+        />
+        <ReadOnlyRow
+          label="Updated at"
+          value={mumin.updatedAt ? new Date(mumin.updatedAt).toLocaleString() : ""}
+        />
+      </Card>
+
+      {editing ? (
+        <Button
+          title="Save Mumin details"
+          loading={saving}
+          onPress={saveMumin}
+        />
+      ) : null}
+
+      <Button
+        title="Delete Mumin"
+        variant="danger"
+        loading={deleting}
+        disabled
+        style={styles.deleteButton}
+        onPress={confirmDelete}
+      />
+    </Screen>
   );
 }
 
@@ -433,8 +451,9 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg
   },
   back: {
-    fontSize: 44,
-    color: colors.primary,
+    color: colors.primaryStrong,
+    fontSize: 32,
+    fontWeight: "700",
     marginRight: spacing.sm
   },
   headerContent: {
@@ -449,82 +468,32 @@ const styles = StyleSheet.create({
     color: colors.muted,
     marginTop: 3
   },
+  sectionTitle: {
+    color: colors.text,
+    fontSize: 18,
+    fontWeight: "800",
+    marginBottom: spacing.md
+  },
+  readOnlyRow: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+    paddingVertical: spacing.sm
+  },
+  readOnlyLabel: {
+    color: colors.muted,
+    fontSize: 12,
+    fontWeight: "700"
+  },
+  readOnlyValue: {
+    color: colors.text,
+    marginTop: 4,
+    lineHeight: 20
+  },
   error: {
     color: colors.danger,
     marginBottom: spacing.md
   },
-  sectionTitle: {
-    color: colors.text,
-    fontSize: 20,
-    fontWeight: "800",
-    marginBottom: spacing.md
-  },
-  subsectionTitle: {
-    color: colors.text,
-    fontSize: 17,
-    fontWeight: "800",
-    marginTop: spacing.lg,
-    marginBottom: spacing.md
-  },
-  help: {
-    color: colors.muted,
-    lineHeight: 20,
-    marginBottom: spacing.md
-  },
-  row: {
-    flexDirection: "row",
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
-    paddingVertical: spacing.sm
-  },
-  rowLabel: {
-    width: 145,
-    color: colors.muted,
-    fontWeight: "600"
-  },
-  rowValue: {
-    flex: 1,
-    color: colors.text,
-    fontWeight: "700"
-  },
-  familyMember: {
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
-    paddingVertical: spacing.sm
-  },
-  familyIdentity: {
-    marginBottom: spacing.xs
-  },
-  familyName: {
-    color: colors.text,
-    fontWeight: "800"
-  },
-  familyMeta: {
-    color: colors.muted,
-    marginTop: 3
-  },
-  familyRelation: {
-    maxWidth: 300
-  },
-  remove: {
-    color: colors.danger,
-    fontWeight: "700",
-    marginBottom: spacing.sm
-  },
-  candidate: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 10,
-    padding: spacing.sm,
-    marginBottom: spacing.sm
-  },
-  selectedCandidate: {
-    borderColor: colors.primary,
-    backgroundColor: "#EAF2F0"
-  },
-  candidateName: {
-    color: colors.text,
-    fontWeight: "800"
-  },
-  ledgerAmount: { fontWeight: "800", color: colors.primary },
+  deleteButton: {
+    marginTop: spacing.md
+  }
 });

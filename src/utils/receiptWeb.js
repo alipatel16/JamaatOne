@@ -91,12 +91,12 @@ function createPdfDocument(receipt) {
   text(
     52,
     78,
-    receipt.jamaatName || "Dawoodi Bohra Jamat Viramgam",
+    "Dawoodi Bohra Jamaat",
     20,
     "F2",
     "1 1 1"
   );
-  text(52, 101, receipt.jamaatAddress || "Viramgam, Gujarat", 9, "F1", "0.84 0.89 0.87");
+  text(52, 101, receipt.jamaatName, 9, "F1", "0.84 0.89 0.87");
 
   rect(386, 46, 155, 67, "0.27 0.37 0.33", 9);
   text(402, 65, "RECEIPT NUMBER", 8, "F2", "0.84 0.89 0.87");

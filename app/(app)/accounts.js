@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -15,22 +14,17 @@ import { apiRequest } from "../../src/api/client";
 import { endpoints } from "../../src/api/endpoints";
 import Button from "../../src/components/Button";
 import Card from "../../src/components/Card";
+import DayBookPanel from "../../src/components/DayBookPanel";
 import Input from "../../src/components/Input";
+import PaymentPanel from "../../src/components/PaymentPanel";
+import RemoteMumineenSelect from "../../src/components/RemoteMumineenSelect";
 import Screen from "../../src/components/Screen";
 import Select from "../../src/components/Select";
-import SearchableSelect from "../../src/components/SearchableSelect";
 import {
-  DONATION_TYPES,
-  ENTRY_TYPES,
-  LAGAT_TYPES,
-  MADRASA_FEE_TYPES,
-  PAYMENT_METHODS,
-  PAYMENT_TYPES,
   BANK_ACCOUNTS,
   getOptionLabel,
-  getPaymentSubtypeOptions,
 } from "../../src/constants/accounts";
-import { ROLES, canManageJamaat } from "../../src/constants/roles";
+import { canManageJamaat, canRefundPayments } from "../../src/constants/roles";
 import { useAuth } from "../../src/context/AuthContext";
 import { colors, spacing } from "../../src/theme";
 const today = () => new Date().toISOString().slice(0, 10);
@@ -173,18 +167,6 @@ function DatePickerField({ label, value, onChange, allowClear = false }) {
   );
 }
 
-const initialPayment = {
-  userId: "",
-  paymentFor: "FMB",
-  subType: "",
-  paidForUserId: "",
-  otherDescription: "",
-  amount: "",
-  paymentDate: today(),
-  paymentMethod: "CASH",
-  referenceNumber: "",
-  notes: "",
-};
 const initialDeposit = {
   bankAccount: "AXIS_GENERAL",
   amount: "",
@@ -193,15 +175,6 @@ const initialDeposit = {
   notes: "",
 };
 
-const initialEntry = {
-  entryType: "DEBIT",
-  category: "",
-  amount: "",
-  entryDate: today(),
-  paymentMethod: "CASH",
-  referenceNumber: "",
-  notes: "",
-};
 const money = (v) =>
   new Intl.NumberFormat("en-IN", {
     style: "currency",
@@ -211,53 +184,25 @@ const money = (v) =>
 export default function AccountsScreen() {
   const { user } = useAuth();
   const manager = canManageJamaat(user?.role);
-  const admin = user?.role === ROLES.ADMIN;
+  const canRefund = canRefundPayments(user?.role);
   const [tab, setTab] = useState("STATS");
   const [summary, setSummary] = useState(null);
   const [payments, setPayments] = useState([]);
-  const [users, setUsers] = useState([]);
   const [daybook, setDaybook] = useState([]);
   const [ledgers, setLedgers] = useState([]);
   const [bankDeposits, setBankDeposits] = useState([]);
-  const [form, setForm] = useState(initialPayment);
-  const [entry, setEntry] = useState(initialEntry);
   const [deposit, setDeposit] = useState(initialDeposit);
-  const [editingId, setEditingId] = useState(null);
-  const [showForm, setShowForm] = useState(false);
-  const [showEntry, setShowEntry] = useState(false);
   const [showDeposit, setShowDeposit] = useState(false);
   const [statsRange, setStatsRange] = useState("TODAY");
   const [statsFrom, setStatsFrom] = useState(today());
   const [statsTo, setStatsTo] = useState(today());
   const [showFilters, setShowFilters] = useState(false);
   const [search, setSearch] = useState("");
+  const [paymentMuminId, setPaymentMuminId] = useState("");
+  const [paymentMumin, setPaymentMumin] = useState(null);
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [error, setError] = useState("");
-  const userOptions = useMemo(
-    () =>
-      users.map((x) => ({
-        label: `${x.name} · ITS ${x.itsId} · ${x.phoneNumber || "No phone"} · Grade ${x.grade || "-"}`,
-        value: x.id,
-        searchText: `${x.name} ${x.lastName} ${x.itsId} ${x.phoneNumber}`,
-      })),
-    [users],
-  );
-  const selectedMember = useMemo(
-    () => users.find((item) => item.id === form.userId) || null,
-    [users, form.userId],
-  );
-  const familyOptions = useMemo(() => {
-    if (!selectedMember) return [];
-    const hofId = selectedMember.hofUserId || selectedMember.id;
-    return users
-      .filter((item) => (item.hofUserId || item.id) === hofId)
-      .map((item) => ({
-        label: `${item.name} · ITS ${item.itsId} · ${item.relationToHof || "FAMILY"}`,
-        value: item.id,
-        searchText: `${item.name} ${item.lastName} ${item.itsId} ${item.phoneNumber}`,
-      }));
-  }, [selectedMember, users]);
   useEffect(() => {
     loadData();
   }, [manager]);
@@ -265,17 +210,15 @@ export default function AccountsScreen() {
     try {
       setError("");
       if (manager) {
-        const [s, p, u, d, l, bd] = await Promise.all([
+        const [s, p, d, l, bd] = await Promise.all([
           apiRequest(endpoints.accountsSummary),
           apiRequest(endpoints.payments),
-          apiRequest(endpoints.users),
           apiRequest(endpoints.daybook),
           apiRequest(endpoints.ledgers),
           apiRequest(endpoints.bankDeposits),
         ]);
         setSummary(s);
         setPayments(p);
-        setUsers(u);
         setDaybook(d);
         setLedgers(l);
         setBankDeposits(bd);
@@ -297,20 +240,6 @@ export default function AccountsScreen() {
         );
       }),
     [payments, search, fromDate, toDate],
-  );
-  const filteredEntries = useMemo(
-    () =>
-      daybook.filter((x) => {
-        const q = search.trim().toLowerCase();
-        const text =
-          `${x.category} ${x.notes} ${x.referenceNumber} ${x.entryType}`.toLowerCase();
-        return (
-          (!q || text.includes(q)) &&
-          (!fromDate || x.entryDate >= fromDate) &&
-          (!toDate || x.entryDate <= toDate)
-        );
-      }),
-    [daybook, search, fromDate, toDate],
   );
   const filteredLedgers = useMemo(
     () =>
@@ -391,82 +320,6 @@ export default function AccountsScreen() {
         .reduce((sum, item) => sum + Number(item.amount || 0), 0),
     })), [bankDeposits]);
 
-  function changePaymentFor(paymentFor) {
-    setForm((v) => ({
-      ...v,
-      paymentFor,
-      subType: "",
-      paidForUserId: paymentFor === "MADRASA_FEE" ? v.paidForUserId : "",
-      otherDescription: paymentFor === "OTHERS" ? v.otherDescription : "",
-    }));
-  }
-  async function savePayment() {
-    const subtypeOptions = getPaymentSubtypeOptions(form.paymentFor);
-    if (!form.userId) return setError("Please select a member.");
-    if (subtypeOptions.length && !form.subType)
-      return setError("Please select the payment type.");
-    if (form.paymentFor === "MADRASA_FEE" && !form.paidForUserId)
-      return setError("Please select the family member for whom the Madrasa fee is being paid.");
-    if (form.paymentFor === "OTHERS" && !form.otherDescription.trim())
-      return setError("Please describe what this payment is for.");
-    if (!form.amount || Number(form.amount) <= 0)
-      return setError("Enter a valid amount.");
-    try {
-      await apiRequest(
-        editingId ? endpoints.paymentById(editingId) : endpoints.payments,
-        {
-          method: editingId ? "PUT" : "POST",
-          body: JSON.stringify({
-            ...form,
-            amount: Number(form.amount),
-            lagatType: form.paymentFor === "LAGAT" ? form.subType : null,
-            recordedByUserId: user?.id,
-            recordedByItsId: user?.itsId,
-            recordedByName: user?.name,
-          }),
-        },
-      );
-      setForm(initialPayment);
-      setEditingId(null);
-      setShowForm(false);
-      await loadData();
-    } catch (e) {
-      setError(e.message);
-    }
-  }
-  function editPayment(x) {
-    setEditingId(x.id);
-    setForm({
-      userId: x.userId,
-      paymentFor: x.paymentFor,
-      subType: x.subType || x.lagatType || "",
-      paidForUserId: x.paidForUserId || "",
-      otherDescription: x.otherDescription || "",
-      amount: String(x.amount),
-      paymentDate: x.paymentDate,
-      paymentMethod: x.paymentMethod || "CASH",
-      referenceNumber: x.referenceNumber || "",
-      notes: x.notes || "",
-    });
-    setShowForm(true);
-  }
-  async function saveEntry() {
-    if (!entry.category.trim())
-      return setError("Enter a category or account head.");
-    if (!entry.amount || Number(entry.amount) <= 0)
-      return setError("Enter a valid amount.");
-    try {
-      await apiRequest(endpoints.daybook, {
-        method: "POST",
-        body: JSON.stringify({ ...entry, amount: Number(entry.amount) }),
-      });
-      setEntry(initialEntry);
-      setShowEntry(false);
-      await loadData();
-    } catch (e) {
-      setError(e.message);
-    }
-  }
   async function saveDeposit() {
     if (!deposit.amount || Number(deposit.amount) <= 0)
       return setError("Enter a valid deposit amount.");
@@ -485,11 +338,6 @@ export default function AccountsScreen() {
     }
   }
 
-  async function removePayment(id) {
-    await apiRequest(endpoints.paymentById(id), { method: "DELETE" });
-    await loadData();
-  }
-  const subtypeOptions = getPaymentSubtypeOptions(form.paymentFor);
   return (
     <Screen>
       <View style={styles.heading}>
@@ -508,8 +356,8 @@ export default function AccountsScreen() {
       {manager ? (
         <View style={styles.tabs}>
           {[
-            ["STATS", "Stats"],
-            ["PAYMENTS", "Payments"],
+            ["STATS", "Summary"],
+            ["PAYMENTS", "Add Payments"],
             ["DAYBOOK", "Day book"],
             ["LEDGERS", "Customer ledgers"],
             ["MANAGEMENT", "Cash management"],
@@ -520,6 +368,10 @@ export default function AccountsScreen() {
               onPress={() => {
                 setTab(v);
                 setSearch("");
+                if (v !== "PAYMENTS") {
+                  setPaymentMuminId("");
+                  setPaymentMumin(null);
+                }
               }}
             >
               <Text style={[styles.tabText, tab === v && styles.activeTabText]}>
@@ -529,90 +381,103 @@ export default function AccountsScreen() {
           ))}
         </View>
       ) : null}
-      {manager && summary && tab !== "STATS" && tab !== "MANAGEMENT" ? (
-        <View style={styles.summary}>
-          <Card style={styles.summaryCard}>
-            <Text>Total received</Text>
-            <Text style={styles.amount}>{money(summary.totalReceived)}</Text>
-          </Card>
-          <Card style={styles.summaryCard}>
-            <Text>Total expenses</Text>
-            <Text style={styles.amount}>{money(summary.totalDebit)}</Text>
-          </Card>
-          <Card style={styles.summaryCard}>
-            <Text>Cash balance</Text>
-            <Text style={styles.amount}>{money(summary.balance)}</Text>
-          </Card>
-        </View>
-      ) : null}
       {["PAYMENTS", "DAYBOOK", "LEDGERS"].includes(tab) ? (
-      <Card>
-        <Input
-          label={
-            tab === "LEDGERS"
-              ? "Search customer ledger"
-              : "Search payments / entries"
-          }
-          value={search}
-          onChangeText={setSearch}
-          placeholder={
-            tab === "LEDGERS"
-              ? "Name, ITS ID or phone"
-              : "Member, ITS ID, receipt, category or reference"
-          }
-        />
-        {tab !== "LEDGERS" ? (
-          <>
-            <Pressable
-              style={styles.filterToggle}
-              onPress={() => setShowFilters((value) => !value)}
-            >
-              <View>
-                <Text style={styles.filterToggleTitle}>Date filters</Text>
-                <Text style={styles.filterToggleSubtitle}>
-                  {fromDate || toDate
-                    ? `${fromDate || "Any date"} to ${toDate || "Any date"}`
-                    : "Filter entries by a date range"}
-                </Text>
-              </View>
-              <Text style={styles.filterChevron}>{showFilters ? "⌃" : "⌄"}</Text>
-            </Pressable>
-            {showFilters ? (
-              <View style={styles.filterPanel}>
-                <View style={styles.filterRow}>
-                  <View style={styles.filter}>
-                    <DatePickerField
-                      label="From date"
-                      value={fromDate}
-                      onChange={setFromDate}
-                      allowClear
-                    />
-                  </View>
-                  <View style={styles.filter}>
-                    <DatePickerField
-                      label="To date"
-                      value={toDate}
-                      onChange={setToDate}
-                      allowClear
-                    />
-                  </View>
+        <Card>
+          {tab === "PAYMENTS" ? (
+            <>
+              <RemoteMumineenSelect
+                label="Search payments by Mumin"
+                value={paymentMuminId}
+                initialItem={paymentMumin}
+                placeholder="Search by name, ITS ID, phone or family ID"
+                onChange={(muminId, item) => {
+                  setPaymentMuminId(muminId);
+                  setPaymentMumin(item);
+                }}
+              />
+              {paymentMuminId ? (
+                <Pressable
+                  style={styles.clearFiltersButton}
+                  onPress={() => {
+                    setPaymentMuminId("");
+                    setPaymentMumin(null);
+                  }}
+                >
+                  <Text style={styles.clearFiltersText}>Clear selected Mumin</Text>
+                </Pressable>
+              ) : null}
+            </>
+          ) : (
+            <Input
+              label={
+                tab === "LEDGERS"
+                  ? "Search customer ledger"
+                  : "Search day-book entries"
+              }
+              value={search}
+              onChangeText={setSearch}
+              placeholder={
+                tab === "LEDGERS"
+                  ? "Name, ITS ID or phone"
+                  : "Category, payment method or reference"
+              }
+            />
+          )}
+
+          {tab !== "LEDGERS" ? (
+            <>
+              <Pressable
+                style={styles.filterToggle}
+                onPress={() => setShowFilters((value) => !value)}
+              >
+                <View>
+                  <Text style={styles.filterToggleTitle}>Date filters</Text>
+                  <Text style={styles.filterToggleSubtitle}>
+                    {fromDate || toDate
+                      ? `${fromDate || "Any date"} to ${toDate || "Any date"}`
+                      : tab === "PAYMENTS"
+                        ? "Filter payment history using the Accounts API"
+                        : "Filter entries by a date range"}
+                  </Text>
                 </View>
-                {fromDate || toDate ? (
-                  <Pressable
-                    style={styles.clearFiltersButton}
-                    onPress={() => {
-                      setFromDate("");
-                      setToDate("");
-                    }}
-                  >
-                    <Text style={styles.clearFiltersText}>Clear date filters</Text>
-                  </Pressable>
-                ) : null}
-              </View>
-            ) : null}
-          </>
-        ) : null}
-      </Card>
+                <Text style={styles.filterChevron}>{showFilters ? "⌃" : "⌄"}</Text>
+              </Pressable>
+              {showFilters ? (
+                <View style={styles.filterPanel}>
+                  <View style={styles.filterRow}>
+                    <View style={styles.filter}>
+                      <DatePickerField
+                        label="From date"
+                        value={fromDate}
+                        onChange={setFromDate}
+                        allowClear
+                      />
+                    </View>
+                    <View style={styles.filter}>
+                      <DatePickerField
+                        label="To date"
+                        value={toDate}
+                        onChange={setToDate}
+                        allowClear
+                      />
+                    </View>
+                  </View>
+                  {fromDate || toDate ? (
+                    <Pressable
+                      style={styles.clearFiltersButton}
+                      onPress={() => {
+                        setFromDate("");
+                        setToDate("");
+                      }}
+                    >
+                      <Text style={styles.clearFiltersText}>Clear date filters</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+              ) : null}
+            </>
+          ) : null}
+        </Card>
       ) : null}
       {manager && tab === "STATS" ? (
         <>
@@ -656,354 +521,26 @@ export default function AccountsScreen() {
         </>
       ) : null}
       {tab === "PAYMENTS" ? (
-        <>
-          {manager ? (
-            <Button
-              title="Add payment"
-              onPress={() => {
-                setEditingId(null);
-                setForm(initialPayment);
-                setShowForm(true);
-              }}
-            />
-          ) : null}
-          {manager && showForm ? (
-            <Modal
-              visible={showForm}
-              transparent
-              animationType="slide"
-              onRequestClose={() => setShowForm(false)}
-            >
-              <KeyboardAvoidingView
-                style={styles.formModalBackdrop}
-                behavior={Platform.OS === "ios" ? "padding" : undefined}
-              >
-                <View style={styles.formModalContainer}>
-                  <View style={styles.formModalHeader}>
-                    <View style={styles.flex}>
-                      <Text style={styles.formModalTitle}>
-                        {editingId ? "Edit payment" : "Add payment"}
-                      </Text>
-                      <Text style={styles.formModalSubtitle}>
-                        Select a member and enter the payment details.
-                      </Text>
-                    </View>
-                    <Pressable
-                      style={styles.closeButton}
-                      onPress={() => setShowForm(false)}
-                    >
-                      <Text style={styles.closeButtonText}>×</Text>
-                    </Pressable>
-                  </View>
-                  <ScrollView
-                    style={styles.formModalScroll}
-                    contentContainerStyle={styles.formModalContent}
-                    keyboardShouldPersistTaps="handled"
-                  >
-                  <View style={styles.formModalCard}>
-              <Text style={styles.sectionTitle}>
-                {editingId ? "Edit payment" : "New payment"}
-              </Text>
-              <SearchableSelect
-                label="Search and select member"
-                value={form.userId}
-                options={userOptions}
-                onChange={(userId) =>
-  setForm((v) => ({ ...v, userId, paidForUserId: "" }))
-}
-              />
-              <Select
-                label="Payment for"
-                value={form.paymentFor}
-                options={PAYMENT_TYPES}
-                onChange={changePaymentFor}
-              />
-              {subtypeOptions.length ? (
-                <Select
-                  label={
-                    form.paymentFor === "DONATION_HUB"
-                      ? "Donation type"
-                      : form.paymentFor === "MADRASA_FEE"
-                        ? "Madrasa fee type"
-                        : "Lagat type"
-                  }
-                  value={form.subType}
-                  options={subtypeOptions}
-                  onChange={(subType) => setForm((v) => ({ ...v, subType }))}
-                />
-              ) : null}
-              {form.paymentFor === "MADRASA_FEE" ? (
-                <SearchableSelect
-                  label="Madrasa fee paid for"
-                  value={form.paidForUserId}
-                  options={familyOptions}
-                  onChange={(paidForUserId) =>
-                    setForm((v) => ({ ...v, paidForUserId }))
-                  }
-                  placeholder={
-                    form.userId
-                      ? "Select member from the payer's family"
-                      : "Select the payer first"
-                  }
-                />
-              ) : null}
-              {form.paymentFor === "OTHERS" ? (
-                <Input
-                  label="Payment description"
-                  value={form.otherDescription}
-                  onChangeText={(otherDescription) =>
-                    setForm((v) => ({ ...v, otherDescription }))
-                  }
-                  placeholder="Describe what this payment is for"
-                />
-              ) : null}
-              <Input
-                label="Amount"
-                value={form.amount}
-                keyboardType="decimal-pad"
-                onChangeText={(amount) => setForm((v) => ({ ...v, amount }))}
-              />
-              <DatePickerField
-                label="Payment date"
-                value={form.paymentDate}
-                onChange={(paymentDate) =>
-                  setForm((v) => ({ ...v, paymentDate }))
-                }
-              />
-              <Select
-                label="Payment method"
-                value={form.paymentMethod}
-                options={PAYMENT_METHODS}
-                onChange={(paymentMethod) =>
-                  setForm((v) => ({ ...v, paymentMethod }))
-                }
-              />
-              <Input
-                label="Reference / cheque / UPI number"
-                value={form.referenceNumber}
-                onChangeText={(referenceNumber) =>
-                  setForm((v) => ({ ...v, referenceNumber }))
-                }
-              />
-              <Input
-                label="Notes"
-                value={form.notes}
-                multiline
-                onChangeText={(notes) => setForm((v) => ({ ...v, notes }))}
-              />
-                <Button
-                  title={editingId ? "Update payment" : "Save & generate receipt"}
-                  onPress={savePayment}
-                />
-                  </View>
-                  </ScrollView>
-                </View>
-              </KeyboardAvoidingView>
-            </Modal>
-          ) : null}
-          <Text style={styles.sectionTitle}>
-            Payment history ({filteredPayments.length})
-          </Text>
-          {filteredPayments.map((x) => (
-            <Card key={x.id}>
-              <View style={styles.row}>
-                <View style={styles.flex}>
-                  <Text style={styles.paymentTitle}>
-                    {getOptionLabel(PAYMENT_TYPES, x.paymentFor)}
-                    {x.subType || x.lagatType
-                      ? ` · ${getOptionLabel(x.paymentFor === "LAGAT" ? LAGAT_TYPES : x.paymentFor === "DONATION_HUB" ? DONATION_TYPES : MADRASA_FEE_TYPES, x.subType || x.lagatType)}`
-                      : ""}
-                  </Text>
-                  {manager ? (
-                    <Text style={styles.member}>
-                      {x.userName} · ITS {x.itsId}
-                    </Text>
-                  ) : null}
-                  {x.paidForUserName ? (
-                    <Text style={styles.meta}>
-                      Madrasa fee for {x.paidForUserName}
-                      {x.paidForItsId ? ` · ITS ${x.paidForItsId}` : ""}
-                    </Text>
-                  ) : null}
-                  {x.paymentFor === "OTHERS" && x.otherDescription ? (
-                    <Text style={styles.meta}>{x.otherDescription}</Text>
-                  ) : null}
-                  <Text style={styles.meta}>
-                    {x.paymentDate} · Receipt {x.receiptNumber || "Pending"}
-                  </Text>
-                  <Text style={styles.recordedBy}>
-                    Recorded by {x.recordedByName || x.createdByName || "-"}
-                    {x.recordedByItsId || x.createdByItsId
-                      ? ` · ITS ${x.recordedByItsId || x.createdByItsId}`
-                      : ""}
-                  </Text>
-                </View>
-                <Text style={styles.paymentAmount}>{money(x.amount)}</Text>
-              </View>
-              <View style={styles.actions}>
-                <Button
-                  title="Receipt"
-                  onPress={() =>
-                    router.push({
-                      pathname: "/(app)/receipt",
-                      params: { paymentId: x.id },
-                    })
-                  }
-                />
-                {manager ? (
-                  <>
-                    <Button title="Edit" onPress={() => editPayment(x)} />
-                    {admin ? (
-                    <Button
-                      title="Delete"
-                      variant="danger"
-                      onPress={() =>
-                        Alert.alert(
-                          "Delete payment?",
-                          "This payment and receipt will be removed.",
-                          [
-                            { text: "Cancel" },
-                            {
-                              text: "Delete",
-                              style: "destructive",
-                              onPress: () => removePayment(x.id),
-                            },
-                          ],
-                        )
-                      }
-                    />
-                    ) : null}
-                  </>
-                ) : null}
-              </View>
-            </Card>
-          ))}
-        </>
+        <PaymentPanel
+          manager={manager}
+          canRefund={canRefund}
+          filters={{
+            muminId: paymentMuminId,
+            fromDate,
+            toDate
+          }}
+        />
       ) : null}
       {manager && tab === "DAYBOOK" ? (
-        <>
-          <Button
-            title="Add debit / credit entry"
-            onPress={() => {
-              setEntry(initialEntry);
-              setShowEntry(true);
-            }}
-          />
-          {showEntry ? (
-            <Modal
-              visible={showEntry}
-              transparent
-              animationType="slide"
-              onRequestClose={() => setShowEntry(false)}
-            >
-              <KeyboardAvoidingView
-                style={styles.formModalBackdrop}
-                behavior={Platform.OS === "ios" ? "padding" : undefined}
-              >
-                <View style={styles.formModalContainer}>
-                  <View style={styles.formModalHeader}>
-                    <View style={styles.flex}>
-                      <Text style={styles.formModalTitle}>Add debit / credit entry</Text>
-                      <Text style={styles.formModalSubtitle}>
-                        Record daily income or expenses in the day book.
-                      </Text>
-                    </View>
-                    <Pressable
-                      style={styles.closeButton}
-                      onPress={() => setShowEntry(false)}
-                    >
-                      <Text style={styles.closeButtonText}>×</Text>
-                    </Pressable>
-                  </View>
-                  <ScrollView
-                    style={styles.formModalScroll}
-                    contentContainerStyle={styles.formModalContent}
-                    keyboardShouldPersistTaps="handled"
-                  >
-                  <View style={styles.formModalCard}>
-              <Text style={styles.sectionTitle}>Daily account entry</Text>
-              <Select
-                label="Entry type"
-                value={entry.entryType}
-                options={ENTRY_TYPES}
-                onChange={(entryType) => setEntry((v) => ({ ...v, entryType }))}
-              />
-              <Input
-                label="Category / account head"
-                value={entry.category}
-                onChangeText={(category) =>
-                  setEntry((v) => ({ ...v, category }))
-                }
-                placeholder="Electricity, salary, donation income..."
-              />
-              <Input
-                label="Amount"
-                value={entry.amount}
-                keyboardType="decimal-pad"
-                onChangeText={(amount) => setEntry((v) => ({ ...v, amount }))}
-              />
-              <DatePickerField
-                label="Entry date"
-                value={entry.entryDate}
-                onChange={(entryDate) =>
-                  setEntry((v) => ({ ...v, entryDate }))
-                }
-              />
-              <Select
-                label="Payment method"
-                value={entry.paymentMethod}
-                options={PAYMENT_METHODS}
-                onChange={(paymentMethod) =>
-                  setEntry((v) => ({ ...v, paymentMethod }))
-                }
-              />
-              <Input
-                label="Reference number"
-                value={entry.referenceNumber}
-                onChangeText={(referenceNumber) =>
-                  setEntry((v) => ({ ...v, referenceNumber }))
-                }
-              />
-              <Input
-                label="Notes"
-                value={entry.notes}
-                multiline
-                onChangeText={(notes) => setEntry((v) => ({ ...v, notes }))}
-              />
-                <Button title="Save entry" onPress={saveEntry} />
-                  </View>
-                  </ScrollView>
-                </View>
-              </KeyboardAvoidingView>
-            </Modal>
-          ) : null}
-          <Text style={styles.sectionTitle}>
-            Day-by-day entries ({filteredEntries.length})
-          </Text>
-          {filteredEntries.map((x) => (
-            <Card key={x.id}>
-              <View style={styles.row}>
-                <View style={styles.flex}>
-                  <Text style={styles.paymentTitle}>{x.category}</Text>
-                  <Text style={styles.meta}>
-                    {x.entryDate} ·{" "}
-                    {getOptionLabel(PAYMENT_METHODS, x.paymentMethod)}
-                  </Text>
-                  <Text style={styles.meta}>{x.notes || "No notes"}</Text>
-                </View>
-                <Text
-                  style={[
-                    styles.paymentAmount,
-                    x.entryType === "DEBIT" && styles.debit,
-                  ]}
-                >
-                  {x.entryType === "DEBIT" ? "−" : "+"}
-                  {money(x.amount)}
-                </Text>
-              </View>
-            </Card>
-          ))}
-        </>
+        <DayBookPanel
+          manager={manager}
+          canDelete={canRefund}
+          filters={{
+            search,
+            fromDate,
+            toDate
+          }}
+        />
       ) : null}
       {manager && tab === "LEDGERS" ? (
         <>

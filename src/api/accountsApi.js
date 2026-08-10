@@ -1,95 +1,262 @@
-import { apiRequest } from "./client";
-import { endpoints } from "./endpoints";
+import { apiRequest, liveApiRequest } from "./client";
+import { endpoints, liveEndpoints } from "./endpoints";
 
-const json = body => ({
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify(body)
-});
+
+function normalizeDayBookPayload(payload) {
+  return {
+    entryType: payload?.entryType || null,
+    paymentFor: payload?.paymentFor || null,
+    amount: Number(payload?.amount),
+    paymentMethodId: Number(payload?.paymentMethodId),
+    paymentReferenceNo: payload?.paymentReferenceNo || null,
+    remarks: payload?.remarks || null
+  };
+}
+
+function normalizePaymentPayload(payload, includeMuminId) {
+  const fieldValues = Array.isArray(payload?.fieldValues)
+    ? payload.fieldValues
+        .filter(item => item && item.fieldId != null)
+        .map(item => ({
+          fieldId: Number(item.fieldId),
+          value: item.value == null ? null : String(item.value)
+        }))
+    : [];
+
+  return {
+    ...(includeMuminId ? { muminId: Number(payload?.muminId) } : {}),
+    categoryId: Number(payload?.categoryId),
+    subCategoryId: Number(payload?.subCategoryId || 0),
+    amount: Number(payload?.amount),
+    paymentMethodId: Number(payload?.paymentMethodId),
+    paymentReference: payload?.paymentReference || null,
+    remarks: payload?.remarks || null,
+    fieldValues
+  };
+}
 
 export const accountsApi = {
+  // Published payment configuration APIs.
+  getPaymentCategories() {
+    return liveApiRequest(liveEndpoints.accounts.paymentCategories);
+  },
+  getPaymentCategory(categoryId) {
+    return liveApiRequest(liveEndpoints.accounts.paymentCategoryById(categoryId));
+  },
+  createPaymentCategory(name) {
+    return liveApiRequest(liveEndpoints.accounts.paymentCategories, {
+      method: "POST",
+      body: { name }
+    });
+  },
+  updatePaymentCategory(categoryId, payload) {
+    return liveApiRequest(liveEndpoints.accounts.paymentCategoryById(categoryId), {
+      method: "PUT",
+      body: { name: payload.name, isActive: Boolean(payload.isActive) }
+    });
+  },
+  deletePaymentCategory(categoryId) {
+    return liveApiRequest(liveEndpoints.accounts.paymentCategoryById(categoryId), {
+      method: "DELETE"
+    });
+  },
+
+  getPaymentSubCategories() {
+    return liveApiRequest(liveEndpoints.accounts.paymentSubCategories);
+  },
+  getPaymentSubCategoriesByCategory(categoryId) {
+    return liveApiRequest(
+      liveEndpoints.accounts.paymentSubCategoriesByCategory(categoryId)
+    );
+  },
+  getPaymentSubCategory(subCategoryId) {
+    return liveApiRequest(
+      liveEndpoints.accounts.paymentSubCategoryById(subCategoryId)
+    );
+  },
+  createPaymentSubCategory(categoryId, name) {
+    return liveApiRequest(liveEndpoints.accounts.paymentSubCategories, {
+      method: "POST",
+      body: { categoryId: Number(categoryId), name }
+    });
+  },
+  updatePaymentSubCategory(subCategoryId, payload) {
+    return liveApiRequest(
+      liveEndpoints.accounts.paymentSubCategoryById(subCategoryId),
+      {
+        method: "PUT",
+        body: {
+          categoryId: Number(payload.categoryId),
+          name: payload.name,
+          isActive: Boolean(payload.isActive)
+        }
+      }
+    );
+  },
+  deletePaymentSubCategory(subCategoryId) {
+    return liveApiRequest(
+      liveEndpoints.accounts.paymentSubCategoryById(subCategoryId),
+      { method: "DELETE" }
+    );
+  },
+
+  getPaymentFields() {
+    return liveApiRequest(liveEndpoints.accounts.paymentFields);
+  },
+  getPaymentFieldsBySubCategory(subCategoryId) {
+    return liveApiRequest(
+      liveEndpoints.accounts.paymentFieldsBySubCategory(subCategoryId)
+    );
+  },
+  getPaymentField(fieldId) {
+    return liveApiRequest(liveEndpoints.accounts.paymentFieldById(fieldId));
+  },
+  createPaymentField(payload) {
+    return liveApiRequest(liveEndpoints.accounts.paymentFields, {
+      method: "POST",
+      body: {
+        subCategoryId: Number(payload.subCategoryId),
+        fieldName: payload.fieldName,
+        fieldKey: payload.fieldKey,
+        fieldType: payload.fieldType,
+        isRequired: Boolean(payload.isRequired),
+        displayOrder: Number(payload.displayOrder || 0)
+      }
+    });
+  },
+  updatePaymentField(fieldId, payload) {
+    return liveApiRequest(liveEndpoints.accounts.paymentFieldById(fieldId), {
+      method: "PUT",
+      body: {
+        subCategoryId: Number(payload.subCategoryId),
+        fieldName: payload.fieldName,
+        fieldKey: payload.fieldKey,
+        fieldType: payload.fieldType,
+        isRequired: Boolean(payload.isRequired),
+        displayOrder: Number(payload.displayOrder || 0),
+        isActive: Boolean(payload.isActive)
+      }
+    });
+  },
+  deletePaymentField(fieldId) {
+    return liveApiRequest(liveEndpoints.accounts.paymentFieldById(fieldId), {
+      method: "DELETE"
+    });
+  },
+
+  getPaymentMethods() {
+    return liveApiRequest(liveEndpoints.accounts.paymentMethods);
+  },
+  getPaymentMethod(paymentMethodId) {
+    return liveApiRequest(
+      liveEndpoints.accounts.paymentMethodById(paymentMethodId)
+    );
+  },
+  createPaymentMethod(name) {
+    return liveApiRequest(liveEndpoints.accounts.paymentMethods, {
+      method: "POST",
+      body: { name }
+    });
+  },
+  updatePaymentMethod(paymentMethodId, payload) {
+    return liveApiRequest(
+      liveEndpoints.accounts.paymentMethodById(paymentMethodId),
+      {
+        method: "PUT",
+        body: { name: payload.name, isActive: Boolean(payload.isActive) }
+      }
+    );
+  },
+  deletePaymentMethod(paymentMethodId) {
+    return liveApiRequest(
+      liveEndpoints.accounts.paymentMethodById(paymentMethodId),
+      { method: "DELETE" }
+    );
+  },
+
+  getPayments(filters = {}) {
+    return liveApiRequest(liveEndpoints.accounts.pagedPayments(filters));
+  },
+  getPayment(paymentId) {
+    return liveApiRequest(liveEndpoints.accounts.paymentById(paymentId));
+  },
+  createPayment(payload) {
+    return liveApiRequest(liveEndpoints.accounts.payments, {
+      method: "POST",
+      body: normalizePaymentPayload(payload, true)
+    });
+  },
+  updatePayment(paymentId, payload) {
+    return liveApiRequest(liveEndpoints.accounts.paymentById(paymentId), {
+      method: "PUT",
+      body: normalizePaymentPayload(payload, false)
+    });
+  },
+  refundPayment(paymentId) {
+    return liveApiRequest(liveEndpoints.accounts.refundPayment(paymentId), {
+      method: "PUT"
+    });
+  },
+  getPaymentLogs(paymentId) {
+    return liveApiRequest(liveEndpoints.accounts.paymentLogs(paymentId));
+  },
+
+  // Published Day Book APIs.
+  getDaybook(filters = {}) {
+    return liveApiRequest(liveEndpoints.accounts.pagedDaybook(filters));
+  },
+  getDaybookEntry(dayBookId) {
+    return liveApiRequest(liveEndpoints.accounts.daybookById(dayBookId));
+  },
+  createDaybookEntry(payload) {
+    return liveApiRequest(liveEndpoints.accounts.daybook, {
+      method: "POST",
+      body: normalizeDayBookPayload(payload)
+    });
+  },
+  updateDaybookEntry(dayBookId, payload) {
+    return liveApiRequest(liveEndpoints.accounts.daybookById(dayBookId), {
+      method: "PUT",
+      body: normalizeDayBookPayload(payload)
+    });
+  },
+  deleteDaybookEntry(dayBookId) {
+    return liveApiRequest(liveEndpoints.accounts.daybookById(dayBookId), {
+      method: "DELETE"
+    });
+  },
+  refundDaybookEntry(dayBookId) {
+    return liveApiRequest(liveEndpoints.accounts.refundDaybook(dayBookId), {
+      method: "PUT"
+    });
+  },
+  getDaybookLogs(dayBookId) {
+    return liveApiRequest(liveEndpoints.accounts.daybookLogs(dayBookId));
+  },
+
+  // Existing mock-backed modules kept until matching APIs are published.
   getSummary() {
     return apiRequest(endpoints.accountsSummary);
   },
-
-  getPayments() {
-    return apiRequest(endpoints.payments);
-  },
-
   getMyPayments() {
     return apiRequest(endpoints.myPayments);
   },
-
-  createPayment(payload) {
-    return apiRequest(endpoints.payments, {
-      method: "POST",
-      ...json(payload)
-    });
-  },
-
-  updatePayment(paymentId, payload) {
-    return apiRequest(endpoints.paymentById(paymentId), {
-      method: "PUT",
-      ...json(payload)
-    });
-  },
-
-  deletePayment(paymentId) {
-    return apiRequest(endpoints.paymentById(paymentId), {
-      method: "DELETE"
-    });
-  },
-
   getReceipt(paymentId) {
     return apiRequest(endpoints.paymentReceipt(paymentId));
   },
-
-  getDaybook() {
-    return apiRequest(endpoints.daybook);
-  },
-
-  createDaybookEntry(payload) {
-    return apiRequest(endpoints.daybook, {
-      method: "POST",
-      ...json(payload)
-    });
-  },
-
-  deleteDaybookEntry(entryId) {
-    return apiRequest(endpoints.daybookEntryById(entryId), {
-      method: "DELETE"
-    });
-  },
-
   getLedgers() {
     return apiRequest(endpoints.ledgers);
   },
-
   getUserLedger(userId) {
     return apiRequest(endpoints.userLedger(userId));
   },
-
   getBankDeposits() {
     return apiRequest(endpoints.bankDeposits);
   },
-
   createBankDeposit(payload) {
-    return apiRequest(endpoints.bankDeposits, {
-      method: "POST",
-      ...json(payload)
-    });
+    return apiRequest(endpoints.bankDeposits, { method: "POST", body: payload });
   },
-
   deleteBankDeposit(depositId) {
-    return apiRequest(endpoints.bankDepositById(depositId), {
-      method: "DELETE"
-    });
-  },
-
-  getUsers() {
-    return apiRequest(endpoints.users);
-  },
-
-  getFamilyMembers(userId) {
-    return apiRequest(endpoints.familyMembers(userId));
+    return apiRequest(endpoints.bankDepositById(depositId), { method: "DELETE" });
   }
 };

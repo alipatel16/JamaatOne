@@ -12,6 +12,7 @@ import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
 
 import { accountsApi } from "../../src/api/accountsApi";
+import { mumineenApi } from "../../src/api/mumineenApi";
 import Button from "../../src/components/Button";
 import Card from "../../src/components/Card";
 import LoadingView from "../../src/components/LoadingView";
@@ -23,6 +24,62 @@ import {
 } from "../../src/utils/receiptWeb";
 import { colors, radius, spacing, typography } from "../../src/theme";
 
+function formatReceiptDate(value) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return String(value);
+  return date.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric"
+  });
+}
+
+function deriveReceiptNumber(payment) {
+  const createdAt = new Date(payment?.createdAt || Date.now());
+  const year = Number.isFinite(createdAt.getTime())
+    ? createdAt.getFullYear()
+    : new Date().getFullYear();
+  return `JMT-${year}-${String(payment?.paymentId || "").padStart(4, "0")}`;
+}
+
+function findPaidForMember(fieldValues = []) {
+  return fieldValues.find(field =>
+    /(member|mumin|child|student|paid.?for)/i.test(String(field?.fieldName || ""))
+  );
+}
+
+function makeLiveReceipt(payment, mumin) {
+  const paidFor = findPaidForMember(payment?.fieldValues || []);
+  const category = [payment?.categoryName, payment?.subCategoryName]
+    .filter(Boolean)
+    .join(" · ");
+
+  return {
+    jamaatName: payment?.jamaatName || "JamaatOne",
+    jamaatAddress: "",
+    receiptNumber: deriveReceiptNumber(payment),
+    paymentDate: formatReceiptDate(payment?.createdAt),
+    paymentFor: category || "Payment",
+    amount: Number(payment?.amount || 0),
+    amountInWords: `Rupees ${Number(payment?.amount || 0).toLocaleString("en-IN", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    })} only`,
+    userName: payment?.muminName || mumin?.fullName || mumin?.firstName || "-",
+    itsId: mumin?.itsId || "-",
+    userGrade: mumin?.category || "-",
+    paidForUserName: paidFor?.value || "",
+    paidForItsId: "",
+    paymentMethod: payment?.paymentMethodName || "-",
+    referenceNumber: payment?.paymentReference || "",
+    notes: payment?.remarks || "",
+    recordedByName: payment?.updatedByName || "-",
+    recordedByItsId: payment?.updatedByItsNo || "-",
+    fieldValues: payment?.fieldValues || []
+  };
+}
+
 export default function Receipt() {
   const { paymentId } = useLocalSearchParams();
   const { width } = useWindowDimensions();
@@ -32,10 +89,29 @@ export default function Receipt() {
 
   useEffect(() => {
     if (!paymentId) return;
-    accountsApi
-      .getReceipt(paymentId)
-      .then(setReceipt)
-      .catch(result => setError(result.message));
+
+    let active = true;
+    (async () => {
+      try {
+        setError("");
+        const payment = await accountsApi.getPayment(paymentId);
+        let mumin = null;
+        if (payment?.muminId) {
+          try {
+            mumin = await mumineenApi.getById(payment.muminId);
+          } catch {
+            // Payment details remain printable even if member enrichment fails.
+          }
+        }
+        if (active) setReceipt(makeLiveReceipt(payment, mumin));
+      } catch (result) {
+        if (active) setError(result.message || "Unable to load payment receipt.");
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
   }, [paymentId]);
 
   if (!receipt && !error) return <LoadingView />;
@@ -113,9 +189,9 @@ export default function Receipt() {
             <View style={styles.brandBlock}>
               <Text style={styles.brandKicker}>JAMAATONE</Text>
               <Text style={styles.brand}>
-                {receipt.jamaatName || "Dawoodi Bohra Jamat Viramgam"}
+                {"Dawoodi Bohra Jamaat"}
               </Text>
-              <Text style={styles.muted}>{receipt.jamaatAddress}</Text>
+              <Text style={styles.muted}>{receipt.jamaatName}</Text>
             </View>
 
             <View style={styles.receiptNumberBox}>

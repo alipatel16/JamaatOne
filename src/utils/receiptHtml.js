@@ -215,8 +215,8 @@ export const receiptHtml = r => {
     <div class="header">
       <div>
         <div class="brand-kicker">OFFICIAL PAYMENT RECEIPT</div>
-        <div class="brand">${escapeHtml(r.jamaatName || "Dawoodi Bohra Jamat Viramgam")}</div>
-        <div class="address">${escapeHtml(r.jamaatAddress || "Viramgam, Gujarat")}</div>
+        <div class="brand">${escapeHtml("Dawoodi Bohra Jamaat")}</div>
+        <div class="address">${escapeHtml(r.jamaatName)}</div>
       </div>
       <div class="receipt-box">
         <div class="receipt-label">RECEIPT NUMBER</div>

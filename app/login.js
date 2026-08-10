@@ -12,6 +12,7 @@ import Card from "../src/components/Card";
 import Input from "../src/components/Input";
 import Screen from "../src/components/Screen";
 import { useAuth } from "../src/context/AuthContext";
+import { isSuperAdmin } from "../src/constants/roles";
 import {
   colors,
   radius,
@@ -38,8 +39,8 @@ export default function LoginScreen() {
     try {
       setError("");
       setLoading(true);
-      await login(itsId.trim(), password);
-      router.replace("/(app)");
+      const signedInUser = await login(itsId.trim(), password);
+      router.replace(isSuperAdmin(signedInUser) ? "/super-admin" : "/(app)");
     } catch (result) {
       setError(result.message);
     } finally {
@@ -108,7 +109,7 @@ export default function LoginScreen() {
         </View>
 
         <Text style={styles.mockHint}>
-          Mock mode supports the existing demo ITS accounts.
+          Sign-in uses the live JamaatOne API. Features without published APIs remain in demo mode.
         </Text>
       </Card>
     </Screen>

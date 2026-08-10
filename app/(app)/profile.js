@@ -7,8 +7,14 @@ import Screen from "../../src/components/Screen";
 import { useAuth } from "../../src/context/AuthContext";
 import { colors, spacing } from "../../src/theme";
 
+function formatExpiry(value) {
+  if (!value) return "Not provided";
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) ? date.toLocaleString() : String(value);
+}
+
 export default function ProfileScreen() {
-  const { user, logout } = useAuth();
+  const { user, session, logout } = useAuth();
 
   async function handleLogout() {
     await logout();
@@ -22,7 +28,25 @@ export default function ProfileScreen() {
         <Text style={styles.name}>{user?.name}</Text>
         <Text style={styles.meta}>ITS ID: {user?.itsId}</Text>
         <Text style={styles.meta}>Role: {user?.role}</Text>
+        <Text style={styles.meta}>Jamaat ID: {user?.jamaatId || "-"}</Text>
       </Card>
+
+      <Card>
+        <Text style={styles.sectionTitle}>Session</Text>
+        <Text style={styles.meta}>
+          Access token validity: {session?.accessTokenExpiresInMinutes ?? "-"} minutes
+        </Text>
+        <Text style={styles.meta}>
+          Access token expires: {formatExpiry(session?.accessTokenExpiresAt)}
+        </Text>
+        <Text style={styles.meta}>
+          Refresh token validity: {session?.refreshTokenExpiresInDays ?? "-"} days
+        </Text>
+        <Text style={styles.meta}>
+          Refresh token expires: {formatExpiry(session?.refreshTokenExpiresAt)}
+        </Text>
+      </Card>
+
       <Button title="Sign out" variant="danger" onPress={handleLogout} />
     </Screen>
   );
@@ -33,8 +57,14 @@ const styles = StyleSheet.create({
     fontSize: 25,
     fontWeight: "800",
     color: colors.text,
-    marginBottom: spacing.md,
+    marginBottom: spacing.md
   },
   name: { fontSize: 20, fontWeight: "800", color: colors.text },
-  meta: { color: colors.muted, marginTop: spacing.xs },
+  sectionTitle: {
+    fontSize: 17,
+    fontWeight: "800",
+    color: colors.text,
+    marginBottom: spacing.xs
+  },
+  meta: { color: colors.muted, marginTop: spacing.xs }
 });

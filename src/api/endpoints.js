@@ -1,7 +1,155 @@
-export const endpoints = {
-  login: "/auth/its-login",
-  me: "/auth/me",
+export const liveEndpoints = {
+  auth: {
+    login: "/api/Auth/login",
+    createUser: "/api/Auth/create-user",
+    createAamil: "/api/Auth/create-aamil",
+    refreshToken: "/api/Auth/refresh-token",
+    roles: "/api/Auth/roles",
+    logout: "/api/Auth/logout"
+  },
 
+  jamiat: {
+    root: "/api/Jamiat",
+    byId: jamiatId => `/api/Jamiat/${jamiatId}`
+  },
+
+  jamaat: {
+    root: "/api/Jamaat",
+    byId: jamaatId => `/api/Jamaat/${jamaatId}`,
+    byJamiat: jamiatId => `/api/Jamaat/by-jamiat/${jamiatId}`
+  },
+
+  mumineen: {
+    root: "/api/Mumineen",
+    byId: muminId => `/api/Mumineen/${muminId}`,
+    byHof: hofId => `/api/Mumineen/hof/${encodeURIComponent(hofId)}`,
+    paged: (pageNumber = 1, pageSize = 20, search = "") => {
+      const params = new URLSearchParams({
+        pageNumber: String(pageNumber),
+        pageSize: String(pageSize)
+      });
+      if (String(search || "").trim()) params.set("search", String(search).trim());
+      return `/api/Mumineen?${params.toString()}`;
+    }
+  },
+
+  logs: {
+    root: "/api/Logs",
+    paged: ({
+      pageNumber = 1,
+      pageSize = 20,
+      userId,
+      isSuccess,
+      method,
+      search,
+      fromDate,
+      toDate
+    } = {}) => {
+      const params = new URLSearchParams({
+        pageNumber: String(pageNumber),
+        pageSize: String(pageSize)
+      });
+      const optional = { userId, isSuccess, method, search, fromDate, toDate };
+      Object.entries(optional).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== "") {
+          params.set(key, String(value));
+        }
+      });
+      return `/api/Logs?${params.toString()}`;
+    }
+  },
+
+  accounts: {
+    paymentCategories: "/api/Accounts/payment-categories",
+    paymentCategoryById: categoryId =>
+      `/api/Accounts/payment-categories/${categoryId}`,
+    paymentSubCategories: "/api/Accounts/payment-sub-categories",
+    paymentSubCategoriesByCategory: categoryId =>
+      `/api/Accounts/payment-categories/${categoryId}/sub-categories`,
+    paymentSubCategoryById: subCategoryId =>
+      `/api/Accounts/payment-sub-categories/${subCategoryId}`,
+    paymentFields: "/api/Accounts/payment-fields",
+    paymentFieldsBySubCategory: subCategoryId =>
+      `/api/Accounts/payment-sub-categories/${subCategoryId}/fields`,
+    paymentFieldById: fieldId => `/api/Accounts/payment-fields/${fieldId}`,
+    paymentMethods: "/api/Accounts/payment-methods",
+    paymentMethodById: paymentMethodId =>
+      `/api/Accounts/payment-methods/${paymentMethodId}`,
+    payments: "/api/Accounts/payments",
+    paymentById: paymentId => `/api/Accounts/payments/${paymentId}`,
+    refundPayment: paymentId => `/api/Accounts/payments/${paymentId}/refund`,
+    paymentLogs: paymentId => `/api/Accounts/payments/${paymentId}/logs`,
+
+    daybook: "/api/Accounts/daybook",
+    daybookById: dayBookId => `/api/Accounts/daybook/${dayBookId}`,
+    refundDaybook: dayBookId => `/api/Accounts/daybook/${dayBookId}/refund`,
+    daybookLogs: dayBookId => `/api/Accounts/daybook/${dayBookId}/logs`,
+    pagedDaybook: ({
+      pageNumber = 1,
+      pageSize = 20,
+      jamaatId,
+      entryType,
+      paymentMethodId,
+      fromDate,
+      toDate
+    } = {}) => {
+      const params = new URLSearchParams({
+        pageNumber: String(pageNumber),
+        pageSize: String(pageSize)
+      });
+      const optional = {
+        jamaatId,
+        entryType,
+        paymentMethodId,
+        fromDate,
+        toDate
+      };
+      Object.entries(optional).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== "") {
+          params.set(key, String(value));
+        }
+      });
+      return `/api/Accounts/daybook?${params.toString()}`;
+    },
+
+    pagedPayments: ({
+      pageNumber = 1,
+      pageSize = 20,
+      jamaatId,
+      muminId,
+      categoryId,
+      subCategoryId,
+      paymentMethodId,
+      status,
+      fromDate,
+      toDate
+    } = {}) => {
+      const params = new URLSearchParams({
+        pageNumber: String(pageNumber),
+        pageSize: String(pageSize)
+      });
+      const optional = {
+        jamaatId,
+        muminId,
+        categoryId,
+        subCategoryId,
+        paymentMethodId,
+        status,
+        fromDate,
+        toDate
+      };
+      Object.entries(optional).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== "") {
+          params.set(key, String(value));
+        }
+      });
+      return `/api/Accounts/payments?${params.toString()}`;
+    }
+  }
+};
+
+// These endpoints remain mock-backed until matching APIs are published.
+export const endpoints = {
   dashboard: "/dashboard",
 
   announcements: "/announcements",
@@ -48,3 +196,6 @@ export const endpoints = {
   removeFamilyMember: (id, memberId) =>
     `/admin/users/${id}/family-members/${memberId}`
 };
+
+export const isPublishedApiPath = path =>
+  typeof path === "string" && path.startsWith("/api/");

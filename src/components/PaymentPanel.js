@@ -1,0 +1,1372 @@
+import React, { useEffect, useMemo, useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View
+} from "react-native";
+import { router } from "expo-router";
+
+import { accountsApi } from "../api/accountsApi";
+import { mumineenApi } from "../api/mumineenApi";
+import { colors, radius, spacing } from "../theme";
+import Button from "./Button";
+import Card from "./Card";
+import Input from "./Input";
+import RemoteMumineenSelect from "./RemoteMumineenSelect";
+import Select from "./Select";
+
+const PAGE_SIZE = 20;
+const MONTHS = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December"
+];
+
+const EMPTY_FORM = {
+  muminId: "",
+  categoryId: "",
+  subCategoryId: "",
+  amount: "",
+  paymentMethodId: "",
+  paymentReference: "",
+  remarks: "",
+  fieldValues: {}
+};
+
+const money = value =>
+  new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 2
+  }).format(Number(value || 0));
+
+function formatDateTime(value) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return String(value);
+  return date.toLocaleString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
+
+function normalizeFieldType(field) {
+  return String(field?.fieldType || "TEXT")
+    .trim()
+    .toUpperCase()
+    .replace(/[\s-]+/g, "_");
+}
+
+function isMemberField(field) {
+  const type = normalizeFieldType(field);
+  if (
+    ["MEMBER", "MUMIN", "MUMINEEN", "FAMILY", "FAMILY_MEMBER", "FAMILYMEMBER"].includes(type)
+  ) {
+    return true;
+  }
+
+  // The API currently defines fieldType but does not expose a separate option-source
+  // schema for arbitrary dropdowns. A dropdown whose field name/key clearly means
+  // family/member is therefore resolved through the Mumineen HOF endpoint.
+  if (!["DROPDOWN", "SELECT"].includes(type)) return false;
+  const semantic = `${field?.fieldKey || ""} ${field?.fieldName || ""}`.toLowerCase();
+  return /(member|mumin|paid.?for|family|student|child)/.test(semantic);
+}
+
+function hasMemberField(fields) {
+  return (fields || []).some(isMemberField);
+}
+
+function MonthPickerField({ label, value, onChange, required }) {
+  const [visible, setVisible] = useState(false);
+  const parsedYear = Number(String(value || "").split("-")[0]);
+  const [year, setYear] = useState(
+    Number.isInteger(parsedYear) && parsedYear > 1900
+      ? parsedYear
+      : new Date().getFullYear()
+  );
+
+  useEffect(() => {
+    const next = Number(String(value || "").split("-")[0]);
+    if (Number.isInteger(next) && next > 1900) setYear(next);
+  }, [value]);
+
+  const displayValue = useMemo(() => {
+    if (!value) return "";
+    const [selectedYear, selectedMonth] = String(value).split("-");
+    const monthIndex = Number(selectedMonth) - 1;
+    if (!selectedYear || monthIndex < 0 || monthIndex > 11) return value;
+    return `${MONTHS[monthIndex]} ${selectedYear}`;
+  }, [value]);
+
+  return (
+    <View style={styles.fieldBlock}>
+      <Text style={styles.label}>
+        {label}
+        {required ? " *" : ""}
+      </Text>
+      <Pressable style={styles.selectLike} onPress={() => setVisible(true)}>
+        <Text style={value ? styles.valueText : styles.placeholderText}>
+          {displayValue || "Select month"}
+        </Text>
+        <Text>⌄</Text>
+      </Pressable>
+
+      <Modal
+        visible={visible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setVisible(false)}
+      >
+        <Pressable style={styles.backdrop} onPress={() => setVisible(false)}>
+          <Pressable style={styles.monthSheet} onPress={() => {}}>
+            <View style={styles.monthHeader}>
+              <Pressable
+                onPress={() => setYear(current => current - 1)}
+                style={styles.monthNav}
+              >
+                <Text style={styles.monthNavText}>‹</Text>
+              </Pressable>
+              <Text style={styles.monthYear}>{year}</Text>
+              <Pressable
+                onPress={() => setYear(current => current + 1)}
+                style={styles.monthNav}
+              >
+                <Text style={styles.monthNavText}>›</Text>
+              </Pressable>
+            </View>
+            <View style={styles.monthGrid}>
+              {MONTHS.map((month, index) => {
+                const monthValue = `${year}-${String(index + 1).padStart(2, "0")}`;
+                const selected = monthValue === value;
+                return (
+                  <Pressable
+                    key={month}
+                    style={[styles.monthCell, selected && styles.monthCellSelected]}
+                    onPress={() => {
+                      onChange(monthValue);
+                      setVisible(false);
+                    }}
+                  >
+                    <Text
+                      style={[
+                        styles.monthCellText,
+                        selected && styles.monthCellTextSelected
+                      ]}
+                    >
+                      {month.slice(0, 3)}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+    </View>
+  );
+}
+
+function DynamicFields({ fields, values, onChange, payer, family, familyLoading }) {
+  const familyOptions = useMemo(
+    () =>
+      (family || []).map(item => {
+        const memberName =
+          item.fullName ||
+          [item.firstName, item.fatherName, item.surname].filter(Boolean).join(" ") ||
+          "Unnamed";
+        return {
+          label: `${memberName} · ITS ${item.itsId || "-"}`,
+          // Dynamic payment field values are strings. For Madrasa/family-member
+          // fields the backend should receive the selected person's NAME, while
+          // the top-level muminId remains the payer selected above.
+          value: memberName
+        };
+      }),
+    [family]
+  );
+
+  if (!fields.length) return null;
+
+  return (
+    <View style={styles.dynamicSection}>
+      <Text style={styles.dynamicTitle}>Additional payment details</Text>
+      {fields.map(field => {
+        const id = String(field.fieldId);
+        const type = normalizeFieldType(field);
+        const value = values[id] || "";
+        const label = field.fieldName || field.fieldKey || `Field ${field.fieldId}`;
+
+        if (isMemberField(field)) {
+          return (
+            <View key={id}>
+              <Select
+                label={`${label}${field.isRequired ? " *" : ""}`}
+                value={value}
+                options={familyOptions}
+                onChange={next => onChange(id, next)}
+                placeholder={
+                  !payer
+                    ? "Select payer first"
+                    : familyLoading
+                      ? "Loading family members..."
+                      : familyOptions.length
+                        ? "Select family member"
+                        : "No family members found"
+                }
+              />
+              {!payer ? (
+                <Text style={styles.helper}>
+                  Select the payer first. The family list is loaded using that Mumin's HOF ID.
+                </Text>
+              ) : null}
+            </View>
+          );
+        }
+
+        if (["MONTH", "MONTH_PICKER", "MONTHPICKER"].includes(type)) {
+          return (
+            <MonthPickerField
+              key={id}
+              label={label}
+              required={field.isRequired}
+              value={value}
+              onChange={next => onChange(id, next)}
+            />
+          );
+        }
+
+        if (["BOOLEAN", "CHECKBOX", "YES_NO", "YESNO"].includes(type)) {
+          return (
+            <Select
+              key={id}
+              label={`${label}${field.isRequired ? " *" : ""}`}
+              value={value}
+              options={[
+                { label: "Yes", value: "true" },
+                { label: "No", value: "false" }
+              ]}
+              onChange={next => onChange(id, next)}
+              placeholder="Select"
+            />
+          );
+        }
+
+        return (
+          <View key={id}>
+            <Input
+              label={`${label}${field.isRequired ? " *" : ""}`}
+              value={value}
+              multiline={type === "TEXTAREA" || type === "MULTILINE"}
+              keyboardType={
+                type === "NUMBER" || type === "DECIMAL" ? "decimal-pad" : "default"
+              }
+              placeholder={
+                type === "DATE"
+                  ? "YYYY-MM-DD"
+                  : type === "DROPDOWN" || type === "SELECT"
+                    ? "Enter value"
+                    : "Enter value"
+              }
+              onChangeText={next => onChange(id, next)}
+            />
+            {(type === "DROPDOWN" || type === "SELECT") && !isMemberField(field) ? (
+              <Text style={styles.helper}>
+                This field is configured as a dropdown, but the current API does not expose dropdown option values. It is rendered as a text value until an option-source API is available.
+              </Text>
+            ) : null}
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+function paymentFilterDate(value, endOfDay = false) {
+  if (!value) return undefined;
+  return `${value}T${endOfDay ? "23:59:59.999" : "00:00:00"}`;
+}
+
+export default function PaymentPanel({ manager, canRefund = false, filters = {} }) {
+  const [categories, setCategories] = useState([]);
+  const [subCategories, setSubCategories] = useState([]);
+  const [fields, setFields] = useState([]);
+  const [methods, setMethods] = useState([]);
+  const [payments, setPayments] = useState([]);
+  const [pageNumber, setPageNumber] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [configurationLoading, setConfigurationLoading] = useState(false);
+  const [subCategoriesLoading, setSubCategoriesLoading] = useState(false);
+  const [fieldsLoading, setFieldsLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [form, setForm] = useState(EMPTY_FORM);
+  const [selectedPayer, setSelectedPayer] = useState(null);
+  const [family, setFamily] = useState([]);
+  const [familyLoading, setFamilyLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const [detail, setDetail] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [logs, setLogs] = useState(null);
+  const [logsLoading, setLogsLoading] = useState(false);
+
+  const categoryOptions = useMemo(
+    () =>
+      categories
+        .filter(item => item.isActive !== false)
+        .map(item => ({
+          label: item.categoryName || `Category ${item.categoryId}`,
+          value: String(item.categoryId)
+        })),
+    [categories]
+  );
+
+  const subCategoryOptions = useMemo(
+    () =>
+      subCategories
+        .filter(item => item.isActive !== false)
+        .map(item => ({
+          label: item.subCategoryName || `Subcategory ${item.subCategoryId}`,
+          value: String(item.subCategoryId)
+        })),
+    [subCategories]
+  );
+
+  const methodOptions = useMemo(
+    () =>
+      methods
+        .filter(item => item.isActive !== false)
+        .map(item => ({
+          label: item.paymentMethodName || `Method ${item.paymentMethodId}`,
+          value: String(item.paymentMethodId)
+        })),
+    [methods]
+  );
+
+  useEffect(() => {
+    setPageNumber(1);
+    loadPayments(1);
+  }, [filters.muminId, filters.fromDate, filters.toDate]);
+
+  useEffect(() => {
+    if (pageNumber !== 1) loadPayments(pageNumber);
+  }, [pageNumber]);
+
+  async function loadPaymentConfiguration() {
+    try {
+      setConfigurationLoading(true);
+      setError("");
+      const [categoryData, methodData] = await Promise.all([
+        accountsApi.getPaymentCategories(),
+        accountsApi.getPaymentMethods()
+      ]);
+      setCategories(Array.isArray(categoryData) ? categoryData : []);
+      setMethods(Array.isArray(methodData) ? methodData : []);
+      return {
+        categories: Array.isArray(categoryData) ? categoryData : [],
+        methods: Array.isArray(methodData) ? methodData : []
+      };
+    } catch (requestError) {
+      setError(requestError.message || "Unable to load payment configuration.");
+      throw requestError;
+    } finally {
+      setConfigurationLoading(false);
+    }
+  }
+
+  async function loadPayments(page = 1) {
+    try {
+      setLoading(true);
+      setError("");
+      const result = await accountsApi.getPayments({
+        pageNumber: page,
+        pageSize: PAGE_SIZE,
+        muminId: filters.muminId ? Number(filters.muminId) : undefined,
+        fromDate: paymentFilterDate(filters.fromDate),
+        toDate: paymentFilterDate(filters.toDate, true)
+      });
+      setPayments(Array.isArray(result?.items) ? result.items : []);
+      setTotalCount(Number(result?.totalCount || 0));
+      setTotalPages(Math.max(1, Number(result?.totalPages || 1)));
+    } catch (requestError) {
+      setPayments([]);
+      setError(requestError.message || "Unable to load payment history.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function loadSubCategories(categoryId) {
+    if (!categoryId) {
+      setSubCategories([]);
+      setFields([]);
+      return [];
+    }
+
+    try {
+      setSubCategoriesLoading(true);
+      const result = await accountsApi.getPaymentSubCategoriesByCategory(
+        Number(categoryId)
+      );
+      const active = (Array.isArray(result) ? result : []).filter(
+        item => item.isActive !== false
+      );
+      setSubCategories(active);
+      return active;
+    } finally {
+      setSubCategoriesLoading(false);
+    }
+  }
+
+  async function loadFields(subCategoryId, payer = selectedPayer) {
+    if (!subCategoryId) {
+      setFields([]);
+      setFamily([]);
+      return [];
+    }
+
+    try {
+      setFieldsLoading(true);
+      const result = await accountsApi.getPaymentFieldsBySubCategory(
+        Number(subCategoryId)
+      );
+      const active = (Array.isArray(result) ? result : [])
+        .filter(item => item.isActive !== false)
+        .sort(
+          (a, b) => Number(a.displayOrder || 0) - Number(b.displayOrder || 0)
+        );
+      setFields(active);
+
+      if (payer && hasMemberField(active)) {
+        await loadFamily(payer);
+      } else {
+        setFamily([]);
+      }
+
+      return active;
+    } finally {
+      setFieldsLoading(false);
+    }
+  }
+
+  async function loadFamily(payer) {
+    if (!payer) {
+      setFamily([]);
+      return;
+    }
+
+    const hofId = payer.hofId || payer.itsId;
+    if (!hofId) {
+      setFamily([payer]);
+      return;
+    }
+
+    try {
+      setFamilyLoading(true);
+      const result = await mumineenApi.getByHof(hofId);
+      const members = Array.isArray(result) ? result : [];
+      setFamily(members.length ? members : [payer]);
+    } catch {
+      setFamily([payer]);
+    } finally {
+      setFamilyLoading(false);
+    }
+  }
+
+  function resetForm() {
+    setEditingId(null);
+    setForm(EMPTY_FORM);
+    setSelectedPayer(null);
+    setSubCategories([]);
+    setFields([]);
+    setFamily([]);
+    setError("");
+  }
+
+  async function openCreate() {
+    resetForm();
+    setShowForm(true);
+    try {
+      // Refresh category + method configuration every time the dialog opens so
+      // Super Admin changes are reflected immediately without restarting app.
+      await loadPaymentConfiguration();
+    } catch {
+      // The dialog remains open and surfaces the API error for retry/visibility.
+    }
+  }
+
+  async function changeCategory(categoryId) {
+    setForm(current => ({
+      ...current,
+      categoryId,
+      subCategoryId: "",
+      fieldValues: {}
+    }));
+    setFields([]);
+    setFamily([]);
+
+    try {
+      await loadSubCategories(categoryId);
+    } catch (requestError) {
+      setError(requestError.message || "Unable to load payment subcategories.");
+    }
+  }
+
+  async function changeSubCategory(subCategoryId) {
+    setForm(current => ({
+      ...current,
+      subCategoryId,
+      fieldValues: {}
+    }));
+
+    try {
+      await loadFields(subCategoryId);
+    } catch (requestError) {
+      setError(requestError.message || "Unable to load payment fields.");
+    }
+  }
+
+  function changeFieldValue(fieldId, value) {
+    setForm(current => ({
+      ...current,
+      fieldValues: {
+        ...current.fieldValues,
+        [String(fieldId)]: value
+      }
+    }));
+  }
+
+  async function handlePayerChange(muminId, item) {
+    setSelectedPayer(item);
+    setForm(current => ({
+      ...current,
+      muminId,
+      fieldValues: {}
+    }));
+
+    // Only call GET /Mumineen/hof/{hofId} when the selected subcategory has a
+    // family/member field. Categories that do not need family data avoid that call.
+    if (hasMemberField(fields)) {
+      await loadFamily(item);
+    } else {
+      setFamily([]);
+    }
+  }
+
+  function validateForm() {
+    if (!form.muminId) return "Please search and select the Mumin making the payment.";
+    if (!form.categoryId) return "Please select a payment category.";
+    if (subCategories.length > 0 && !form.subCategoryId) {
+      return "Please select a payment subcategory.";
+    }
+    if (!form.amount || Number(form.amount) <= 0) return "Enter a valid payment amount.";
+    if (!form.paymentMethodId) return "Please select a payment method.";
+
+    const missing = fields.find(
+      field =>
+        field.isRequired &&
+        !String(form.fieldValues[String(field.fieldId)] || "").trim()
+    );
+    if (missing) return `${missing.fieldName || "Required field"} is required.`;
+    return "";
+  }
+
+  function buildPayload() {
+    const fieldValues = fields
+      .map(field => ({
+        fieldId: Number(field.fieldId),
+        value: String(form.fieldValues[String(field.fieldId)] || "").trim()
+      }))
+      .filter(item => item.value !== "");
+
+    return {
+      ...(editingId ? {} : { muminId: Number(form.muminId) }),
+      categoryId: Number(form.categoryId),
+      // Swagger models subCategoryId as int32. When Super Admin has configured no
+      // subcategory for a category, 0 is sent and no field API is called.
+      subCategoryId: Number(form.subCategoryId || 0),
+      amount: Number(form.amount),
+      paymentMethodId: Number(form.paymentMethodId),
+      paymentReference: form.paymentReference.trim() || null,
+      remarks: form.remarks.trim() || null,
+      fieldValues
+    };
+  }
+
+  async function savePayment() {
+    const validation = validateForm();
+    if (validation) {
+      setError(validation);
+      return;
+    }
+
+    try {
+      setSaving(true);
+      setError("");
+      const payload = buildPayload();
+      if (editingId) {
+        await accountsApi.updatePayment(editingId, payload);
+      } else {
+        await accountsApi.createPayment(payload);
+      }
+      setShowForm(false);
+      resetForm();
+      if (pageNumber === 1) await loadPayments(1);
+      else setPageNumber(1);
+    } catch (requestError) {
+      setError(requestError.message || "Unable to save payment.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function openDetail(paymentId) {
+    try {
+      setDetailLoading(true);
+      setError("");
+      setDetail(await accountsApi.getPayment(paymentId));
+    } catch (requestError) {
+      setError(requestError.message || "Unable to load payment details.");
+    } finally {
+      setDetailLoading(false);
+    }
+  }
+
+  async function editPayment(paymentId) {
+    try {
+      setDetailLoading(true);
+      setError("");
+      await loadPaymentConfiguration();
+
+      const item = await accountsApi.getPayment(paymentId);
+      const payer = await mumineenApi.getById(item.muminId);
+      const loadedSubCategories = await loadSubCategories(item.categoryId);
+
+      const hasSavedSubCategory = Number(item.subCategoryId || 0) > 0;
+      const loadedFields = hasSavedSubCategory
+        ? await loadFields(item.subCategoryId, payer)
+        : [];
+
+      const savedValues = {};
+      (item.fieldValues || []).forEach(field => {
+        savedValues[String(field.fieldId)] = field.value || "";
+      });
+      loadedFields.forEach(field => {
+        if (!Object.prototype.hasOwnProperty.call(savedValues, String(field.fieldId))) {
+          savedValues[String(field.fieldId)] = "";
+        }
+      });
+
+      setSelectedPayer(payer);
+      setEditingId(item.paymentId);
+      setForm({
+        muminId: String(item.muminId),
+        categoryId: String(item.categoryId),
+        subCategoryId:
+          hasSavedSubCategory &&
+          loadedSubCategories.some(
+            sub => String(sub.subCategoryId) === String(item.subCategoryId)
+          )
+            ? String(item.subCategoryId)
+            : "",
+        amount: String(item.amount ?? ""),
+        paymentMethodId: String(item.paymentMethodId),
+        paymentReference: item.paymentReference || "",
+        remarks: item.remarks || "",
+        fieldValues: savedValues
+      });
+      setShowForm(true);
+    } catch (requestError) {
+      setError(requestError.message || "Unable to edit payment.");
+    } finally {
+      setDetailLoading(false);
+    }
+  }
+
+  async function openLogs(paymentId) {
+    try {
+      setLogsLoading(true);
+      setError("");
+      const result = await accountsApi.getPaymentLogs(paymentId);
+      setLogs({
+        paymentId,
+        items: Array.isArray(result) ? result : []
+      });
+    } catch (requestError) {
+      setError(requestError.message || "Unable to load payment logs.");
+    } finally {
+      setLogsLoading(false);
+    }
+  }
+
+  async function refundPayment(item) {
+    if (!canRefund) return;
+
+    const proceed =
+      Platform.OS === "web"
+        ? globalThis.confirm?.(`Refund payment #${item.paymentId}?`) ?? false
+        : await new Promise(resolve => {
+            Alert.alert(
+              "Refund payment?",
+              "This uses the payment refund API. The payment will remain in history with its refunded status.",
+              [
+                { text: "Cancel", style: "cancel", onPress: () => resolve(false) },
+                {
+                  text: "Refund",
+                  style: "destructive",
+                  onPress: () => resolve(true)
+                }
+              ]
+            );
+          });
+
+    if (!proceed) return;
+
+    try {
+      setError("");
+      await accountsApi.refundPayment(item.paymentId);
+      await loadPayments(pageNumber);
+      if (detail?.paymentId === item.paymentId) {
+        setDetail(await accountsApi.getPayment(item.paymentId));
+      }
+    } catch (requestError) {
+      setError(requestError.message || "Unable to refund payment.");
+    }
+  }
+
+  return (
+    <View>
+      <View style={styles.panelHeader}>
+        <View style={styles.flex}>
+          <Text style={styles.title}>Payment history</Text>
+          <Text style={styles.subtitle}>
+            {totalCount} payments · live Accounts API
+          </Text>
+        </View>
+        {manager ? (
+          <Button title="Add payment" compact onPress={openCreate} />
+        ) : null}
+      </View>
+
+      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {loading ? (
+        <ActivityIndicator color={colors.primary} style={styles.loader} />
+      ) : null}
+
+      {payments.map(item => (
+        <Pressable
+          key={String(item.paymentId)}
+          onPress={() => openDetail(item.paymentId)}
+        >
+          <Card style={styles.paymentCard}>
+            <View style={styles.row}>
+              <View style={styles.flex}>
+                <Text style={styles.paymentTitle}>
+                  {item.categoryName || "Payment"}
+                  {item.subCategoryName ? ` · ${item.subCategoryName}` : ""}
+                </Text>
+                <Text style={styles.member}>
+                  {item.muminName || `Mumin ${item.muminId}`}
+                </Text>
+                <Text style={styles.meta}>
+                  {item.paymentMethodName || "-"} · {formatDateTime(item.createdAt)}
+                </Text>
+                {item.paymentReference ? (
+                  <Text style={styles.meta}>Ref: {item.paymentReference}</Text>
+                ) : null}
+                <Text style={styles.status}>{item.status || "-"}</Text>
+              </View>
+              <Text style={styles.amount}>{money(item.amount)}</Text>
+            </View>
+
+            {manager ? (
+              <View style={styles.actions}>
+                <Button
+                  title="Receipt"
+                  compact
+                  variant="outline"
+                  onPress={() =>
+                    router.push({
+                      pathname: "/(app)/receipt",
+                      params: { paymentId: String(item.paymentId) }
+                    })
+                  }
+                />
+                <Button
+                  title="Details"
+                  compact
+                  variant="outline"
+                  onPress={() => openDetail(item.paymentId)}
+                />
+                <Button
+                  title="Edit"
+                  compact
+                  variant="outline"
+                  onPress={() => editPayment(item.paymentId)}
+                />
+                <Button
+                  title="Logs"
+                  compact
+                  variant="outline"
+                  onPress={() => openLogs(item.paymentId)}
+                />
+                {canRefund && String(item.status || "").toUpperCase() !== "REFUNDED" ? (
+                  <Button
+                    title="Refund"
+                    compact
+                    variant="danger"
+                    onPress={() => refundPayment(item)}
+                  />
+                ) : null}
+              </View>
+            ) : null}
+          </Card>
+        </Pressable>
+      ))}
+
+      {!loading && !payments.length ? (
+        <Card>
+          <Text style={styles.meta}>No payments found.</Text>
+        </Card>
+      ) : null}
+
+      <View style={styles.pagination}>
+        <Button
+          title="Previous"
+          compact
+          variant="outline"
+          disabled={loading || pageNumber <= 1}
+          onPress={() => setPageNumber(page => Math.max(1, page - 1))}
+        />
+        <Text style={styles.pageText}>
+          {pageNumber} / {totalPages}
+        </Text>
+        <Button
+          title="Next"
+          compact
+          variant="outline"
+          disabled={loading || pageNumber >= totalPages}
+          onPress={() => setPageNumber(page => Math.min(totalPages, page + 1))}
+        />
+      </View>
+
+      <Modal
+        visible={showForm}
+        transparent
+        animationType="slide"
+        onRequestClose={() => !saving && setShowForm(false)}
+      >
+        <KeyboardAvoidingView
+          style={styles.backdrop}
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+        >
+          <View style={styles.formSheet}>
+            <View style={styles.modalHeader}>
+              <View style={styles.flex}>
+                <Text style={styles.modalTitle}>
+                  {editingId ? "Edit payment" : "Add payment"}
+                </Text>
+                <Text style={styles.subtitle}>
+                  Search a Mumin, then load category, subcategory and configured fields from the backend.
+                </Text>
+              </View>
+              <Pressable onPress={() => !saving && setShowForm(false)}>
+                <Text style={styles.close}>×</Text>
+              </Pressable>
+            </View>
+
+            <ScrollView
+              contentContainerStyle={styles.formContent}
+              keyboardShouldPersistTaps="handled"
+            >
+              <View style={styles.formCard}>
+                <Text style={styles.formSectionTitle}>Payment member</Text>
+                <RemoteMumineenSelect
+                  label="Search and select Mumin"
+                  value={form.muminId}
+                  initialItem={selectedPayer}
+                  disabled={Boolean(editingId)}
+                  onChange={handlePayerChange}
+                />
+
+                <Text style={styles.formSectionTitle}>Payment for</Text>
+                {configurationLoading ? (
+                  <View style={styles.inlineLoading}>
+                    <ActivityIndicator color={colors.primary} />
+                    <Text style={styles.helper}>Loading categories and payment methods...</Text>
+                  </View>
+                ) : null}
+
+                <Select
+                  label="Payment category"
+                  value={form.categoryId}
+                  options={categoryOptions}
+                  onChange={changeCategory}
+                  placeholder="Select category"
+                />
+
+                {subCategoriesLoading ? (
+                  <View style={styles.inlineLoading}>
+                    <ActivityIndicator color={colors.primary} />
+                    <Text style={styles.helper}>Loading subcategories...</Text>
+                  </View>
+                ) : null}
+
+                {form.categoryId && !subCategoriesLoading && subCategories.length > 0 ? (
+                  <Select
+                    label="Payment subcategory"
+                    value={form.subCategoryId}
+                    options={subCategoryOptions}
+                    onChange={changeSubCategory}
+                    placeholder="Select subcategory"
+                  />
+                ) : null}
+
+                {form.categoryId && !subCategoriesLoading && subCategories.length === 0 ? (
+                  <Text style={styles.infoText}>
+                    No subcategory is configured for this category. The payment can continue without additional fields.
+                  </Text>
+                ) : null}
+
+                {fieldsLoading ? (
+                  <View style={styles.inlineLoading}>
+                    <ActivityIndicator color={colors.primary} />
+                    <Text style={styles.helper}>Loading configured payment fields...</Text>
+                  </View>
+                ) : null}
+
+                {!fieldsLoading ? (
+                  <DynamicFields
+                    fields={fields}
+                    values={form.fieldValues}
+                    onChange={changeFieldValue}
+                    payer={selectedPayer}
+                    family={family}
+                    familyLoading={familyLoading}
+                  />
+                ) : null}
+
+                <Text style={styles.formSectionTitle}>Payment details</Text>
+                <Input
+                  label="Amount"
+                  value={form.amount}
+                  keyboardType="decimal-pad"
+                  onChangeText={amount =>
+                    setForm(current => ({ ...current, amount }))
+                  }
+                />
+                <Select
+                  label="Payment method"
+                  value={form.paymentMethodId}
+                  options={methodOptions}
+                  onChange={paymentMethodId =>
+                    setForm(current => ({ ...current, paymentMethodId }))
+                  }
+                  placeholder="Select payment method"
+                />
+                <Input
+                  label="Reference / cheque / UPI number"
+                  value={form.paymentReference}
+                  onChangeText={paymentReference =>
+                    setForm(current => ({ ...current, paymentReference }))
+                  }
+                />
+                <Input
+                  label="Remarks"
+                  value={form.remarks}
+                  multiline
+                  onChangeText={remarks =>
+                    setForm(current => ({ ...current, remarks }))
+                  }
+                />
+                <Button
+                  title={editingId ? "Update payment" : "Save payment"}
+                  loading={saving}
+                  disabled={
+                    configurationLoading ||
+                    subCategoriesLoading ||
+                    fieldsLoading ||
+                    familyLoading
+                  }
+                  onPress={savePayment}
+                />
+              </View>
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      <Modal
+        visible={Boolean(detail) || detailLoading}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setDetail(null)}
+      >
+        <View style={styles.backdrop}>
+          <View style={styles.detailSheet}>
+            {detailLoading ? (
+              <ActivityIndicator color={colors.primary} />
+            ) : detail ? (
+              <ScrollView>
+                <View style={styles.modalHeader}>
+                  <View style={styles.flex}>
+                    <Text style={styles.modalTitle}>
+                      Payment #{detail.paymentId}
+                    </Text>
+                    <Text style={styles.subtitle}>{detail.status || "-"}</Text>
+                  </View>
+                  <Pressable onPress={() => setDetail(null)}>
+                    <Text style={styles.close}>×</Text>
+                  </Pressable>
+                </View>
+
+                <View style={styles.detailContent}>
+                  <Text style={styles.detailLabel}>Member</Text>
+                  <Text style={styles.detailValue}>
+                    {detail.muminName || detail.muminId}
+                  </Text>
+                  <Text style={styles.detailLabel}>Payment for</Text>
+                  <Text style={styles.detailValue}>
+                    {detail.categoryName || "-"}
+                    {detail.subCategoryName ? ` · ${detail.subCategoryName}` : ""}
+                  </Text>
+                  <Text style={styles.detailLabel}>Amount</Text>
+                  <Text style={styles.detailValue}>{money(detail.amount)}</Text>
+                  <Text style={styles.detailLabel}>Payment method</Text>
+                  <Text style={styles.detailValue}>
+                    {detail.paymentMethodName || "-"}
+                  </Text>
+                  <Text style={styles.detailLabel}>Reference</Text>
+                  <Text style={styles.detailValue}>
+                    {detail.paymentReference || "-"}
+                  </Text>
+                  <Text style={styles.detailLabel}>Remarks</Text>
+                  <Text style={styles.detailValue}>{detail.remarks || "-"}</Text>
+                  <Text style={styles.detailLabel}>Created</Text>
+                  <Text style={styles.detailValue}>
+                    {formatDateTime(detail.createdAt)}
+                  </Text>
+
+                  {(detail.fieldValues || []).length ? (
+                    <View style={styles.detailFields}>
+                      <Text style={styles.dynamicTitle}>Additional details</Text>
+                      {detail.fieldValues.map((field, index) => (
+                        <View
+                          key={`${field.fieldId}-${index}`}
+                          style={styles.detailRow}
+                        >
+                          <Text style={styles.detailLabelInline}>
+                            {field.fieldName || `Field ${field.fieldId}`}
+                          </Text>
+                          <Text style={styles.detailValueInline}>
+                            {field.value || "-"}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                  ) : null}
+
+                  {manager ? (
+                    <View style={styles.detailActions}>
+                      <Button
+                        title="Edit payment"
+                        variant="outline"
+                        onPress={() => {
+                          const paymentId = detail.paymentId;
+                          setDetail(null);
+                          editPayment(paymentId);
+                        }}
+                      />
+                      <Button
+                        title="View logs"
+                        variant="outline"
+                        onPress={() => {
+                          const paymentId = detail.paymentId;
+                          setDetail(null);
+                          openLogs(paymentId);
+                        }}
+                      />
+                      {canRefund &&
+                      String(detail.status || "").toUpperCase() !== "REFUNDED" ? (
+                        <Button
+                          title="Refund payment"
+                          variant="danger"
+                          onPress={() => refundPayment(detail)}
+                        />
+                      ) : null}
+                    </View>
+                  ) : null}
+                </View>
+              </ScrollView>
+            ) : null}
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={Boolean(logs) || logsLoading}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setLogs(null)}
+      >
+        <View style={styles.backdrop}>
+          <View style={styles.detailSheet}>
+            {logsLoading ? (
+              <ActivityIndicator color={colors.primary} />
+            ) : logs ? (
+              <ScrollView>
+                <View style={styles.modalHeader}>
+                  <View style={styles.flex}>
+                    <Text style={styles.modalTitle}>Payment #{logs.paymentId} logs</Text>
+                    <Text style={styles.subtitle}>{logs.items.length} audit entries</Text>
+                  </View>
+                  <Pressable onPress={() => setLogs(null)}>
+                    <Text style={styles.close}>×</Text>
+                  </Pressable>
+                </View>
+
+                <View style={styles.detailContent}>
+                  {logs.items.map(log => (
+                    <Card key={String(log.paymentLogId)} style={styles.logCard}>
+                      <Text style={styles.paymentTitle}>{log.actionType || "Action"}</Text>
+                      <Text style={styles.meta}>
+                        {log.performedByName || `User ${log.performedBy}`} · {formatDateTime(log.performedAt)}
+                      </Text>
+                      {log.oldData ? (
+                        <>
+                          <Text style={styles.detailLabel}>Old data</Text>
+                          <Text style={styles.logData}>{log.oldData}</Text>
+                        </>
+                      ) : null}
+                      {log.newData ? (
+                        <>
+                          <Text style={styles.detailLabel}>New data</Text>
+                          <Text style={styles.logData}>{log.newData}</Text>
+                        </>
+                      ) : null}
+                    </Card>
+                  ))}
+                  {!logs.items.length ? (
+                    <Text style={styles.meta}>No logs found for this payment.</Text>
+                  ) : null}
+                </View>
+              </ScrollView>
+            ) : null}
+          </View>
+        </View>
+      </Modal>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  flex: { flex: 1 },
+  panelHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    marginBottom: spacing.md
+  },
+  title: { color: colors.text, fontSize: 20, fontWeight: "800" },
+  subtitle: { color: colors.muted, marginTop: 3, fontSize: 12 },
+  error: { color: colors.danger, marginBottom: spacing.md },
+  loader: { marginVertical: spacing.lg },
+  paymentCard: { marginBottom: spacing.sm },
+  row: { flexDirection: "row", alignItems: "flex-start", gap: spacing.md },
+  paymentTitle: { color: colors.text, fontWeight: "800", fontSize: 16 },
+  member: { color: colors.primary, fontWeight: "700", marginTop: 4 },
+  meta: { color: colors.muted, marginTop: 4, fontSize: 12 },
+  status: {
+    color: colors.primaryStrong,
+    fontWeight: "700",
+    marginTop: 6,
+    fontSize: 12
+  },
+  amount: { color: colors.primaryStrong, fontWeight: "900", fontSize: 17 },
+  actions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+    marginTop: spacing.md
+  },
+  pagination: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: spacing.md
+  },
+  pageText: { color: colors.muted, fontWeight: "700" },
+  backdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,.4)",
+    justifyContent: "center",
+    padding: spacing.md
+  },
+  formSheet: {
+    width: "100%",
+    maxWidth: 720,
+    maxHeight: "92%",
+    alignSelf: "center",
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    overflow: "hidden"
+  },
+  detailSheet: {
+    width: "100%",
+    maxWidth: 620,
+    maxHeight: "86%",
+    alignSelf: "center",
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    overflow: "hidden"
+  },
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: spacing.md,
+    padding: spacing.lg,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border
+  },
+  modalTitle: { color: colors.text, fontSize: 20, fontWeight: "900" },
+  close: { color: colors.muted, fontSize: 30, lineHeight: 30 },
+  formContent: { padding: spacing.md },
+  formCard: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    backgroundColor: colors.surface
+  },
+  formSectionTitle: {
+    color: colors.text,
+    fontWeight: "800",
+    fontSize: 16,
+    marginTop: spacing.xs,
+    marginBottom: spacing.sm
+  },
+  inlineLoading: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    marginBottom: spacing.sm
+  },
+  infoText: {
+    color: colors.muted,
+    fontSize: 12,
+    marginTop: -spacing.xs,
+    marginBottom: spacing.md
+  },
+  dynamicSection: { paddingTop: spacing.xs, marginBottom: spacing.sm },
+  dynamicTitle: {
+    color: colors.text,
+    fontWeight: "800",
+    fontSize: 15,
+    marginBottom: spacing.sm
+  },
+  helper: {
+    color: colors.muted,
+    marginTop: -spacing.sm,
+    marginBottom: spacing.md,
+    fontSize: 12,
+    flex: 1
+  },
+  fieldBlock: { marginBottom: spacing.md },
+  label: {
+    marginBottom: spacing.xs,
+    color: colors.textSoft,
+    fontWeight: "700",
+    fontSize: 13
+  },
+  selectLike: {
+    minHeight: 50,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceMuted,
+    paddingHorizontal: spacing.md,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between"
+  },
+  valueText: { color: colors.text },
+  placeholderText: { color: colors.muted },
+  monthSheet: {
+    width: "100%",
+    maxWidth: 520,
+    alignSelf: "center",
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    padding: spacing.lg
+  },
+  monthHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: spacing.md
+  },
+  monthNav: { padding: spacing.sm },
+  monthNavText: { fontSize: 28, color: colors.primary },
+  monthYear: { fontSize: 18, fontWeight: "800", color: colors.text },
+  monthGrid: { flexDirection: "row", flexWrap: "wrap" },
+  monthCell: {
+    width: "33.333%",
+    paddingVertical: spacing.md,
+    alignItems: "center",
+    borderRadius: radius.md
+  },
+  monthCellSelected: { backgroundColor: colors.primary },
+  monthCellText: { color: colors.text, fontWeight: "700" },
+  monthCellTextSelected: { color: "#fff" },
+  detailContent: { padding: spacing.lg },
+  detailLabel: {
+    color: colors.muted,
+    fontSize: 12,
+    fontWeight: "700",
+    marginTop: spacing.md
+  },
+  detailValue: { color: colors.text, fontSize: 15, marginTop: 3 },
+  detailFields: {
+    marginTop: spacing.lg,
+    paddingTop: spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border
+  },
+  detailRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: spacing.md,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border
+  },
+  detailLabelInline: { color: colors.muted, flex: 1 },
+  detailValueInline: {
+    color: colors.text,
+    fontWeight: "700",
+    flex: 1,
+    textAlign: "right"
+  },
+  detailActions: { gap: spacing.sm, marginTop: spacing.lg },
+  logCard: { marginBottom: spacing.md },
+  logData: {
+    color: colors.text,
+    fontSize: 12,
+    marginTop: 4,
+    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace"
+  }
+});

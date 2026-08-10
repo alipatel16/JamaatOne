@@ -3,9 +3,15 @@ import { Redirect, Tabs } from "expo-router";
 import { Text } from "react-native";
 
 import { useAuth } from "../../src/context/AuthContext";
-import { canManageJamaat } from "../../src/constants/roles";
+import { canManageJamaat, isSuperAdmin } from "../../src/constants/roles";
 import LoadingView from "../../src/components/LoadingView";
 import AppHeader from "../../src/components/AppHeader";
+
+const ROUTE_TITLES = {
+  index: "Home",
+  users: "Mumineen",
+  "user-detail": "Mumin Details"
+};
 
 const tabIcon = symbol => ({ color }) => (
   <Text style={{ color, fontSize: 20, fontWeight: "800" }}>{symbol}</Text>
@@ -16,6 +22,7 @@ export default function AppLayout() {
 
   if (bootstrapping) return <LoadingView />;
   if (!user) return <Redirect href="/login" />;
+  if (isSuperAdmin(user)) return <Redirect href="/super-admin" />;
 
   const manager = canManageJamaat(user.role);
 
@@ -23,7 +30,11 @@ export default function AppLayout() {
     <Tabs
       screenOptions={({ route }) => ({
         headerShown: true,
-        header: () => <AppHeader title={route.name === "index" ? "Home" : route.name.replace(/-/g, " ")} />,
+        header: () => (
+          <AppHeader
+            title={ROUTE_TITLES[route.name] || route.name.replace(/-/g, " ")}
+          />
+        ),
         tabBarActiveTintColor: "#526A61",
         tabBarInactiveTintColor: "#8B9590",
         tabBarStyle: {
@@ -40,7 +51,7 @@ export default function AppLayout() {
       <Tabs.Screen name="accounts" options={{ title: "Accounts", tabBarIcon: tabIcon("₹") }} />
       <Tabs.Screen
         name="users"
-        options={{ title: "Users", href: manager ? undefined : null, tabBarIcon: tabIcon("◉") }}
+        options={{ title: "Mumineen", href: manager ? undefined : null, tabBarIcon: tabIcon("◉") }}
       />
       <Tabs.Screen name="profile" options={{ title: "Profile", tabBarIcon: tabIcon("○") }} />
 
