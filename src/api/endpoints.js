@@ -79,6 +79,13 @@ export const liveEndpoints = {
     paymentById: paymentId => `/api/Accounts/payments/${paymentId}`,
     refundPayment: paymentId => `/api/Accounts/payments/${paymentId}/refund`,
     paymentLogs: paymentId => `/api/Accounts/payments/${paymentId}/logs`,
+    muminLedger: (muminId, pageNumber = 1, pageSize = 20) => {
+      const params = new URLSearchParams({
+        pageNumber: String(pageNumber),
+        pageSize: String(pageSize)
+      });
+      return `/api/Accounts/mumineen/${muminId}/ledger?${params.toString()}`;
+    },
 
     daybook: "/api/Accounts/daybook",
     daybookById: dayBookId => `/api/Accounts/daybook/${dayBookId}`,
@@ -110,6 +117,48 @@ export const liveEndpoints = {
         }
       });
       return `/api/Accounts/daybook?${params.toString()}`;
+    },
+
+    bankAccounts: "/api/Accounts/bank-accounts",
+    bankAccountById: bankAccountId =>
+      `/api/Accounts/bank-accounts/${bankAccountId}`,
+    deposits: "/api/Accounts/deposits",
+    depositById: bankDepositId => `/api/Accounts/deposits/${bankDepositId}`,
+    depositLogs: bankDepositId =>
+      `/api/Accounts/deposits/${bankDepositId}/logs`,
+    pagedDeposits: ({
+      pageNumber = 1,
+      pageSize = 20,
+      paymentMethodId,
+      bankAccountId,
+      fromDate,
+      toDate
+    } = {}) => {
+      const params = new URLSearchParams({
+        pageNumber: String(pageNumber),
+        pageSize: String(pageSize)
+      });
+      const optional = { paymentMethodId, bankAccountId, fromDate, toDate };
+      Object.entries(optional).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== "") {
+          params.set(key, String(value));
+        }
+      });
+      return `/api/Accounts/deposits?${params.toString()}`;
+    },
+    cashSummary: ({ fromDate, toDate } = {}) => {
+      const params = new URLSearchParams();
+      if (fromDate) params.set("fromDate", String(fromDate));
+      if (toDate) params.set("toDate", String(toDate));
+      const query = params.toString();
+      return `/api/Accounts/cash-summary${query ? `?${query}` : ""}`;
+    },
+    summary: ({ fromDate, toDate } = {}) => {
+      const params = new URLSearchParams();
+      if (fromDate) params.set("fromDate", String(fromDate));
+      if (toDate) params.set("toDate", String(toDate));
+      const query = params.toString();
+      return `/api/Accounts/summary${query ? `?${query}` : ""}`;
     },
 
     pagedPayments: ({

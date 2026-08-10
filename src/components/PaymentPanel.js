@@ -19,7 +19,7 @@ import { colors, radius, spacing } from "../theme";
 import Button from "./Button";
 import Card from "./Card";
 import Input from "./Input";
-import RemoteMumineenSelect from "./RemoteMumineenSelect";
+import MumineenSearchList from "./MumineenSearchList";
 import Select from "./Select";
 
 const PAGE_SIZE = 20;
@@ -399,7 +399,11 @@ export default function PaymentPanel({ manager, canRefund = false, filters = {} 
         fromDate: paymentFilterDate(filters.fromDate),
         toDate: paymentFilterDate(filters.toDate, true)
       });
-      setPayments(Array.isArray(result?.items) ? result.items : []);
+      setPayments(
+        (Array.isArray(result?.items) ? result.items : []).filter(
+          item => item?.isActive !== false
+        )
+      );
       setTotalCount(Number(result?.totalCount || 0));
       setTotalPages(Math.max(1, Number(result?.totalPages || 1)));
     } catch (requestError) {
@@ -895,12 +899,15 @@ export default function PaymentPanel({ manager, canRefund = false, filters = {} 
             >
               <View style={styles.formCard}>
                 <Text style={styles.formSectionTitle}>Payment member</Text>
-                <RemoteMumineenSelect
-                  label="Search and select Mumin"
-                  value={form.muminId}
-                  initialItem={selectedPayer}
+                <MumineenSearchList
+                  selectedItem={selectedPayer}
                   disabled={Boolean(editingId)}
-                  onChange={handlePayerChange}
+                  embedded
+                  label="Search and select Mumin"
+                  hint="Search by name, ITS ID, mobile or family ID, then select the Mumin making this payment."
+                  selectActionLabel="Select ›"
+                  onSelect={item => handlePayerChange(String(item.muminId), item)}
+                  onClear={() => handlePayerChange("", null)}
                 />
 
                 <Text style={styles.formSectionTitle}>Payment for</Text>

@@ -182,7 +182,11 @@ export default function DayBookPanel({ manager, canDelete = false, filters = {} 
         toDate: apiFilterDate(filters.toDate, true)
       });
 
-      setEntries(Array.isArray(result?.items) ? result.items : []);
+      setEntries(
+        (Array.isArray(result?.items) ? result.items : []).filter(
+          item => item?.isActive !== false
+        )
+      );
       setTotalCount(Number(result?.totalCount || 0));
       setTotalPages(Math.max(1, Number(result?.totalPages || 1)));
     } catch (requestError) {
@@ -325,6 +329,9 @@ export default function DayBookPanel({ manager, canDelete = false, filters = {} 
     try {
       setError("");
       await accountsApi.deleteDaybookEntry(item.dayBookId);
+      setEntries(current =>
+        current.filter(entry => entry.dayBookId !== item.dayBookId)
+      );
       if (detail?.dayBookId === item.dayBookId) setDetail(null);
       await refreshCurrentPage();
     } catch (requestError) {

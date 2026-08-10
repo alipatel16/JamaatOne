@@ -1,29 +1,22 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  KeyboardAvoidingView,
+  ActivityIndicator,
   Modal,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
-import { router } from "expo-router";
-import { apiRequest } from "../../src/api/client";
-import { endpoints } from "../../src/api/endpoints";
-import Button from "../../src/components/Button";
+import { accountsApi } from "../../src/api/accountsApi";
 import Card from "../../src/components/Card";
+import CashManagementPanel from "../../src/components/CashManagementPanel";
+import CustomerLedgerPanel from "../../src/components/CustomerLedgerPanel";
 import DayBookPanel from "../../src/components/DayBookPanel";
 import Input from "../../src/components/Input";
 import PaymentPanel from "../../src/components/PaymentPanel";
-import RemoteMumineenSelect from "../../src/components/RemoteMumineenSelect";
+import MumineenSearchList from "../../src/components/MumineenSearchList";
 import Screen from "../../src/components/Screen";
-import Select from "../../src/components/Select";
-import {
-  BANK_ACCOUNTS,
-  getOptionLabel,
-} from "../../src/constants/accounts";
 import { canManageJamaat, canRefundPayments } from "../../src/constants/roles";
 import { useAuth } from "../../src/context/AuthContext";
 import { colors, spacing } from "../../src/theme";
@@ -167,32 +160,23 @@ function DatePickerField({ label, value, onChange, allowClear = false }) {
   );
 }
 
-const initialDeposit = {
-  bankAccount: "AXIS_GENERAL",
-  amount: "",
-  depositDate: today(),
-  referenceNumber: "",
-  notes: "",
-};
-
 const money = (v) =>
   new Intl.NumberFormat("en-IN", {
     style: "currency",
     currency: "INR",
     maximumFractionDigits: 2,
   }).format(Number(v || 0));
+
+const toApiFromDate = value => value ? `${value}T00:00:00` : undefined;
+const toApiToDate = value => value ? `${value}T23:59:59.999` : undefined;
+
 export default function AccountsScreen() {
   const { user } = useAuth();
   const manager = canManageJamaat(user?.role);
   const canRefund = canRefundPayments(user?.role);
   const [tab, setTab] = useState("STATS");
   const [summary, setSummary] = useState(null);
-  const [payments, setPayments] = useState([]);
-  const [daybook, setDaybook] = useState([]);
-  const [ledgers, setLedgers] = useState([]);
-  const [bankDeposits, setBankDeposits] = useState([]);
-  const [deposit, setDeposit] = useState(initialDeposit);
-  const [showDeposit, setShowDeposit] = useState(false);
+  const [summaryLoading, setSummaryLoading] = useState(false);
   const [statsRange, setStatsRange] = useState("TODAY");
   const [statsFrom, setStatsFrom] = useState(today());
   const [statsTo, setStatsTo] = useState(today());
@@ -203,55 +187,7 @@ export default function AccountsScreen() {
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [error, setError] = useState("");
-  useEffect(() => {
-    loadData();
-  }, [manager]);
-  async function loadData() {
-    try {
-      setError("");
-      if (manager) {
-        const [s, p, d, l, bd] = await Promise.all([
-          apiRequest(endpoints.accountsSummary),
-          apiRequest(endpoints.payments),
-          apiRequest(endpoints.daybook),
-          apiRequest(endpoints.ledgers),
-          apiRequest(endpoints.bankDeposits),
-        ]);
-        setSummary(s);
-        setPayments(p);
-        setDaybook(d);
-        setLedgers(l);
-        setBankDeposits(bd);
-      } else setPayments(await apiRequest(endpoints.myPayments));
-    } catch (e) {
-      setError(e.message);
-    }
-  }
-  const filteredPayments = useMemo(
-    () =>
-      payments.filter((x) => {
-        const q = search.trim().toLowerCase();
-        const text =
-          `${x.userName} ${x.itsId} ${x.receiptNumber} ${x.paymentFor} ${x.subType || x.lagatType || ""} ${x.paidForUserName || ""} ${x.recordedByName || x.createdByName || ""}`.toLowerCase();
-        return (
-          (!q || text.includes(q)) &&
-          (!fromDate || x.paymentDate >= fromDate) &&
-          (!toDate || x.paymentDate <= toDate)
-        );
-      }),
-    [payments, search, fromDate, toDate],
-  );
-  const filteredLedgers = useMemo(
-    () =>
-      ledgers.filter((x) => {
-        const q = search.trim().toLowerCase();
-        return (
-          !q ||
-          `${x.userName} ${x.itsId} ${x.phoneNumber}`.toLowerCase().includes(q)
-        );
-      }),
-    [ledgers, search],
-  );
+
   const statsDates = useMemo(() => {
     const now = new Date();
     if (statsRange === "TODAY") return { from: today(), to: today() };
@@ -263,80 +199,60 @@ export default function AccountsScreen() {
     return { from: statsFrom, to: statsTo };
   }, [statsRange, statsFrom, statsTo]);
 
+  useEffect(() => {
+    if (!manager || tab !== "STATS") return;
+    let active = true;
+    (async () => {
+      try {
+        setSummaryLoading(true);
+        setError("");
+        const result = await accountsApi.getAccountsSummary({
+          fromDate: toApiFromDate(statsDates.from),
+          toDate: toApiToDate(statsDates.to)
+        });
+        if (active) setSummary(result || null);
+      } catch (requestError) {
+        if (active) setError(requestError.message || "Unable to load account summary.");
+      } finally {
+        if (active) setSummaryLoading(false);
+      }
+    })();
+    return () => { active = false; };
+  }, [manager, tab, statsDates.from, statsDates.to]);
+
   const stats = useMemo(() => {
-    const inRange = (date) =>
-      (!statsDates.from || date >= statsDates.from) &&
-      (!statsDates.to || date <= statsDates.to);
-    const paymentIncome = payments
-      .filter((item) => inRange(item.paymentDate))
-      .reduce((sum, item) => sum + Number(item.amount || 0), 0);
-    const otherIncome = daybook
-      .filter((item) => item.entryType === "CREDIT" && inRange(item.entryDate))
-      .reduce((sum, item) => sum + Number(item.amount || 0), 0);
-    const expenses = daybook
-      .filter((item) => item.entryType === "DEBIT" && inRange(item.entryDate))
-      .reduce((sum, item) => sum + Number(item.amount || 0), 0);
+    const payments = summary?.paymentsOverview || {};
+    const daybook = summary?.dayBookOverview || {};
+    const paymentIncome = Number(payments.netAmount || 0);
+    const otherIncome = Number(daybook.totalCreditAmount || 0);
+    const expenses = Number(daybook.totalDebitAmount || 0);
     const received = paymentIncome + otherIncome;
-    return { paymentIncome, otherIncome, received, expenses, balance: received - expenses };
-  }, [payments, daybook, statsDates]);
-
-  const dailyStats = useMemo(() => {
-    const rows = {};
-    const ensure = (date) => {
-      if (!rows[date]) rows[date] = { date, received: 0, expenses: 0 };
-      return rows[date];
+    return {
+      paymentIncome,
+      paymentGross: Number(payments.totalPaidAmount || 0),
+      paymentRefunds: Number(payments.totalRefundedAmount || 0),
+      otherIncome,
+      expenses,
+      received,
+      balance: paymentIncome + Number(daybook.netAmount || 0)
     };
-    const inRange = (date) =>
-      (!statsDates.from || date >= statsDates.from) &&
-      (!statsDates.to || date <= statsDates.to);
-    payments.filter((item) => inRange(item.paymentDate)).forEach((item) => {
-      ensure(item.paymentDate).received += Number(item.amount || 0);
-    });
-    daybook.filter((item) => inRange(item.entryDate)).forEach((item) => {
-      if (item.entryType === "CREDIT") ensure(item.entryDate).received += Number(item.amount || 0);
-      else ensure(item.entryDate).expenses += Number(item.amount || 0);
-    });
-    return Object.values(rows)
-      .map((item) => ({ ...item, balance: item.received - item.expenses }))
-      .sort((a, b) => b.date.localeCompare(a.date));
-  }, [payments, daybook, statsDates]);
+  }, [summary]);
 
-  const cashManagement = useMemo(() => {
-    const cashPayments = payments
-      .filter((item) => item.paymentMethod === "CASH")
-      .reduce((sum, item) => sum + Number(item.amount || 0), 0);
-    const cashCredits = daybook
-      .filter((item) => item.entryType === "CREDIT" && item.paymentMethod === "CASH")
-      .reduce((sum, item) => sum + Number(item.amount || 0), 0);
-    const deposited = bankDeposits.reduce((sum, item) => sum + Number(item.amount || 0), 0);
-    return { cashReceived: cashPayments + cashCredits, deposited, pending: cashPayments + cashCredits - deposited };
-  }, [payments, daybook, bankDeposits]);
-
-  const bankTotals = useMemo(() =>
-    BANK_ACCOUNTS.map((bank) => ({
-      ...bank,
-      total: bankDeposits
-        .filter((item) => item.bankAccount === bank.value)
-        .reduce((sum, item) => sum + Number(item.amount || 0), 0),
-    })), [bankDeposits]);
-
-  async function saveDeposit() {
-    if (!deposit.amount || Number(deposit.amount) <= 0)
-      return setError("Enter a valid deposit amount.");
-    if (Number(deposit.amount) > cashManagement.pending)
-      return setError("Deposit amount cannot be more than the pending cash.");
-    try {
-      await apiRequest(endpoints.bankDeposits, {
-        method: "POST",
-        body: JSON.stringify({ ...deposit, amount: Number(deposit.amount) }),
-      });
-      setDeposit(initialDeposit);
-      setShowDeposit(false);
-      await loadData();
-    } catch (e) {
-      setError(e.message);
-    }
-  }
+  const dailyStats = useMemo(() =>
+    (Array.isArray(summary?.dailyTrend) ? summary.dailyTrend : [])
+      .map(item => {
+        const received = Number(item.paymentsAmount || 0) + Number(item.dayBookCreditAmount || 0);
+        const expenses = Number(item.dayBookDebitAmount || 0);
+        return {
+          date: item.entryDate ? String(item.entryDate).slice(0, 10) : "-",
+          received,
+          expenses,
+          balance: received - expenses
+        };
+      })
+      .sort((a, b) => b.date.localeCompare(a.date)),
+    [summary]
+  );
 
   return (
     <Screen>
@@ -381,101 +297,84 @@ export default function AccountsScreen() {
           ))}
         </View>
       ) : null}
-      {["PAYMENTS", "DAYBOOK", "LEDGERS"].includes(tab) ? (
+      {tab === "PAYMENTS" ? (
+        <MumineenSearchList
+          selectedItem={paymentMumin}
+          onSelect={item => {
+            setPaymentMumin(item);
+            setPaymentMuminId(String(item.muminId));
+          }}
+          onClear={() => {
+            setPaymentMumin(null);
+            setPaymentMuminId("");
+          }}
+          label="Search payments by Mumin"
+          hint="Search by name, ITS ID, mobile or family ID, then select a Mumin to filter payment history."
+          selectActionLabel="View payments ›"
+        />
+      ) : null}
+
+      {tab === "DAYBOOK" ? (
         <Card>
-          {tab === "PAYMENTS" ? (
-            <>
-              <RemoteMumineenSelect
-                label="Search payments by Mumin"
-                value={paymentMuminId}
-                initialItem={paymentMumin}
-                placeholder="Search by name, ITS ID, phone or family ID"
-                onChange={(muminId, item) => {
-                  setPaymentMuminId(muminId);
-                  setPaymentMumin(item);
-                }}
-              />
-              {paymentMuminId ? (
+          <Input
+            label="Search day-book entries"
+            value={search}
+            onChangeText={setSearch}
+            placeholder="Category, payment method or reference"
+          />
+        </Card>
+      ) : null}
+
+      {["PAYMENTS", "DAYBOOK"].includes(tab) ? (
+        <Card>
+          <Pressable
+            style={styles.filterToggle}
+            onPress={() => setShowFilters(value => !value)}
+          >
+            <View>
+              <Text style={styles.filterToggleTitle}>Date filters</Text>
+              <Text style={styles.filterToggleSubtitle}>
+                {fromDate || toDate
+                  ? `${fromDate || "Any date"} to ${toDate || "Any date"}`
+                  : tab === "PAYMENTS"
+                    ? "Filter payment history using the Accounts API"
+                    : "Filter entries by a date range"}
+              </Text>
+            </View>
+            <Text style={styles.filterChevron}>{showFilters ? "⌃" : "⌄"}</Text>
+          </Pressable>
+          {showFilters ? (
+            <View style={styles.filterPanel}>
+              <View style={styles.filterRow}>
+                <View style={styles.filter}>
+                  <DatePickerField
+                    label="From date"
+                    value={fromDate}
+                    onChange={setFromDate}
+                    allowClear
+                  />
+                </View>
+                <View style={styles.filter}>
+                  <DatePickerField
+                    label="To date"
+                    value={toDate}
+                    onChange={setToDate}
+                    allowClear
+                  />
+                </View>
+              </View>
+              {fromDate || toDate ? (
                 <Pressable
                   style={styles.clearFiltersButton}
                   onPress={() => {
-                    setPaymentMuminId("");
-                    setPaymentMumin(null);
+                    setFromDate("");
+                    setToDate("");
                   }}
                 >
-                  <Text style={styles.clearFiltersText}>Clear selected Mumin</Text>
+                  <Text style={styles.clearFiltersText}>Clear date filters</Text>
                 </Pressable>
               ) : null}
-            </>
-          ) : (
-            <Input
-              label={
-                tab === "LEDGERS"
-                  ? "Search customer ledger"
-                  : "Search day-book entries"
-              }
-              value={search}
-              onChangeText={setSearch}
-              placeholder={
-                tab === "LEDGERS"
-                  ? "Name, ITS ID or phone"
-                  : "Category, payment method or reference"
-              }
-            />
-          )}
-
-          {tab !== "LEDGERS" ? (
-            <>
-              <Pressable
-                style={styles.filterToggle}
-                onPress={() => setShowFilters((value) => !value)}
-              >
-                <View>
-                  <Text style={styles.filterToggleTitle}>Date filters</Text>
-                  <Text style={styles.filterToggleSubtitle}>
-                    {fromDate || toDate
-                      ? `${fromDate || "Any date"} to ${toDate || "Any date"}`
-                      : tab === "PAYMENTS"
-                        ? "Filter payment history using the Accounts API"
-                        : "Filter entries by a date range"}
-                  </Text>
-                </View>
-                <Text style={styles.filterChevron}>{showFilters ? "⌃" : "⌄"}</Text>
-              </Pressable>
-              {showFilters ? (
-                <View style={styles.filterPanel}>
-                  <View style={styles.filterRow}>
-                    <View style={styles.filter}>
-                      <DatePickerField
-                        label="From date"
-                        value={fromDate}
-                        onChange={setFromDate}
-                        allowClear
-                      />
-                    </View>
-                    <View style={styles.filter}>
-                      <DatePickerField
-                        label="To date"
-                        value={toDate}
-                        onChange={setToDate}
-                        allowClear
-                      />
-                    </View>
-                  </View>
-                  {fromDate || toDate ? (
-                    <Pressable
-                      style={styles.clearFiltersButton}
-                      onPress={() => {
-                        setFromDate("");
-                        setToDate("");
-                      }}
-                    >
-                      <Text style={styles.clearFiltersText}>Clear date filters</Text>
-                    </Pressable>
-                  ) : null}
-                </View>
-              ) : null}
-            </>
+            </View>
           ) : null}
         </Card>
       ) : null}
@@ -497,6 +396,10 @@ export default function AccountsScreen() {
             </Card>
           ) : null}
           <Text style={styles.periodLabel}>{statsDates.from} to {statsDates.to}</Text>
+          {summaryLoading ? (
+            <ActivityIndicator color={colors.primary} style={{ marginVertical: spacing.lg }} />
+          ) : (
+            <>
           <View style={styles.summary}>
             <Card style={styles.summaryCard}><Text>Money received</Text><Text style={styles.amount}>{money(stats.received)}</Text></Card>
             <Card style={styles.summaryCard}><Text>Total expenses</Text><Text style={[styles.amount, styles.debit]}>{money(stats.expenses)}</Text></Card>
@@ -504,7 +407,9 @@ export default function AccountsScreen() {
           </View>
           <Card>
             <Text style={styles.sectionTitle}>Account breakdown</Text>
-            <View style={styles.statLine}><Text style={styles.meta}>Member payments received</Text><Text style={styles.statValue}>{money(stats.paymentIncome)}</Text></View>
+            <View style={styles.statLine}><Text style={styles.meta}>Member payments received</Text><Text style={styles.statValue}>{money(stats.paymentGross)}</Text></View>
+            <View style={styles.statLine}><Text style={styles.meta}>Payment refunds</Text><Text style={[styles.statValue, styles.debit]}>-{money(stats.paymentRefunds)}</Text></View>
+            <View style={styles.statLine}><Text style={styles.meta}>Net member payments</Text><Text style={styles.statValue}>{money(stats.paymentIncome)}</Text></View>
             <View style={styles.statLine}><Text style={styles.meta}>Other credit entries</Text><Text style={styles.statValue}>{money(stats.otherIncome)}</Text></View>
             <View style={styles.statLine}><Text style={styles.meta}>Expenses recorded</Text><Text style={[styles.statValue, styles.debit]}>{money(stats.expenses)}</Text></View>
             <View style={[styles.statLine, styles.totalLine]}><Text style={styles.paymentTitle}>Available balance</Text><Text style={styles.paymentAmount}>{money(stats.balance)}</Text></View>
@@ -518,6 +423,8 @@ export default function AccountsScreen() {
               <View style={[styles.statLine, styles.totalLine]}><Text style={styles.member}>Balance</Text><Text style={styles.paymentAmount}>{money(item.balance)}</Text></View>
             </Card>
           )) : <Card><Text style={styles.meta}>No account entries found for this period.</Text></Card>}
+            </>
+          )}
         </>
       ) : null}
       {tab === "PAYMENTS" ? (
@@ -543,92 +450,10 @@ export default function AccountsScreen() {
         />
       ) : null}
       {manager && tab === "LEDGERS" ? (
-        <>
-          <Text style={styles.sectionTitle}>
-            Customer ledgers ({filteredLedgers.length})
-          </Text>
-          {filteredLedgers.map((x) => (
-            <Pressable
-              key={x.userId}
-              onPress={() =>
-                router.push({
-                  pathname: "/(app)/user-detail",
-                  params: { userId: x.userId },
-                })
-              }
-            >
-              <Card>
-                <View style={styles.row}>
-                  <View style={styles.flex}>
-                    <Text style={styles.paymentTitle}>{x.userName}</Text>
-                    <Text style={styles.meta}>
-                      ITS {x.itsId} · {x.phoneNumber || "No phone"}
-                    </Text>
-                    <Text style={styles.meta}>
-                      {x.paymentCount} payments · Last payment{" "}
-                      {x.lastPaymentDate || "-"}
-                    </Text>
-                  </View>
-                  <View>
-                    <Text style={styles.ledgerLabel}>Total paid</Text>
-                    <Text style={styles.paymentAmount}>
-                      {money(x.totalPaid)}
-                    </Text>
-                  </View>
-                </View>
-              </Card>
-            </Pressable>
-          ))}
-        </>
+        <CustomerLedgerPanel />
       ) : null}
       {manager && tab === "MANAGEMENT" ? (
-        <>
-          <View style={styles.summary}>
-            <Card style={styles.summaryCard}><Text>Total cash received</Text><Text style={styles.amount}>{money(cashManagement.cashReceived)}</Text></Card>
-            <Card style={styles.summaryCard}><Text>Deposited to banks</Text><Text style={styles.amount}>{money(cashManagement.deposited)}</Text></Card>
-            <Card style={styles.summaryCard}><Text>Pending cash</Text><Text style={[styles.amount, cashManagement.pending > 0 && styles.pending]}>{money(cashManagement.pending)}</Text></Card>
-          </View>
-          <Button title="Record bank deposit" onPress={() => { setDeposit(initialDeposit); setShowDeposit(true); }} />
-          <Text style={styles.sectionTitle}>Bank-wise deposited amount</Text>
-          <View style={styles.bankGrid}>
-            {bankTotals.map((bank) => (
-              <Card key={bank.value} style={styles.bankCard}><Text style={styles.meta}>{bank.label}</Text><Text style={styles.paymentAmount}>{money(bank.total)}</Text></Card>
-            ))}
-          </View>
-          <Text style={styles.sectionTitle}>Deposit history</Text>
-          {bankDeposits.map((item) => (
-            <Card key={item.id}>
-              <View style={styles.row}>
-                <View style={styles.flex}>
-                  <Text style={styles.paymentTitle}>{getOptionLabel(BANK_ACCOUNTS, item.bankAccount)}</Text>
-                  <Text style={styles.meta}>{item.depositDate} · {item.referenceNumber || "No reference"}</Text>
-                  <Text style={styles.meta}>{item.notes || "No notes"}</Text>
-                </View>
-                <Text style={styles.paymentAmount}>{money(item.amount)}</Text>
-              </View>
-            </Card>
-          ))}
-          <Modal visible={showDeposit} transparent animationType="slide" onRequestClose={() => setShowDeposit(false)}>
-            <KeyboardAvoidingView style={styles.formModalBackdrop} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-              <View style={styles.formModalContainer}>
-                <View style={styles.formModalHeader}>
-                  <View style={styles.flex}><Text style={styles.formModalTitle}>Record bank deposit</Text><Text style={styles.formModalSubtitle}>Pending cash: {money(cashManagement.pending)}</Text></View>
-                  <Pressable style={styles.closeButton} onPress={() => setShowDeposit(false)}><Text style={styles.closeButtonText}>×</Text></Pressable>
-                </View>
-                <ScrollView contentContainerStyle={styles.formModalContent} keyboardShouldPersistTaps="handled">
-                  <View style={styles.formModalCard}>
-                    <Select label="Bank account" value={deposit.bankAccount} options={BANK_ACCOUNTS} onChange={(bankAccount) => setDeposit((v) => ({ ...v, bankAccount }))} />
-                    <Input label="Amount deposited" value={deposit.amount} keyboardType="decimal-pad" onChangeText={(amount) => setDeposit((v) => ({ ...v, amount }))} />
-                    <DatePickerField label="Deposit date" value={deposit.depositDate} onChange={(depositDate) => setDeposit((v) => ({ ...v, depositDate }))} />
-                    <Input label="Deposit slip / reference number" value={deposit.referenceNumber} onChangeText={(referenceNumber) => setDeposit((v) => ({ ...v, referenceNumber }))} />
-                    <Input label="Notes" value={deposit.notes} multiline onChangeText={(notes) => setDeposit((v) => ({ ...v, notes }))} />
-                    <Button title="Save bank deposit" onPress={saveDeposit} />
-                  </View>
-                </ScrollView>
-              </View>
-            </KeyboardAvoidingView>
-          </Modal>
-        </>
+        <CashManagementPanel canDelete={canRefund} />
       ) : null}
     </Screen>
   );

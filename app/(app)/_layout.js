@@ -10,7 +10,13 @@ import AppHeader from "../../src/components/AppHeader";
 const ROUTE_TITLES = {
   index: "Home",
   users: "Mumineen",
-  "user-detail": "Mumin Details"
+  "user-detail": "Mumin Details",
+  "bank-accounts": "Bank Accounts",
+  receipt: "Payment Receipt",
+  namaz: "Namaaz",
+  calendar: "Hijri Calendar",
+  fmb: "FMB",
+  announcements: "Announcements"
 };
 
 const tabIcon = symbol => ({ color }) => (
@@ -28,11 +34,14 @@ export default function AppLayout() {
 
   return (
     <Tabs
+      backBehavior="history"
       screenOptions={({ route }) => ({
         headerShown: true,
         header: () => (
           <AppHeader
             title={ROUTE_TITLES[route.name] || route.name.replace(/-/g, " ")}
+            showBack={!['index', 'accounts', 'users', 'profile'].includes(route.name)}
+            fallbackRoute={route.name === 'bank-accounts' ? '/accounts' : '/'}
           />
         ),
         tabBarActiveTintColor: "#526A61",
@@ -61,6 +70,7 @@ export default function AppLayout() {
       <Tabs.Screen name="user-detail" options={{ href: null }} />
       <Tabs.Screen name="announcements" options={{ href: null }} />
       <Tabs.Screen name="receipt" options={{ href: null }} />
+      <Tabs.Screen name="bank-accounts" options={{ href: null }} />
     </Tabs>
   );
 }

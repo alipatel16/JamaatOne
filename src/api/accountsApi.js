@@ -35,6 +35,29 @@ function normalizePaymentPayload(payload, includeMuminId) {
   };
 }
 
+function normalizeBankAccountPayload(payload) {
+  return {
+    bankAccountName: payload?.bankAccountName || null,
+    bankName: payload?.bankName || null,
+    bankAccountNumber: payload?.bankAccountNumber || null,
+    accountHolderName: payload?.accountHolderName || null,
+    ifscCode: payload?.ifscCode || null,
+    branchName: payload?.branchName || null,
+    remarks: payload?.remarks || null
+  };
+}
+
+function normalizeBankDepositPayload(payload) {
+  return {
+    paymentMethodId: Number(payload?.paymentMethodId),
+    bankAccountId: Number(payload?.bankAccountId),
+    amount: Number(payload?.amount),
+    depositDate: payload?.depositDate || null,
+    depositReferenceNo: payload?.depositReferenceNo || null,
+    remarks: payload?.remarks || null
+  };
+}
+
 export const accountsApi = {
   // Published payment configuration APIs.
   getPaymentCategories() {
@@ -200,6 +223,11 @@ export const accountsApi = {
   getPaymentLogs(paymentId) {
     return liveApiRequest(liveEndpoints.accounts.paymentLogs(paymentId));
   },
+  getMuminLedger(muminId, pageNumber = 1, pageSize = 20) {
+    return liveApiRequest(
+      liveEndpoints.accounts.muminLedger(muminId, pageNumber, pageSize)
+    );
+  },
 
   // Published Day Book APIs.
   getDaybook(filters = {}) {
@@ -234,9 +262,67 @@ export const accountsApi = {
     return liveApiRequest(liveEndpoints.accounts.daybookLogs(dayBookId));
   },
 
-  // Existing mock-backed modules kept until matching APIs are published.
-  getSummary() {
-    return apiRequest(endpoints.accountsSummary);
+  // Published bank account, deposit and summary APIs.
+  getBankAccounts() {
+    return liveApiRequest(liveEndpoints.accounts.bankAccounts);
+  },
+  getBankAccount(bankAccountId) {
+    return liveApiRequest(liveEndpoints.accounts.bankAccountById(bankAccountId));
+  },
+  createBankAccount(payload) {
+    return liveApiRequest(liveEndpoints.accounts.bankAccounts, {
+      method: "POST",
+      body: normalizeBankAccountPayload(payload)
+    });
+  },
+  updateBankAccount(bankAccountId, payload) {
+    return liveApiRequest(liveEndpoints.accounts.bankAccountById(bankAccountId), {
+      method: "PUT",
+      body: normalizeBankAccountPayload(payload)
+    });
+  },
+  deleteBankAccount(bankAccountId) {
+    return liveApiRequest(liveEndpoints.accounts.bankAccountById(bankAccountId), {
+      method: "DELETE"
+    });
+  },
+
+  getBankDeposits(filters = {}) {
+    return liveApiRequest(liveEndpoints.accounts.pagedDeposits(filters));
+  },
+  getBankDeposit(bankDepositId) {
+    return liveApiRequest(liveEndpoints.accounts.depositById(bankDepositId));
+  },
+  createBankDeposit(payload) {
+    return liveApiRequest(liveEndpoints.accounts.deposits, {
+      method: "POST",
+      body: normalizeBankDepositPayload(payload)
+    });
+  },
+  updateBankDeposit(bankDepositId, payload) {
+    return liveApiRequest(liveEndpoints.accounts.depositById(bankDepositId), {
+      method: "PUT",
+      body: normalizeBankDepositPayload(payload)
+    });
+  },
+  deleteBankDeposit(bankDepositId) {
+    return liveApiRequest(liveEndpoints.accounts.depositById(bankDepositId), {
+      method: "DELETE"
+    });
+  },
+  getBankDepositLogs(bankDepositId) {
+    return liveApiRequest(liveEndpoints.accounts.depositLogs(bankDepositId));
+  },
+  getCashSummary(filters = {}) {
+    return liveApiRequest(liveEndpoints.accounts.cashSummary(filters));
+  },
+  getAccountsSummary(filters = {}) {
+    return liveApiRequest(liveEndpoints.accounts.summary(filters));
+  },
+
+  // Legacy aliases retained for older callers.
+  getSummary(filters = {}) {
+    return liveApiRequest(liveEndpoints.accounts.summary(filters));
   },
   getMyPayments() {
     return apiRequest(endpoints.myPayments);
@@ -247,16 +333,9 @@ export const accountsApi = {
   getLedgers() {
     return apiRequest(endpoints.ledgers);
   },
-  getUserLedger(userId) {
-    return apiRequest(endpoints.userLedger(userId));
-  },
-  getBankDeposits() {
-    return apiRequest(endpoints.bankDeposits);
-  },
-  createBankDeposit(payload) {
-    return apiRequest(endpoints.bankDeposits, { method: "POST", body: payload });
-  },
-  deleteBankDeposit(depositId) {
-    return apiRequest(endpoints.bankDepositById(depositId), { method: "DELETE" });
+  getUserLedger(muminId, pageNumber = 1, pageSize = 20) {
+    return liveApiRequest(
+      liveEndpoints.accounts.muminLedger(muminId, pageNumber, pageSize)
+    );
   }
 };

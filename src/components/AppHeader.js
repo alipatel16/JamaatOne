@@ -21,7 +21,7 @@ const MENU_ITEMS = [
   { label: "Announcements", route: "/announcements", icon: "◇" }
 ];
 
-export default function AppHeader({ title }) {
+export default function AppHeader({ title, showBack = false, fallbackRoute = "/" }) {
   const router = useRouter();
   const { user } = useAuth();
   const { width } = useWindowDimensions();
@@ -34,16 +34,27 @@ export default function AppHeader({ title }) {
     router.push(route);
   }
 
+  function goBack() {
+    setOpen(false);
+    if (router.canGoBack?.()) {
+      router.back();
+      return;
+    }
+    router.replace(fallbackRoute);
+  }
+
   return (
     <>
       <View style={[styles.header, isWide && styles.headerWide]}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Open navigation menu"
-          onPress={() => setOpen(true)}
+          accessibilityLabel={showBack ? "Go back" : "Open navigation menu"}
+          onPress={showBack ? goBack : () => setOpen(true)}
           style={styles.menuButton}
         >
-          <Text style={styles.menuIcon}>☰</Text>
+          <Text style={[styles.menuIcon, showBack && styles.backIcon]}>
+            {showBack ? "‹" : "☰"}
+          </Text>
         </Pressable>
 
         <View style={styles.brandMark}>
@@ -164,6 +175,11 @@ const styles = StyleSheet.create({
     fontSize: 20,
     color: colors.text,
     fontWeight: "700"
+  },
+  backIcon: {
+    fontSize: 32,
+    lineHeight: 32,
+    fontWeight: "400"
   },
   brandMark: {
     width: 38,
