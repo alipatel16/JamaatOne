@@ -1,5 +1,5 @@
 import React from "react";
-import { StyleSheet, Text, TextInput, View } from "react-native";
+import { Platform, StyleSheet, Text, TextInput, View } from "react-native";
 import { colors, radius, spacing, typography } from "../theme";
 
 export default function Input({ label, error, helperText, style, ...props }) {
@@ -17,51 +17,38 @@ export default function Input({ label, error, helperText, style, ...props }) {
         {...props}
       />
       {error ? <Text style={styles.error}>{error}</Text> : null}
-      {!error && helperText ? (
-        <Text style={styles.helper}>{helperText}</Text>
-      ) : null}
+      {!error && helperText ? <Text style={styles.helper}>{helperText}</Text> : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrapper: {
-    marginBottom: spacing.md
-  },
+  wrapper: { marginBottom: spacing.md },
   label: {
     fontFamily: typography.family,
     marginBottom: spacing.xs,
     color: colors.textSoft,
     fontSize: 13,
-    fontWeight: "700"
+    fontWeight: "800"
   },
   input: {
-    minHeight: 50,
+    minHeight: 52,
     borderWidth: 1,
     borderColor: colors.borderStrong,
     borderRadius: radius.md,
-    backgroundColor: colors.surfaceMuted,
+    backgroundColor: colors.surface,
     paddingHorizontal: spacing.md,
     color: colors.text,
     fontFamily: typography.family,
-    fontSize: 15
+    fontSize: 16,
+    ...(Platform.OS === "web" ? { outlineStyle: "none", outlineWidth: 0 } : {})
   },
   multiline: {
-    minHeight: 108,
+    minHeight: 110,
     paddingTop: spacing.md,
     textAlignVertical: "top"
   },
-  inputError: {
-    borderColor: colors.danger
-  },
-  error: {
-    color: colors.danger,
-    fontSize: 12,
-    marginTop: spacing.xs
-  },
-  helper: {
-    color: colors.muted,
-    fontSize: 12,
-    marginTop: spacing.xs
-  }
+  inputError: { borderColor: colors.danger },
+  error: { color: colors.danger, fontSize: 12, marginTop: spacing.xs },
+  helper: { color: colors.muted, fontSize: 12, marginTop: spacing.xs, lineHeight: 17 }
 });

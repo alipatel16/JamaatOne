@@ -6,6 +6,7 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View
 } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
@@ -44,6 +45,9 @@ function formatBytes(bytes) {
 }
 
 export default function UsersScreen() {
+  const { width } = useWindowDimensions();
+  const phone = width < 600;
+  const narrow = width < 380;
   const [mumineen, setMumineen] = useState([]);
   const [query, setQuery] = useState("");
   const [pageNumber, setPageNumber] = useState(1);
@@ -139,11 +143,11 @@ export default function UsersScreen() {
 
   return (
     <Screen>
-      <View style={styles.titleRow}>
+      <View style={[styles.titleRow, phone && styles.titleRowPhone]}>
         <View style={styles.titleContent}>
           <Text style={styles.title}>Mumineen</Text>
           <Text style={styles.subtitle}>
-            Paginated Mumineen records for the current Jamaat.
+            Search and manage Mumineen for the current Jamaat.
           </Text>
         </View>
         <Button
@@ -152,7 +156,7 @@ export default function UsersScreen() {
           loading={pickingFile}
           disabled={importing}
           onPress={chooseExcel}
-          style={styles.importButton}
+          style={[styles.importButton, phone && styles.importButtonPhone]}
         />
       </View>
 
@@ -164,7 +168,6 @@ export default function UsersScreen() {
           setPageNumber(1);
         }}
         placeholder="Name, ITS ID, mobile, family ID..."
-        helperText="Search is sent to GET /api/Mumineen using the backend search parameter."
       />
 
       {error ? (
@@ -174,7 +177,7 @@ export default function UsersScreen() {
         </Card>
       ) : null}
 
-      <View style={styles.summaryRow}>
+      <View style={[styles.summaryRow, narrow && styles.summaryRowNarrow]}>
         <View>
           <Text style={styles.resultCount}>{totalCount} Mumineen</Text>
           <Text style={styles.rangeText}>
@@ -187,7 +190,7 @@ export default function UsersScreen() {
       {!loading && !error && mumineen.length === 0 ? (
         <Card>
           <Text style={styles.emptyTitle}>No Mumineen found</Text>
-          <Text style={styles.emptyText}>No backend records match this search.</Text>
+          <Text style={styles.emptyText}>Try a different name, ITS ID, mobile or family ID.</Text>
         </Card>
       ) : null}
 
@@ -201,7 +204,7 @@ export default function UsersScreen() {
             })
           }
         >
-          <Card style={styles.userCard}>
+          <Card style={[styles.userCard, narrow && styles.userCardNarrow]}>
             <View style={styles.avatar}>
               <Text style={styles.avatarText}>{getInitials(mumin)}</Text>
             </View>
@@ -240,13 +243,13 @@ export default function UsersScreen() {
         animationType="fade"
         onRequestClose={() => !importing && (setSelectedFile(null), setImportError(""))}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalHeader}>
+        <View style={[styles.modalOverlay, phone && styles.modalOverlayPhone]}>
+          <View style={[styles.modalCard, phone && styles.modalCardPhone]}>
+            <View style={[styles.modalHeader, phone && styles.modalHeaderPhone]}>
               <View style={styles.titleContent}>
                 <Text style={styles.modalTitle}>Import Mumineen Excel</Text>
                 <Text style={styles.modalSubtitle}>
-                  The selected Excel file is uploaded directly to POST /api/Mumineen as multipart/form-data. The frontend does not convert it to JSON.
+                  Review the selected Excel workbook before importing Mumineen records.
                 </Text>
               </View>
               <Pressable disabled={importing} onPress={() => { setSelectedFile(null); setImportError(""); }} style={styles.closeButton}>
@@ -254,7 +257,7 @@ export default function UsersScreen() {
               </Pressable>
             </View>
 
-            <View style={styles.modalBody}>
+            <View style={[styles.modalBody, phone && styles.modalBodyPhone]}>
               {selectedFile ? (
                 <View style={styles.fileCard}>
                   <Text style={styles.fileName}>{selectedFile.name}</Text>
@@ -264,7 +267,7 @@ export default function UsersScreen() {
               {importError ? <Text style={styles.importError}>{importError}</Text> : null}
             </View>
 
-            <View style={styles.modalActions}>
+            <View style={[styles.modalActions, phone && styles.modalActionsPhone]}>
               <Button title="Choose another file" compact variant="outline" disabled={importing} loading={pickingFile} onPress={chooseExcel} />
               <Button title="Upload & import" compact disabled={!selectedFile || importing} loading={importing} onPress={importExcel} />
             </View>
@@ -277,14 +280,18 @@ export default function UsersScreen() {
 
 const styles = StyleSheet.create({
   titleRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: spacing.md, marginBottom: spacing.lg },
+  titleRowPhone: { flexDirection: "column", alignItems: "stretch", gap: spacing.sm },
   titleContent: { flex: 1 },
   title: { fontSize: 26, fontWeight: "800", color: colors.text },
   subtitle: { color: colors.muted, lineHeight: 20, marginTop: spacing.xs },
   importButton: { flexShrink: 0 },
+  importButtonPhone: { width: "100%" },
   summaryRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: spacing.sm },
+  summaryRowNarrow: { alignItems: "flex-start", flexDirection: "column", gap: 3 },
   resultCount: { color: colors.text, fontWeight: "800" },
   rangeText: { color: colors.muted, fontSize: 12, marginTop: 3 },
   userCard: { flexDirection: "row", alignItems: "center" },
+  userCardNarrow: { alignItems: "flex-start" },
   avatar: { width: 48, height: 48, borderRadius: 24, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center", marginRight: spacing.md },
   avatarText: { color: "#FFFFFF", fontWeight: "800" },
   content: { flex: 1 },
@@ -303,16 +310,21 @@ const styles = StyleSheet.create({
   pagination: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.md, marginTop: spacing.lg },
   pageLabel: { minWidth: 70, textAlign: "center", color: colors.text, fontWeight: "800" },
   modalOverlay: { flex: 1, backgroundColor: "rgba(20,30,27,.55)", alignItems: "center", justifyContent: "center", padding: spacing.md },
+  modalOverlayPhone: { justifyContent: "flex-end", padding: 0 },
   modalCard: { width: "100%", maxWidth: 650, backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, overflow: "hidden", ...shadows.card },
+  modalCardPhone: { maxHeight: "94%", borderTopLeftRadius: 24, borderTopRightRadius: 24, borderBottomLeftRadius: 0, borderBottomRightRadius: 0 },
   modalHeader: { flexDirection: "row", alignItems: "flex-start", borderBottomWidth: 1, borderBottomColor: colors.border, padding: spacing.lg },
+  modalHeaderPhone: { padding: spacing.md },
   modalTitle: { color: colors.text, fontSize: 21, fontWeight: "800" },
   modalSubtitle: { color: colors.muted, marginTop: spacing.xs, lineHeight: 19 },
   closeButton: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center", backgroundColor: colors.backgroundAlt, marginLeft: spacing.md },
   closeText: { color: colors.text, fontSize: 25, lineHeight: 27 },
   modalBody: { padding: spacing.lg },
+  modalBodyPhone: { padding: spacing.md },
   fileCard: { backgroundColor: colors.backgroundAlt, borderRadius: radius.md, padding: spacing.md, borderWidth: 1, borderColor: colors.border },
   fileName: { color: colors.text, fontWeight: "800" },
   fileMeta: { color: colors.muted, marginTop: spacing.xs, fontSize: 12 },
   importError: { color: colors.danger, marginTop: spacing.md },
+  modalActionsPhone: { padding: spacing.md },
   modalActions: { flexDirection: "row", justifyContent: "flex-end", flexWrap: "wrap", gap: spacing.sm, borderTopWidth: 1, borderTopColor: colors.border, padding: spacing.lg }
 });

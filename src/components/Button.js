@@ -1,10 +1,5 @@
 import React from "react";
-import {
-  ActivityIndicator,
-  Pressable,
-  StyleSheet,
-  Text
-} from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, Text } from "react-native";
 import { colors, radius, spacing, typography } from "../theme";
 
 const variants = {
@@ -15,7 +10,7 @@ const variants = {
   },
   secondary: {
     backgroundColor: colors.primarySoft,
-    borderColor: colors.primarySoft,
+    borderColor: colors.primarySoftStrong,
     textColor: colors.primaryStrong
   },
   outline: {
@@ -23,9 +18,14 @@ const variants = {
     borderColor: colors.borderStrong,
     textColor: colors.text
   },
+  ghost: {
+    backgroundColor: "transparent",
+    borderColor: "transparent",
+    textColor: colors.primaryStrong
+  },
   danger: {
     backgroundColor: colors.dangerSoft,
-    borderColor: colors.dangerSoft,
+    borderColor: "#F3D6D6",
     textColor: colors.danger
   }
 };
@@ -43,6 +43,7 @@ export default function Button({
 
   return (
     <Pressable
+      accessibilityRole="button"
       onPress={onPress}
       disabled={disabled || loading}
       style={({ pressed }) => [
@@ -60,9 +61,7 @@ export default function Button({
       {loading ? (
         <ActivityIndicator color={palette.textColor} />
       ) : (
-        <Text style={[styles.text, { color: palette.textColor }]}>
-          {title}
-        </Text>
+        <Text style={[styles.text, { color: palette.textColor }]}>{title}</Text>
       )}
     </Pressable>
   );
@@ -84,11 +83,12 @@ const styles = StyleSheet.create({
   text: {
     fontFamily: typography.family,
     fontSize: 14,
-    fontWeight: "700"
+    fontWeight: "800",
+    letterSpacing: 0.1
   },
   pressed: {
-    opacity: 0.82,
-    transform: [{ scale: 0.995 }]
+    opacity: 0.84,
+    transform: [{ scale: 0.985 }]
   },
   disabled: {
     opacity: 0.5

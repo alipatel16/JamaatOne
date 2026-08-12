@@ -186,7 +186,7 @@ export default function ApiLogsPanel() {
           <Text style={styles.eyebrow}>AUDIT TRAIL</Text>
           <Text style={styles.title}>API Logs</Text>
           <Text style={styles.description}>
-            Track backend API calls across users, roles and endpoints using GET /api/Logs.
+            Review request activity across users, roles and application services.
           </Text>
         </View>
         <Button
@@ -380,6 +380,7 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   headingRow: {
     flexDirection: "row",
+    flexWrap: "wrap",
     alignItems: "flex-start",
     gap: spacing.md,
     marginBottom: spacing.xs
@@ -392,7 +393,7 @@ const styles = StyleSheet.create({
   },
   title: { color: colors.text, fontSize: 26, fontWeight: "900", marginTop: 3 },
   description: { color: colors.muted, marginTop: spacing.xs, lineHeight: 20 },
-  filtersCard: { padding: spacing.lg },
+  filtersCard: { padding: spacing.md },
   filterGrid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.md },
   filterWide: { flexGrow: 2, flexBasis: 280, minWidth: 240 },
   filterItem: { flexGrow: 1, flexBasis: 170, minWidth: 150 },
@@ -401,12 +402,13 @@ const styles = StyleSheet.create({
   errorText: { color: colors.danger, fontWeight: "700" },
   summaryRow: {
     flexDirection: "row",
+    flexWrap: "wrap",
     justifyContent: "space-between",
     alignItems: "center"
   },
   summaryText: { color: colors.muted, fontWeight: "700" },
   logCard: { marginBottom: spacing.sm },
-  logTopRow: { flexDirection: "row", alignItems: "flex-start", gap: spacing.sm },
+  logTopRow: { flexDirection: "row", flexWrap: "wrap", alignItems: "flex-start", gap: spacing.sm },
   methodPill: {
     minWidth: 58,
     borderRadius: radius.pill,

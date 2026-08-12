@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View
 } from "react-native";
 
@@ -10,7 +11,7 @@ import { accountsApi } from "../api/accountsApi";
 import { colors, spacing } from "../theme";
 import Button from "./Button";
 import Card from "./Card";
-import MumineenSearchList from "./MumineenSearchList";
+import RemoteMumineenSelect from "./RemoteMumineenSelect";
 
 const PAGE_SIZE = 20;
 
@@ -35,6 +36,9 @@ function formatDate(value) {
 }
 
 export default function CustomerLedgerPanel() {
+  const { width } = useWindowDimensions();
+  const phone = width < 600;
+  const narrow = width < 380;
   const [selectedMumin, setSelectedMumin] = useState(null);
   const [ledgerPage, setLedgerPage] = useState(1);
   const [ledger, setLedger] = useState([]);
@@ -83,13 +87,24 @@ export default function CustomerLedgerPanel() {
 
   return (
     <View>
-      <MumineenSearchList
-        selectedItem={selectedMumin}
-        onSelect={selectMumin}
-        onClear={clearSelection}
-        hint="Select a Mumin to load their payment ledger from the Accounts API."
-        selectActionLabel="View ledger ›"
-      />
+      <Card style={styles.searchCard}>
+        <View style={[styles.searchHeader, phone && styles.searchHeaderPhone]}>
+          <View style={styles.flex}>
+            <Text style={styles.searchTitle}>Choose a Mumin</Text>
+            <Text style={styles.searchHint}>Search by name, ITS ID, mobile or family ID.</Text>
+          </View>
+          {selectedMumin ? (
+            <Button title="Clear" compact variant="ghost" onPress={clearSelection} />
+          ) : null}
+        </View>
+        <RemoteMumineenSelect
+          label="Mumin"
+          value={selectedMumin?.muminId ? String(selectedMumin.muminId) : ""}
+          initialItem={selectedMumin}
+          placeholder="Search name, ITS ID, mobile or family ID"
+          onChange={(_, item) => selectMumin(item)}
+        />
+      </Card>
 
       {selectedMumin ? (
         <>
@@ -103,7 +118,7 @@ export default function CustomerLedgerPanel() {
           ) : ledger.length ? (
             ledger.map(item => (
               <Card key={String(item.paymentId)}>
-                <View style={styles.row}>
+                <View style={[styles.row, phone && styles.rowPhone]}>
                   <View style={styles.flex}>
                     <Text style={styles.title}>
                       {item.categoryName || "Payment"}
@@ -127,7 +142,7 @@ export default function CustomerLedgerPanel() {
                       </View>
                     ) : null}
                   </View>
-                  <Text style={styles.amount}>{money(item.amount)}</Text>
+                  <Text style={[styles.amount, phone && styles.amountPhone]}>{money(item.amount)}</Text>
                 </View>
               </Card>
             ))
@@ -135,7 +150,7 @@ export default function CustomerLedgerPanel() {
             <Card><Text style={styles.empty}>No payments found for this Mumin.</Text></Card>
           )}
 
-          <View style={styles.pagination}>
+          <View style={[styles.pagination, narrow && styles.paginationNarrow]}>
             <Button
               title="Previous"
               compact
@@ -161,11 +176,18 @@ export default function CustomerLedgerPanel() {
 }
 
 const styles = StyleSheet.create({
+  searchCard: { marginBottom: spacing.lg },
+  searchHeader: { flexDirection: "row", alignItems: "flex-start", gap: spacing.md, marginBottom: spacing.xs },
+  searchHeaderPhone: { flexWrap: "wrap", alignItems: "stretch" },
+  searchTitle: { color: colors.text, fontSize: 17, fontWeight: "900" },
+  searchHint: { color: colors.muted, fontSize: 12, marginTop: 3 },
   row: { flexDirection: "row", gap: spacing.md, alignItems: "flex-start" },
+  rowPhone: { flexWrap: "wrap", gap: spacing.sm },
   flex: { flex: 1 },
   title: { color: colors.text, fontSize: 16, fontWeight: "800" },
   meta: { color: colors.muted, marginTop: 4, fontSize: 13 },
   amount: { color: colors.primary, fontSize: 18, fontWeight: "800" },
+  amountPhone: { width: "100%" },
   sectionTitle: { color: colors.text, fontSize: 19, fontWeight: "800", marginTop: spacing.md, marginBottom: spacing.sm },
   fields: { marginTop: spacing.sm, paddingTop: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
   fieldText: { color: colors.textSoft, marginTop: 3, fontSize: 12 },
@@ -173,5 +195,6 @@ const styles = StyleSheet.create({
   error: { color: colors.danger, marginBottom: spacing.md },
   loader: { marginVertical: spacing.lg },
   pagination: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md, marginVertical: spacing.md },
+  paginationNarrow: { gap: spacing.xs },
   pageText: { color: colors.muted, fontSize: 12, fontWeight: "700" }
 });

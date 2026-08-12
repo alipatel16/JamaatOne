@@ -220,24 +220,30 @@ function Tab({ id, label, selected, onSelect }) {
 const styles = StyleSheet.create({
   tabs: {
     flexDirection: "row",
-    marginBottom: spacing.md,
+    marginBottom: spacing.lg,
+    padding: 4,
+    gap: 4,
+    backgroundColor: colors.backgroundAlt,
+    borderRadius: 16,
   },
   tab: {
     flex: 1,
     padding: 11,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: "transparent",
+    borderRadius: 12,
     alignItems: "center",
   },
   tabActive: {
-    backgroundColor: colors.primary,
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
   },
   tabText: {
     fontWeight: "700",
     color: colors.text,
   },
   tabTextActive: {
-    color: "#FFFFFF",
+    color: colors.primaryStrong,
   },
   title: {
     fontSize: 24,
@@ -262,10 +268,12 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: "row",
     alignItems: "center",
+    flexWrap: "wrap",
+    gap: spacing.sm,
   },
   memberDetails: {
     flex: 1,
-    marginRight: spacing.sm,
+    minWidth: 210,
   },
   name: {
     fontWeight: "900",

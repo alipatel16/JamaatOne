@@ -9,6 +9,9 @@ export default function Root({ children }) {
           name="viewport"
           content="width=device-width, initial-scale=1, shrink-to-fit=no"
         />
+        <meta name="referrer" content="no-referrer" />
+        <meta name="robots" content="noindex,nofollow,noarchive" />
+        <meta name="theme-color" content="#145A52" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
@@ -18,7 +21,7 @@ export default function Root({ children }) {
         <style>{`
           html, body, #root {
             min-height: 100%;
-            background: #F7F8F6;
+            background: #F5F7F9;
           }
           body, button, input, textarea {
             font-family: "Mozilla Text", Inter, system-ui, sans-serif;

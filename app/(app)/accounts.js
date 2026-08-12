@@ -6,6 +6,7 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { accountsApi } from "../../src/api/accountsApi";
@@ -15,11 +16,11 @@ import CustomerLedgerPanel from "../../src/components/CustomerLedgerPanel";
 import DayBookPanel from "../../src/components/DayBookPanel";
 import Input from "../../src/components/Input";
 import PaymentPanel from "../../src/components/PaymentPanel";
-import MumineenSearchList from "../../src/components/MumineenSearchList";
+import RemoteMumineenSelect from "../../src/components/RemoteMumineenSelect";
 import Screen from "../../src/components/Screen";
 import { canManageJamaat, canRefundPayments } from "../../src/constants/roles";
 import { useAuth } from "../../src/context/AuthContext";
-import { colors, spacing } from "../../src/theme";
+import { colors, radius, spacing } from "../../src/theme";
 const today = () => new Date().toISOString().slice(0, 10);
 
 const WEEK_DAYS = ["S", "M", "T", "W", "T", "F", "S"];
@@ -38,6 +39,9 @@ function formatDate(date) {
 }
 
 function DatePickerField({ label, value, onChange, allowClear = false }) {
+  const { width } = useWindowDimensions();
+  const phone = width < 600;
+  const narrow = width < 380;
   const [visible, setVisible] = useState(false);
   const [visibleMonth, setVisibleMonth] = useState(parseDate(value));
 
@@ -83,7 +87,7 @@ function DatePickerField({ label, value, onChange, allowClear = false }) {
         onRequestClose={() => setVisible(false)}
       >
         <View style={styles.modalBackdrop}>
-          <View style={styles.calendarModal}>
+          <View style={[styles.calendarModal, phone && styles.calendarModalPhone]}>
             <View style={styles.calendarHeader}>
               <Pressable style={styles.monthButton} onPress={() => moveMonth(-1)}>
                 <Text style={styles.monthButtonText}>‹</Text>
@@ -117,6 +121,7 @@ function DatePickerField({ label, value, onChange, allowClear = false }) {
                       <Pressable
                         style={[
                           styles.dayButton,
+                          narrow && styles.dayButtonNarrow,
                           isToday && styles.todayButton,
                           selected && styles.selectedDayButton,
                         ]}
@@ -171,6 +176,9 @@ const toApiFromDate = value => value ? `${value}T00:00:00` : undefined;
 const toApiToDate = value => value ? `${value}T23:59:59.999` : undefined;
 
 export default function AccountsScreen() {
+  const { width } = useWindowDimensions();
+  const phone = width < 600;
+  const narrow = width < 380;
   const { user } = useAuth();
   const manager = canManageJamaat(user?.role);
   const canRefund = canRefundPayments(user?.role);
@@ -184,6 +192,7 @@ export default function AccountsScreen() {
   const [search, setSearch] = useState("");
   const [paymentMuminId, setPaymentMuminId] = useState("");
   const [paymentMumin, setPaymentMumin] = useState(null);
+  const [paymentCreateRequest, setPaymentCreateRequest] = useState(0);
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [error, setError] = useState("");
@@ -270,7 +279,7 @@ export default function AccountsScreen() {
       </View>
       {error ? <Text style={styles.error}>{error}</Text> : null}
       {manager ? (
-        <View style={styles.tabs}>
+        <View style={[styles.tabs, phone && styles.tabsPhone]}>
           {[
             ["STATS", "Summary"],
             ["PAYMENTS", "Add Payments"],
@@ -280,13 +289,14 @@ export default function AccountsScreen() {
           ].map(([v, l]) => (
             <Pressable
               key={v}
-              style={[styles.tab, tab === v && styles.activeTab]}
+              style={[styles.tab, phone && styles.tabPhone, tab === v && styles.activeTab]}
               onPress={() => {
                 setTab(v);
                 setSearch("");
                 if (v !== "PAYMENTS") {
                   setPaymentMuminId("");
                   setPaymentMumin(null);
+                  setPaymentCreateRequest(0);
                 }
               }}
             >
@@ -298,20 +308,51 @@ export default function AccountsScreen() {
         </View>
       ) : null}
       {tab === "PAYMENTS" ? (
-        <MumineenSearchList
-          selectedItem={paymentMumin}
-          onSelect={item => {
-            setPaymentMumin(item);
-            setPaymentMuminId(String(item.muminId));
-          }}
-          onClear={() => {
-            setPaymentMumin(null);
-            setPaymentMuminId("");
-          }}
-          label="Search payments by Mumin"
-          hint="Search by name, ITS ID, mobile or family ID, then select a Mumin to filter payment history."
-          selectActionLabel="View payments ›"
-        />
+        <Card style={styles.paymentSearchCard}>
+          <View style={[styles.paymentSearchHeader, phone && styles.paymentSearchHeaderPhone]}>
+            <View style={styles.flex}>
+              <Text style={styles.paymentSearchTitle}>Payments</Text>
+              <Text style={styles.paymentSearchSubtitle}>Record a new payment or find an existing member payment.</Text>
+            </View>
+            {manager ? (
+              <Pressable
+                style={[styles.addPaymentButton, phone && styles.addPaymentButtonPhone]}
+                onPress={() => setPaymentCreateRequest(value => value + 1)}
+              >
+                <Text style={styles.addPaymentPlus}>＋</Text>
+                <Text style={styles.addPaymentText}>Add payment</Text>
+              </Pressable>
+            ) : null}
+          </View>
+          <View style={styles.paymentSearchDivider} />
+          <View style={[styles.memberSearchTop, narrow && styles.memberSearchTopNarrow]}>
+            <View style={styles.flex}>
+              <Text style={styles.memberSearchLabel}>Find member payment</Text>
+              <Text style={styles.paymentSearchSubtitle}>Search by name, ITS ID, mobile or family ID.</Text>
+            </View>
+            {paymentMumin ? (
+              <Pressable
+                style={styles.clearMemberButton}
+                onPress={() => {
+                  setPaymentMumin(null);
+                  setPaymentMuminId("");
+                }}
+              >
+                <Text style={styles.clearMemberText}>Clear</Text>
+              </Pressable>
+            ) : null}
+          </View>
+          <RemoteMumineenSelect
+            label="Mumin"
+            value={paymentMuminId}
+            initialItem={paymentMumin}
+            placeholder="Search name, ITS ID, mobile or family ID"
+            onChange={(muminId, item) => {
+              setPaymentMumin(item);
+              setPaymentMuminId(String(muminId || ""));
+            }}
+          />
+        </Card>
       ) : null}
 
       {tab === "DAYBOOK" ? (
@@ -337,7 +378,7 @@ export default function AccountsScreen() {
                 {fromDate || toDate
                   ? `${fromDate || "Any date"} to ${toDate || "Any date"}`
                   : tab === "PAYMENTS"
-                    ? "Filter payment history using the Accounts API"
+                    ? "Narrow payment history by date"
                     : "Filter entries by a date range"}
               </Text>
             </View>
@@ -401,26 +442,26 @@ export default function AccountsScreen() {
           ) : (
             <>
           <View style={styles.summary}>
-            <Card style={styles.summaryCard}><Text>Money received</Text><Text style={styles.amount}>{money(stats.received)}</Text></Card>
-            <Card style={styles.summaryCard}><Text>Total expenses</Text><Text style={[styles.amount, styles.debit]}>{money(stats.expenses)}</Text></Card>
-            <Card style={styles.summaryCard}><Text>Balance</Text><Text style={styles.amount}>{money(stats.balance)}</Text></Card>
+            <Card style={[styles.summaryCard, phone && styles.summaryCardPhone]}><Text>Money received</Text><Text style={styles.amount}>{money(stats.received)}</Text></Card>
+            <Card style={[styles.summaryCard, phone && styles.summaryCardPhone]}><Text>Total expenses</Text><Text style={[styles.amount, styles.debit]}>{money(stats.expenses)}</Text></Card>
+            <Card style={[styles.summaryCard, phone && styles.summaryCardPhone]}><Text>Balance</Text><Text style={styles.amount}>{money(stats.balance)}</Text></Card>
           </View>
           <Card>
             <Text style={styles.sectionTitle}>Account breakdown</Text>
-            <View style={styles.statLine}><Text style={styles.meta}>Member payments received</Text><Text style={styles.statValue}>{money(stats.paymentGross)}</Text></View>
-            <View style={styles.statLine}><Text style={styles.meta}>Payment refunds</Text><Text style={[styles.statValue, styles.debit]}>-{money(stats.paymentRefunds)}</Text></View>
-            <View style={styles.statLine}><Text style={styles.meta}>Net member payments</Text><Text style={styles.statValue}>{money(stats.paymentIncome)}</Text></View>
-            <View style={styles.statLine}><Text style={styles.meta}>Other credit entries</Text><Text style={styles.statValue}>{money(stats.otherIncome)}</Text></View>
-            <View style={styles.statLine}><Text style={styles.meta}>Expenses recorded</Text><Text style={[styles.statValue, styles.debit]}>{money(stats.expenses)}</Text></View>
-            <View style={[styles.statLine, styles.totalLine]}><Text style={styles.paymentTitle}>Available balance</Text><Text style={styles.paymentAmount}>{money(stats.balance)}</Text></View>
+            <View style={[styles.statLine, narrow && styles.statLineNarrow]}><Text style={styles.meta}>Member payments received</Text><Text style={styles.statValue}>{money(stats.paymentGross)}</Text></View>
+            <View style={[styles.statLine, narrow && styles.statLineNarrow]}><Text style={styles.meta}>Payment refunds</Text><Text style={[styles.statValue, styles.debit]}>-{money(stats.paymentRefunds)}</Text></View>
+            <View style={[styles.statLine, narrow && styles.statLineNarrow]}><Text style={styles.meta}>Net member payments</Text><Text style={styles.statValue}>{money(stats.paymentIncome)}</Text></View>
+            <View style={[styles.statLine, narrow && styles.statLineNarrow]}><Text style={styles.meta}>Other credit entries</Text><Text style={styles.statValue}>{money(stats.otherIncome)}</Text></View>
+            <View style={[styles.statLine, narrow && styles.statLineNarrow]}><Text style={styles.meta}>Expenses recorded</Text><Text style={[styles.statValue, styles.debit]}>{money(stats.expenses)}</Text></View>
+            <View style={[styles.statLine, styles.totalLine, narrow && styles.statLineNarrow]}><Text style={styles.paymentTitle}>Available balance</Text><Text style={styles.paymentAmount}>{money(stats.balance)}</Text></View>
           </Card>
           <Text style={styles.sectionTitle}>Date-wise summary</Text>
           {dailyStats.length ? dailyStats.map((item) => (
             <Card key={item.date}>
               <Text style={styles.paymentTitle}>{item.date}</Text>
-              <View style={styles.statLine}><Text style={styles.meta}>Received</Text><Text style={styles.statValue}>{money(item.received)}</Text></View>
-              <View style={styles.statLine}><Text style={styles.meta}>Expenses</Text><Text style={[styles.statValue, styles.debit]}>{money(item.expenses)}</Text></View>
-              <View style={[styles.statLine, styles.totalLine]}><Text style={styles.member}>Balance</Text><Text style={styles.paymentAmount}>{money(item.balance)}</Text></View>
+              <View style={[styles.statLine, narrow && styles.statLineNarrow]}><Text style={styles.meta}>Received</Text><Text style={styles.statValue}>{money(item.received)}</Text></View>
+              <View style={[styles.statLine, narrow && styles.statLineNarrow]}><Text style={styles.meta}>Expenses</Text><Text style={[styles.statValue, styles.debit]}>{money(item.expenses)}</Text></View>
+              <View style={[styles.statLine, styles.totalLine, narrow && styles.statLineNarrow]}><Text style={styles.member}>Balance</Text><Text style={styles.paymentAmount}>{money(item.balance)}</Text></View>
             </Card>
           )) : <Card><Text style={styles.meta}>No account entries found for this period.</Text></Card>}
             </>
@@ -431,6 +472,9 @@ export default function AccountsScreen() {
         <PaymentPanel
           manager={manager}
           canRefund={canRefund}
+          createRequestKey={paymentCreateRequest}
+          onCreateRequestHandled={() => setPaymentCreateRequest(0)}
+          hideCreateButton
           filters={{
             muminId: paymentMuminId,
             fromDate,
@@ -459,45 +503,64 @@ export default function AccountsScreen() {
   );
 }
 const styles = StyleSheet.create({
+  paymentSearchCard: { backgroundColor: colors.surfaceTint, borderColor: colors.primarySoftStrong },
+  paymentSearchHeader: { flexDirection: "row", alignItems: "flex-start", gap: spacing.md, marginBottom: spacing.xs },
+  paymentSearchHeaderPhone: { flexDirection: "column", alignItems: "stretch", gap: spacing.sm },
+  paymentSearchTitle: { color: colors.text, fontSize: 17, fontWeight: "900" },
+  paymentSearchSubtitle: { color: colors.muted, fontSize: 12, marginTop: 3 },
+  clearMemberButton: { paddingVertical: 7, paddingHorizontal: 10, borderRadius: 10, backgroundColor: colors.surface },
+  clearMemberText: { color: colors.primaryStrong, fontWeight: "800", fontSize: 12 },
+  addPaymentButton: { minHeight: 42, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, backgroundColor: colors.primaryStrong, paddingHorizontal: 14, borderRadius: radius.md },
+  addPaymentButtonPhone: { width: "100%", minHeight: 46 },
+  addPaymentPlus: { color: "#fff", fontSize: 18, fontWeight: "900" },
+  addPaymentText: { color: "#fff", fontSize: 12, fontWeight: "900" },
+  paymentSearchDivider: { height: 1, backgroundColor: colors.primarySoftStrong, marginVertical: spacing.md },
+  memberSearchTop: { flexDirection: "row", alignItems: "flex-start", gap: spacing.md, marginBottom: spacing.xs },
+  memberSearchTopNarrow: { flexWrap: "wrap" },
+  memberSearchLabel: { color: colors.text, fontSize: 14, fontWeight: "900" },
   heading: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: spacing.md,
+    marginBottom: spacing.lg,
   },
   flex: { flex: 1 },
-  title: { fontSize: 25, fontWeight: "800", color: colors.text },
-  subtitle: { color: colors.muted, marginTop: spacing.xs },
+  title: { fontSize: 30, fontWeight: "900", color: colors.text },
+  subtitle: { color: colors.muted, marginTop: spacing.xs, lineHeight: 20 },
   error: { color: colors.danger, marginBottom: spacing.md },
   tabs: {
     flexDirection: "row",
     flexWrap: "wrap",
-    marginBottom: spacing.md,
-    gap: 8,
+    marginBottom: spacing.lg,
+    gap: spacing.xs,
+    padding: 5,
+    backgroundColor: colors.backgroundAlt,
+    borderRadius: radius.lg,
+    alignSelf: "flex-start",
   },
   tab: {
     paddingVertical: 10,
     paddingHorizontal: 14,
-    borderRadius: 20,
+    borderRadius: radius.md,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: "transparent",
   },
-  activeTab: { backgroundColor: colors.primary, borderColor: colors.primary },
-  tabText: { color: colors.text, fontWeight: "700" },
-  activeTabText: { color: "white" },
-  summary: { flexDirection: "row", flexWrap: "wrap", marginHorizontal: -4 },
-  summaryCard: { minWidth: 170, flex: 1, marginHorizontal: 4 },
-  amount: { fontSize: 21, fontWeight: "800", color: colors.primary },
+  activeTab: { backgroundColor: colors.surface, borderColor: colors.border },
+  tabText: { color: colors.muted, fontWeight: "800", fontSize: 12 },
+  activeTabText: { color: colors.primaryStrong },
+  tabsPhone: { width: "100%", alignSelf: "stretch" },
+  tabPhone: { flexGrow: 1, flexBasis: "46%", alignItems: "center", paddingHorizontal: spacing.sm },
+  summary: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  summaryCard: { minWidth: 190, flex: 1, marginHorizontal: 0, backgroundColor: colors.surfaceTint, borderColor: colors.primarySoftStrong },
+  summaryCardPhone: { minWidth: "100%", width: "100%" },
+  amount: { fontSize: 23, fontWeight: "900", color: colors.primaryStrong, marginTop: spacing.xs },
   filterToggle: {
-    marginTop: spacing.sm,
-    paddingTop: spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
+    paddingVertical: spacing.xs,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     gap: spacing.md,
   },
-  filterToggleTitle: { color: colors.text, fontWeight: "800" },
+  filterToggleTitle: { color: colors.text, fontWeight: "900" },
   filterToggleSubtitle: { color: colors.muted, marginTop: 3, fontSize: 13 },
   filterChevron: { color: colors.primary, fontSize: 22, fontWeight: "800" },
   filterPanel: { paddingTop: spacing.md },
@@ -535,6 +598,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     padding: spacing.md,
   },
+  calendarModalPhone: { padding: spacing.sm, borderRadius: 16 },
   calendarHeader: {
     flexDirection: "row",
     alignItems: "center",
@@ -562,8 +626,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  dayButtonNarrow: { width: 34, height: 34, borderRadius: 17 },
   todayButton: { borderWidth: 1, borderColor: colors.accent },
-  selectedDayButton: { backgroundColor: colors.primary },
+  selectedDayButton: { backgroundColor: colors.primaryStrong },
   dayText: { color: colors.text, fontWeight: "600" },
   selectedDayText: { color: "white", fontWeight: "800" },
   calendarActions: {
@@ -645,11 +710,12 @@ const styles = StyleSheet.create({
   ledgerLabel: { fontSize: 12, color: colors.muted, textAlign: "right" },
   rangeTabs: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: spacing.md },
   rangeTab: { paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
-  activeRangeTab: { backgroundColor: colors.primary, borderColor: colors.primary },
+  activeRangeTab: { backgroundColor: colors.primaryStrong, borderColor: colors.primaryStrong },
   rangeTabText: { color: colors.text, fontWeight: "700" },
   activeRangeTabText: { color: "white" },
   periodLabel: { color: colors.muted, fontWeight: "700", marginBottom: spacing.md },
   statLine: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: spacing.md, paddingVertical: spacing.sm },
+  statLineNarrow: { alignItems: "flex-start", flexWrap: "wrap", gap: spacing.xs },
   statValue: { color: colors.text, fontWeight: "800" },
   totalLine: { borderTopWidth: 1, borderTopColor: colors.border, marginTop: spacing.sm, paddingTop: spacing.md },
   pending: { color: colors.danger },

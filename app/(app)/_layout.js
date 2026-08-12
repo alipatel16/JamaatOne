@@ -1,36 +1,42 @@
 import React from "react";
 import { Redirect, Tabs } from "expo-router";
-import { Text } from "react-native";
+import { Text, useWindowDimensions } from "react-native";
 
 import { useAuth } from "../../src/context/AuthContext";
 import { canManageJamaat, isSuperAdmin } from "../../src/constants/roles";
 import LoadingView from "../../src/components/LoadingView";
 import AppHeader from "../../src/components/AppHeader";
+import { colors } from "../../src/theme";
 
 const ROUTE_TITLES = {
   index: "Home",
+  accounts: "Accounts",
   users: "Mumineen",
-  "user-detail": "Mumin Details",
-  "bank-accounts": "Bank Accounts",
-  receipt: "Payment Receipt",
+  profile: "Profile",
+  "user-detail": "Mumin details",
+  "bank-accounts": "Bank accounts",
+  receipt: "Payment receipt",
   namaz: "Namaaz",
-  calendar: "Hijri Calendar",
+  calendar: "Hijri calendar",
   fmb: "FMB",
   announcements: "Announcements"
 };
 
 const tabIcon = symbol => ({ color }) => (
-  <Text style={{ color, fontSize: 20, fontWeight: "800" }}>{symbol}</Text>
+  <Text style={{ color, fontSize: 20, fontWeight: "900" }}>{symbol}</Text>
 );
 
 export default function AppLayout() {
   const { user, bootstrapping } = useAuth();
+  const { width } = useWindowDimensions();
 
   if (bootstrapping) return <LoadingView />;
   if (!user) return <Redirect href="/login" />;
   if (isSuperAdmin(user)) return <Redirect href="/super-admin" />;
 
   const manager = canManageJamaat(user.role);
+  const desktop = width >= 1024;
+  const narrowPhone = width < 380;
 
   return (
     <Tabs
@@ -41,27 +47,33 @@ export default function AppLayout() {
           <AppHeader
             title={ROUTE_TITLES[route.name] || route.name.replace(/-/g, " ")}
             showBack={!['index', 'accounts', 'users', 'profile'].includes(route.name)}
-            fallbackRoute={route.name === 'bank-accounts' ? '/accounts' : '/'}
+            fallbackRoute={['bank-accounts', 'receipt'].includes(route.name) ? '/(app)/accounts' : '/(app)'}
           />
         ),
-        tabBarActiveTintColor: "#526A61",
-        tabBarInactiveTintColor: "#8B9590",
-        tabBarStyle: {
-          height: 66,
+        tabBarActiveTintColor: colors.primaryStrong,
+        tabBarInactiveTintColor: colors.muted,
+        tabBarHideOnKeyboard: true,
+        tabBarStyle: desktop ? { display: "none" } : {
+          height: narrowPhone ? 66 : 72,
           paddingTop: 7,
-          paddingBottom: 8,
-          borderTopColor: "#E3E8E5",
-          backgroundColor: "#FFFFFF"
+          paddingBottom: narrowPhone ? 6 : 9,
+          paddingHorizontal: 4,
+          borderTopWidth: 1,
+          borderTopColor: colors.border,
+          backgroundColor: colors.surface,
+          elevation: 10,
+          shadowColor: "#102D29",
+          shadowOpacity: 0.08,
+          shadowRadius: 12,
+          shadowOffset: { width: 0, height: -4 }
         },
-        tabBarLabelStyle: { fontSize: 11, fontWeight: "600" }
+        tabBarItemStyle: { borderRadius: 14, marginHorizontal: 2 },
+        tabBarLabelStyle: { fontSize: narrowPhone ? 9 : 10, fontWeight: "800", marginTop: 1 }
       })}
     >
       <Tabs.Screen name="index" options={{ title: "Home", tabBarIcon: tabIcon("⌂") }} />
       <Tabs.Screen name="accounts" options={{ title: "Accounts", tabBarIcon: tabIcon("₹") }} />
-      <Tabs.Screen
-        name="users"
-        options={{ title: "Mumineen", href: manager ? undefined : null, tabBarIcon: tabIcon("◉") }}
-      />
+      <Tabs.Screen name="users" options={{ title: "Mumineen", href: manager ? undefined : null, tabBarIcon: tabIcon("◉") }} />
       <Tabs.Screen name="profile" options={{ title: "Profile", tabBarIcon: tabIcon("○") }} />
 
       <Tabs.Screen name="namaz" options={{ title: "Namaaz", href: null }} />

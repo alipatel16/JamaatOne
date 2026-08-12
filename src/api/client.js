@@ -25,6 +25,16 @@ export class ApiClientError extends Error {
 
 function getWebStorage() {
   try {
+    // Keep web sessions scoped to the current browser tab/session instead of
+    // persisting bearer credentials indefinitely in localStorage.
+    return globalThis.sessionStorage || null;
+  } catch {
+    return null;
+  }
+}
+
+function getLegacyWebStorage() {
+  try {
     return globalThis.localStorage || null;
   } catch {
     return null;
@@ -33,7 +43,20 @@ function getWebStorage() {
 
 async function readStorage(key) {
   if (Platform.OS === "web") {
-    return getWebStorage()?.getItem(key) || null;
+    const storage = getWebStorage();
+    const current = storage?.getItem(key) || null;
+    if (current) return current;
+
+    // One-time migration from older builds that persisted the session in
+    // localStorage. Move it to sessionStorage and remove the persistent copy.
+    const legacyStorage = getLegacyWebStorage();
+    const legacy = legacyStorage?.getItem(key) || null;
+    if (legacy) {
+      storage?.setItem(key, legacy);
+      legacyStorage?.removeItem(key);
+      return legacy;
+    }
+    return null;
   }
   return SecureStore.getItemAsync(key);
 }
@@ -41,6 +64,7 @@ async function readStorage(key) {
 async function writeStorage(key, value) {
   if (Platform.OS === "web") {
     getWebStorage()?.setItem(key, value);
+    getLegacyWebStorage()?.removeItem(key);
     return;
   }
   await SecureStore.setItemAsync(key, value);
@@ -49,6 +73,7 @@ async function writeStorage(key, value) {
 async function removeStorage(key) {
   if (Platform.OS === "web") {
     getWebStorage()?.removeItem(key);
+    getLegacyWebStorage()?.removeItem(key);
     return;
   }
   await SecureStore.deleteItemAsync(key);
@@ -241,6 +266,13 @@ async function performFetch(path, options = {}, accessToken = null) {
   try {
     const response = await fetch(combineUrl(path), {
       ...fetchOptions,
+      ...(Platform.OS === "web"
+        ? {
+            cache: "no-store",
+            credentials: "omit",
+            referrerPolicy: "no-referrer"
+          }
+        : {}),
       body,
       signal: controller.signal,
       headers: {
@@ -418,7 +450,7 @@ export async function apiRequest(path, options = {}) {
   }
 
   throw new ApiClientError(
-    `No published backend API exists for ${path}. Enable mock unavailable APIs or add the endpoint to Swagger.`
+    "This feature is not available in the current server configuration."
   );
 }
 

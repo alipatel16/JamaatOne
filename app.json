@@ -1,11 +1,28 @@
 {
   "expo": {
     "name": "JamaatOne",
-    "slug": "jamaat-one",
+    "slug": "jamaatone",
     "scheme": "jamaatone",
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
+
+    "ios": {
+      "bundleIdentifier": "com.saifuddinpatel.jamaatone"
+    },
+
+    "android": {
+      "package": "com.saifuddinpatel.jamaatone",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#174F46"
+      },
+      "permissions": [
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ]
+    },
+
     "plugins": [
       "expo-router",
       [
@@ -16,24 +33,32 @@
       ],
       "expo-secure-store"
     ],
+
     "web": {
       "bundler": "metro",
+      "output": "single",
       "favicon": "./assets/favicon.png"
     },
+
     "experiments": {
       "typedRoutes": false
     },
+
     "icon": "./assets/icon.png",
+
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
       "backgroundColor": "#F5F7F6"
     },
-    "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#174F46"
+
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "492e93a1-7660-4522-88ef-f7e14e0c53f6"
       }
-    }
+    },
+
+    "owner": "saifuddin_patel"
   }
 }

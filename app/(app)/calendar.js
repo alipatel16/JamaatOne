@@ -35,6 +35,8 @@ function toIso(date) {
 export default function CalendarScreen() {
   const { width } = useWindowDimensions();
   const isWide = width >= 820;
+  const phone = width < 600;
+  const narrow = width < 380;
   const [cursor, setCursor] = useState(null);
   const [days, setDays] = useState([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -118,17 +120,17 @@ export default function CalendarScreen() {
       <View style={[styles.hero, isWide && styles.heroWide]}>
         <View style={styles.heroCopy}>
           <Text style={styles.eyebrow}>HIJRI CALENDAR</Text>
-          <Text style={styles.title}>Your Islamic month, first.</Text>
+          <Text style={[styles.title, phone && styles.titlePhone]}>Your Islamic month, first.</Text>
           <Text style={styles.subtitle}>
             The main grid follows the Hijri month. Gregorian dates are shown only as a reference inside each Hijri day.
           </Text>
         </View>
 
-        <View style={styles.monthNavigator}>
+        <View style={[styles.monthNavigator, phone && styles.monthNavigatorPhone]}>
           <Pressable style={styles.navButton} onPress={() => changeHijriMonth(-1)}>
             <Text style={styles.navText}>‹</Text>
           </Pressable>
-          <View style={styles.monthCenter}>
+          <View style={[styles.monthCenter, phone && styles.monthCenterPhone]}>
             <Text style={styles.hijriMonth}>{MISRI_MONTH_NAMES[(cursor?.month || 1) - 1]}</Text>
             <Text style={styles.hijriYear}>{cursor?.year || "—"} H</Text>
           </View>
@@ -159,7 +161,7 @@ export default function CalendarScreen() {
 
             <View style={styles.grid}>
               {cells.map((day, index) => {
-                if (!day) return <View key={`blank-${index}`} style={styles.dayCell} />;
+                if (!day) return <View key={`blank-${index}`} style={[styles.dayCell, phone && styles.dayCellPhone, narrow && styles.dayCellNarrow]} />;
                 const actualIndex = index - firstWeekday;
                 const isSelected = actualIndex === selectedIndex;
                 const isToday = toIso(day.date) === toIso(new Date());
@@ -170,6 +172,8 @@ export default function CalendarScreen() {
                     onPress={() => setSelectedIndex(actualIndex)}
                     style={[
                       styles.dayCell,
+                      phone && styles.dayCellPhone,
+                      narrow && styles.dayCellNarrow,
                       isToday && styles.todayCell,
                       isSelected && styles.selectedCell
                     ]}
@@ -185,9 +189,9 @@ export default function CalendarScreen() {
             </View>
           </View>
 
-          <View style={[styles.detailCard, isWide && styles.detailCardWide]}>
+          <View style={[styles.detailCard, phone && styles.detailCardPhone, isWide && styles.detailCardWide]}>
             <Text style={styles.detailEyebrow}>SELECTED HIJRI DATE</Text>
-            <Text style={styles.detailDay}>{selected?.hijriDay || "—"}</Text>
+            <Text style={[styles.detailDay, phone && styles.detailDayPhone]}>{selected?.hijriDay || "—"}</Text>
             <Text style={styles.detailMonth}>
               {MISRI_MONTH_NAMES[(selected?.hijriMonth?.number || cursor?.month || 1) - 1]} {selected?.hijriYear || cursor?.year} H
             </Text>
@@ -201,7 +205,7 @@ export default function CalendarScreen() {
                 year: "numeric"
               }) || "—"}
             </Text>
-            <Text style={styles.sourceNote}>Calendar dates are loaded live rather than generated from static app data.</Text>
+            
           </View>
         </View>
       )}
@@ -215,9 +219,12 @@ const styles = StyleSheet.create({
   heroCopy: { flex: 1, maxWidth: 620 },
   eyebrow: { color: colors.accent, fontWeight: "900", fontSize: 11, letterSpacing: 1.4 },
   title: { color: colors.text, fontSize: 31, lineHeight: 37, fontWeight: "900", marginTop: 7 },
+  titlePhone: { fontSize: 27, lineHeight: 33 },
   subtitle: { color: colors.muted, lineHeight: 21, marginTop: 8, maxWidth: 610 },
   monthNavigator: { flexDirection: "row", alignItems: "center", marginTop: spacing.lg, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 18, padding: 8 },
+  monthNavigatorPhone: { width: "100%", justifyContent: "space-between", marginTop: spacing.md },
   monthCenter: { minWidth: 190, alignItems: "center", paddingHorizontal: 8 },
+  monthCenterPhone: { minWidth: 0, flex: 1, paddingHorizontal: 4 },
   hijriMonth: { color: colors.text, fontWeight: "900", fontSize: 16, textAlign: "center" },
   hijriYear: { color: colors.muted, fontSize: 12, fontWeight: "700", marginTop: 2 },
   navButton: { width: 42, height: 42, borderRadius: 13, alignItems: "center", justifyContent: "center", backgroundColor: colors.background },
@@ -229,6 +236,8 @@ const styles = StyleSheet.create({
   weekday: { width: "14.2857%", textAlign: "center", color: colors.muted, fontSize: 11, fontWeight: "800" },
   grid: { flexDirection: "row", flexWrap: "wrap" },
   dayCell: { width: "14.2857%", aspectRatio: 1, minHeight: 54, borderRadius: 15, alignItems: "center", justifyContent: "center", marginVertical: 2 },
+  dayCellPhone: { minHeight: 44, borderRadius: 12 },
+  dayCellNarrow: { minHeight: 40, borderRadius: 10 },
   todayCell: { borderWidth: 1, borderColor: "#DDBD48" },
   selectedCell: { backgroundColor: "#1E2A24" },
   hijriDay: { color: colors.text, fontWeight: "900", fontSize: 18 },
@@ -238,8 +247,10 @@ const styles = StyleSheet.create({
   todayDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: colors.accent, marginTop: 4 },
   todayDotSelected: { backgroundColor: "#F5D35B" },
   detailCard: { width: "100%", backgroundColor: "#F7F2E4", borderRadius: 22, padding: 22, borderWidth: 1, borderColor: "#E9DFC4" },
+  detailCardPhone: { padding: spacing.lg, borderRadius: 18 },
   detailEyebrow: { color: "#927817", fontSize: 10, letterSpacing: 1.1, fontWeight: "900" },
   detailDay: { color: "#1E2A24", fontSize: 58, lineHeight: 64, fontWeight: "900", marginTop: 10 },
+  detailDayPhone: { fontSize: 48, lineHeight: 54 },
   detailMonth: { color: "#1E2A24", fontSize: 17, lineHeight: 24, fontWeight: "800" },
   divider: { height: 1, backgroundColor: "#DED3B8", marginVertical: 20 },
   gregorianLabel: { color: "#80765F", fontSize: 11, fontWeight: "800", textTransform: "uppercase", letterSpacing: .7 },
