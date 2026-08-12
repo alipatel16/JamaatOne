@@ -10,13 +10,15 @@ import {
   View
 } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
-import { router } from "expo-router";
+import { Redirect, router } from "expo-router";
 
 import { mumineenApi } from "../../src/api/mumineenApi";
 import Button from "../../src/components/Button";
 import Card from "../../src/components/Card";
 import Input from "../../src/components/Input";
 import Screen from "../../src/components/Screen";
+import { canAccessMumineen, canManageMumineen } from "../../src/constants/roles";
+import { useAuth } from "../../src/context/AuthContext";
 import { colors, radius, shadows, spacing } from "../../src/theme";
 
 const PAGE_SIZE = 20;
@@ -45,6 +47,9 @@ function formatBytes(bytes) {
 }
 
 export default function UsersScreen() {
+  const { user } = useAuth();
+  const canBrowse = canAccessMumineen(user);
+  const canManage = canManageMumineen(user);
   const { width } = useWindowDimensions();
   const phone = width < 600;
   const narrow = width < 380;
@@ -63,9 +68,12 @@ export default function UsersScreen() {
   const requestId = useRef(0);
 
   useEffect(() => {
+    if (!canBrowse) return;
     const timer = setTimeout(() => loadMumineen(pageNumber, query), 350);
     return () => clearTimeout(timer);
-  }, [pageNumber, query]);
+  }, [pageNumber, query, canBrowse]);
+
+  if (!canBrowse) return <Redirect href="/(app)" />;
 
   async function loadMumineen(page, searchValue = query) {
     const id = ++requestId.current;
@@ -147,17 +155,19 @@ export default function UsersScreen() {
         <View style={styles.titleContent}>
           <Text style={styles.title}>Mumineen</Text>
           <Text style={styles.subtitle}>
-            Search and manage Mumineen for the current Jamaat.
+            {canManage ? "Search and manage Mumineen for the current Jamaat." : "Browse Mumineen for the current Jamaat."}
           </Text>
         </View>
-        <Button
-          title="Import Mumineen"
-          compact
-          loading={pickingFile}
-          disabled={importing}
-          onPress={chooseExcel}
-          style={[styles.importButton, phone && styles.importButtonPhone]}
-        />
+        {canManage ? (
+          <Button
+            title="Import Mumineen"
+            compact
+            loading={pickingFile}
+            disabled={importing}
+            onPress={chooseExcel}
+            style={[styles.importButton, phone && styles.importButtonPhone]}
+          />
+        ) : null}
       </View>
 
       <Input

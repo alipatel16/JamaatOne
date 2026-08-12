@@ -3,7 +3,7 @@ import { Redirect, Tabs } from "expo-router";
 import { Text, useWindowDimensions } from "react-native";
 
 import { useAuth } from "../../src/context/AuthContext";
-import { canManageJamaat, isSuperAdmin } from "../../src/constants/roles";
+import { canAccessMumineen, isSuperAdmin } from "../../src/constants/roles";
 import LoadingView from "../../src/components/LoadingView";
 import AppHeader from "../../src/components/AppHeader";
 import { colors } from "../../src/theme";
@@ -15,6 +15,7 @@ const ROUTE_TITLES = {
   profile: "Profile",
   "user-detail": "Mumin details",
   "bank-accounts": "Bank accounts",
+  "user-management": "User Management",
   receipt: "Payment receipt",
   namaz: "Namaaz",
   calendar: "Hijri calendar",
@@ -34,7 +35,7 @@ export default function AppLayout() {
   if (!user) return <Redirect href="/login" />;
   if (isSuperAdmin(user)) return <Redirect href="/super-admin" />;
 
-  const manager = canManageJamaat(user.role);
+  const canBrowseMumineen = canAccessMumineen(user);
   const desktop = width >= 1024;
   const narrowPhone = width < 380;
 
@@ -46,7 +47,7 @@ export default function AppLayout() {
         header: () => (
           <AppHeader
             title={ROUTE_TITLES[route.name] || route.name.replace(/-/g, " ")}
-            showBack={!['index', 'accounts', 'users', 'profile'].includes(route.name)}
+            showBack={!['index', 'accounts', 'users', 'profile', 'user-management'].includes(route.name)}
             fallbackRoute={['bank-accounts', 'receipt'].includes(route.name) ? '/(app)/accounts' : '/(app)'}
           />
         ),
@@ -73,7 +74,7 @@ export default function AppLayout() {
     >
       <Tabs.Screen name="index" options={{ title: "Home", tabBarIcon: tabIcon("⌂") }} />
       <Tabs.Screen name="accounts" options={{ title: "Accounts", tabBarIcon: tabIcon("₹") }} />
-      <Tabs.Screen name="users" options={{ title: "Mumineen", href: manager ? undefined : null, tabBarIcon: tabIcon("◉") }} />
+      <Tabs.Screen name="users" options={{ title: "Mumineen", href: canBrowseMumineen ? undefined : null, tabBarIcon: tabIcon("◉") }} />
       <Tabs.Screen name="profile" options={{ title: "Profile", tabBarIcon: tabIcon("○") }} />
 
       <Tabs.Screen name="namaz" options={{ title: "Namaaz", href: null }} />
@@ -83,6 +84,7 @@ export default function AppLayout() {
       <Tabs.Screen name="announcements" options={{ href: null }} />
       <Tabs.Screen name="receipt" options={{ href: null }} />
       <Tabs.Screen name="bank-accounts" options={{ href: null }} />
+      <Tabs.Screen name="user-management" options={{ href: null }} />
     </Tabs>
   );
 }

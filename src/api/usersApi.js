@@ -1,41 +1,119 @@
-import { apiClient } from "./client";
-import { endpoints } from "./endpoints";
+import { liveApiRequest } from "./client";
+import { liveEndpoints } from "./endpoints";
+
+const paged = (path, filters = {}) =>
+  liveApiRequest(liveEndpoints.users.paged(path, filters));
+
+const createRoleUser = (path, payload) =>
+  liveApiRequest(path, {
+    method: "POST",
+    body: {
+      itsNo: String(payload.itsNo || "").trim(),
+      name: String(payload.name || "").trim(),
+      password: payload.password || ""
+    }
+  });
+
+const updateRoleUser = (path, payload) =>
+  liveApiRequest(path, {
+    method: "PUT",
+    body: {
+      name: String(payload.name || "").trim(),
+      isActive:
+        payload.isActive === undefined || payload.isActive === null
+          ? undefined
+          : Boolean(payload.isActive)
+    }
+  });
+
+const removeRoleUser = path => liveApiRequest(path, { method: "DELETE" });
 
 export const usersApi = {
-  getAll(query) {
-    return apiClient.get(endpoints.users, { query });
+  // Super Admin -> Aamil CRUD
+  getAamils(filters = {}) {
+    return paged(liveEndpoints.users.aamils, filters);
   },
-  getById(id) {
-    return apiClient.get(endpoints.userById(id));
+  getAamil(userId) {
+    return liveApiRequest(liveEndpoints.users.aamilById(userId));
   },
-  update(id, payload) {
-    return apiClient.put(endpoints.updateUser(id), payload);
+  createAamil(payload) {
+    return liveApiRequest(liveEndpoints.users.aamils, {
+      method: "POST",
+      body: {
+        itsNo: String(payload.itsNo || "").trim(),
+        name: String(payload.name || "").trim(),
+        password: payload.password || "",
+        jamaatId: Number(payload.jamaatId)
+      }
+    });
   },
-  updateRole(id, payload) {
-    return apiClient.put(endpoints.updateUserRole(id), payload);
+  updateAamil(userId, payload) {
+    const body = {
+      name: String(payload.name || "").trim(),
+      jamaatId: Number(payload.jamaatId),
+      isActive:
+        payload.isActive === undefined || payload.isActive === null
+          ? undefined
+          : Boolean(payload.isActive)
+    };
+    if (String(payload.password || "").length) body.password = payload.password;
+    return liveApiRequest(liveEndpoints.users.aamilById(userId), {
+      method: "PUT",
+      body
+    });
   },
-  updateGrade(id, payload) {
-    return apiClient.put(endpoints.updateUserGrade(id), payload);
+  deleteAamil(userId) {
+    return removeRoleUser(liveEndpoints.users.aamilById(userId));
   },
-  updateFmb(id, payload) {
-    return apiClient.put(endpoints.updateUserFmb(id), payload);
+
+  // Aamil -> Committee Member CRUD
+  getCommitteeMembers(filters = {}) {
+    return paged(liveEndpoints.users.committeeMembers, filters);
   },
-  getFamilyMembers(id) {
-    return apiClient.get(endpoints.familyMembers(id));
+  getCommitteeMember(userId) {
+    return liveApiRequest(liveEndpoints.users.committeeMemberById(userId));
   },
-  getFamilyCandidates(id, query) {
-    return apiClient.get(endpoints.familyCandidates(id), { query });
+  createCommitteeMember(payload) {
+    return createRoleUser(liveEndpoints.users.committeeMembers, payload);
   },
-  addFamilyMember(id, payload) {
-    return apiClient.post(endpoints.addFamilyMember(id), payload);
+  updateCommitteeMember(userId, payload) {
+    return updateRoleUser(liveEndpoints.users.committeeMemberById(userId), payload);
   },
-  updateFamilyRelation(id, memberId, payload) {
-    return apiClient.put(
-      endpoints.updateFamilyRelation(id, memberId),
-      payload
-    );
+  deleteCommitteeMember(userId) {
+    return removeRoleUser(liveEndpoints.users.committeeMemberById(userId));
   },
-  removeFamilyMember(id, memberId) {
-    return apiClient.delete(endpoints.removeFamilyMember(id, memberId));
+
+  // Aamil -> FMB User CRUD
+  getFmbUsers(filters = {}) {
+    return paged(liveEndpoints.users.fmbUsers, filters);
   },
+  getFmbUser(userId) {
+    return liveApiRequest(liveEndpoints.users.fmbUserById(userId));
+  },
+  createFmbUser(payload) {
+    return createRoleUser(liveEndpoints.users.fmbUsers, payload);
+  },
+  updateFmbUser(userId, payload) {
+    return updateRoleUser(liveEndpoints.users.fmbUserById(userId), payload);
+  },
+  deleteFmbUser(userId) {
+    return removeRoleUser(liveEndpoints.users.fmbUserById(userId));
+  },
+
+  // Aamil -> Madarsa Admin CRUD (endpoint spelling follows Swagger exactly).
+  getMadarsaAdmins(filters = {}) {
+    return paged(liveEndpoints.users.madarsaAdmins, filters);
+  },
+  getMadarsaAdmin(userId) {
+    return liveApiRequest(liveEndpoints.users.madarsaAdminById(userId));
+  },
+  createMadarsaAdmin(payload) {
+    return createRoleUser(liveEndpoints.users.madarsaAdmins, payload);
+  },
+  updateMadarsaAdmin(userId, payload) {
+    return updateRoleUser(liveEndpoints.users.madarsaAdminById(userId), payload);
+  },
+  deleteMadarsaAdmin(userId) {
+    return removeRoleUser(liveEndpoints.users.madarsaAdminById(userId));
+  }
 };

@@ -17,6 +17,8 @@ import Button from "../../src/components/Button";
 import Card from "../../src/components/Card";
 import LoadingView from "../../src/components/LoadingView";
 import Screen from "../../src/components/Screen";
+import { canManageAccounts } from "../../src/constants/roles";
+import { useAuth } from "../../src/context/AuthContext";
 import { receiptHtml } from "../../src/utils/receiptHtml";
 import {
   downloadReceiptPdf,
@@ -87,6 +89,8 @@ function makeLiveReceipt(payment, mumin) {
 }
 
 export default function Receipt() {
+  const { user } = useAuth();
+  const manager = canManageAccounts(user);
   const { paymentId } = useLocalSearchParams();
   const { width } = useWindowDimensions();
   const isWide = width >= 760;
@@ -103,6 +107,18 @@ export default function Receipt() {
       try {
         setError("");
         const payment = await accountsApi.getPayment(paymentId);
+
+        if (!manager) {
+          const itsNo = String(user?.itsNo || user?.itsId || "").trim();
+          if (!itsNo) throw new Error("This receipt is not available for the current account.");
+          const result = await mumineenApi.getPaged(1, 20, itsNo);
+          const mumineen = Array.isArray(result?.items) ? result.items : [];
+          const ownMumin = mumineen.find(item => String(item?.itsId || "").trim() === itsNo);
+          if (!ownMumin?.muminId || String(ownMumin.muminId) !== String(payment?.muminId)) {
+            throw new Error("You can only open receipts from your own payment history.");
+          }
+        }
+
         let mumin = null;
         if (payment?.muminId) {
           try {
@@ -120,7 +136,7 @@ export default function Receipt() {
     return () => {
       active = false;
     };
-  }, [paymentId]);
+  }, [paymentId, manager, user?.itsNo, user?.itsId]);
 
   if (!receipt && !error) return <LoadingView />;
 

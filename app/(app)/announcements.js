@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Alert, StyleSheet, Text, View } from "react-native";
+import { Redirect } from "expo-router";
 
 import { apiRequest } from "../../src/api/client";
 import { endpoints } from "../../src/api/endpoints";
@@ -12,6 +13,8 @@ import {
   ANNOUNCEMENT_TYPES,
   getAnnouncementTypeLabel
 } from "../../src/constants/announcements";
+import { canDeleteJamaatData, canManageAnnouncements } from "../../src/constants/roles";
+import { useAuth } from "../../src/context/AuthContext";
 import { colors, spacing } from "../../src/theme";
 
 const initialForm = {
@@ -24,14 +27,19 @@ const initialForm = {
 };
 
 export default function AnnouncementsScreen() {
+  const { user } = useAuth();
+  const manager = canManageAnnouncements(user);
+  const canDelete = canDeleteJamaatData(user);
   const [items, setItems] = useState([]);
   const [form, setForm] = useState(initialForm);
   const [editingId, setEditingId] = useState(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    load();
-  }, []);
+    if (manager) load();
+  }, [manager]);
+
+  if (!manager) return <Redirect href="/(app)" />;
 
   async function load() {
     try {
@@ -183,26 +191,28 @@ export default function AnnouncementsScreen() {
                 }}
               />
             </View>
-            <View style={styles.action}>
-              <Button
-                title="Delete"
-                variant="danger"
-                onPress={() =>
-                  Alert.alert(
-                    "Delete announcement?",
-                    item.title,
-                    [
-                      { text: "Cancel", style: "cancel" },
-                      {
-                        text: "Delete",
-                        style: "destructive",
-                        onPress: () => remove(item.id)
-                      }
-                    ]
-                  )
-                }
-              />
-            </View>
+            {canDelete ? (
+              <View style={styles.action}>
+                <Button
+                  title="Delete"
+                  variant="danger"
+                  onPress={() =>
+                    Alert.alert(
+                      "Delete announcement?",
+                      item.title,
+                      [
+                        { text: "Cancel", style: "cancel" },
+                        {
+                          text: "Delete",
+                          style: "destructive",
+                          onPress: () => remove(item.id)
+                        }
+                      ]
+                    )
+                  }
+                />
+              </View>
+            ) : null}
           </View>
         </Card>
       ))}

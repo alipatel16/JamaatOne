@@ -26,7 +26,7 @@ function normalizePaymentPayload(payload, includeMuminId) {
   return {
     ...(includeMuminId ? { muminId: Number(payload?.muminId) } : {}),
     categoryId: Number(payload?.categoryId),
-    subCategoryId: Number(payload?.subCategoryId || 0),
+    subCategoryId: payload?.subCategoryId ? Number(payload.subCategoryId) : null,
     amount: Number(payload?.amount),
     paymentMethodId: Number(payload?.paymentMethodId),
     paymentReference: payload?.paymentReference || null,

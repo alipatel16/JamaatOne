@@ -12,10 +12,10 @@ import {
 } from "react-native";
 import { Redirect, router } from "expo-router";
 
-import { authApi } from "../src/api/authApi";
 import { jamaatApi } from "../src/api/jamaatApi";
 import { jamiatApi } from "../src/api/jamiatApi";
 import Button from "../src/components/Button";
+import AamilManagementPanel from "../src/components/AamilManagementPanel";
 import ApiLogsPanel from "../src/components/ApiLogsPanel";
 import Card from "../src/components/Card";
 import Input from "../src/components/Input";
@@ -64,13 +64,6 @@ const EMPTY_JAMAAT_FORM = {
   isActive: true
 };
 
-const EMPTY_AAMIL_FORM = {
-  itsNo: "",
-  name: "",
-  password: "",
-  roleId: "",
-  jamaatId: ""
-};
 
 function getErrorMessage(error) {
   return (
@@ -599,164 +592,8 @@ function JamaatPanel({ items, jamiats, loading, onReload }) {
   );
 }
 
-function AamilPanel({ jamaats, roles }) {
-  const [form, setForm] = useState(EMPTY_AAMIL_FORM);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-  const [createdAamil, setCreatedAamil] = useState(null);
-
-  const jamaatOptions = useMemo(
-    () =>
-      jamaats.map(item => ({
-        label: `${item.name || "Unnamed Jamaat"} · ID ${item.jamaatId}`,
-        value: String(item.jamaatId)
-      })),
-    [jamaats]
-  );
-
-  const roleOptions = useMemo(
-    () =>
-      (roles || []).map(item => ({
-        label: item.roleName || `Role ${item.roleId}`,
-        value: String(item.roleId)
-      })),
-    [roles]
-  );
-
-  useEffect(() => {
-    if (form.roleId || !roles?.length) return;
-    const aamilRole = roles.find(item =>
-      String(item.roleName || "").trim().toUpperCase().replace(/[\s-]+/g, "_") === "AAMIL"
-    );
-    if (aamilRole) {
-      setForm(current => ({ ...current, roleId: String(aamilRole.roleId) }));
-    }
-  }, [form.roleId, roles]);
-
-  async function submit() {
-    const roleId = Number(form.roleId);
-    const jamaatId = Number(form.jamaatId);
-
-    if (!form.itsNo.trim() || !form.name.trim() || !form.password) {
-      setError("ITS number, name and password are required.");
-      return;
-    }
-    if (!Number.isInteger(roleId) || roleId <= 0) {
-      setError("Select the Aamil role.");
-      return;
-    }
-    if (!Number.isInteger(jamaatId) || jamaatId <= 0) {
-      setError("Select the Jamaat for this Aamil.");
-      return;
-    }
-
-    try {
-      setSaving(true);
-      setError("");
-      const created = await authApi.createAamil({
-        itsNo: form.itsNo.trim(),
-        name: form.name.trim(),
-        password: form.password,
-        roleId,
-        jamaatId
-      });
-      setCreatedAamil(created);
-      setForm(EMPTY_AAMIL_FORM);
-    } catch (requestError) {
-      setError(getErrorMessage(requestError));
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <View style={styles.panelGrid}>
-      <Card style={styles.formCard}>
-        <SectionHeading
-          eyebrow="SUPER ADMIN ONLY"
-          title="Create Aamil"
-          description="Create an Aamil and assign the correct role and Jamaat."
-        />
-
-        <Input
-          label="ITS number"
-          value={form.itsNo}
-          onChangeText={itsNo => setForm(current => ({ ...current, itsNo }))}
-          keyboardType="number-pad"
-          autoCapitalize="none"
-          placeholder="Enter ITS number"
-        />
-        <Input
-          label="Name"
-          value={form.name}
-          onChangeText={name => setForm(current => ({ ...current, name }))}
-          placeholder="Enter Aamil name"
-          autoCapitalize="words"
-        />
-        <Input
-          label="Temporary password"
-          value={form.password}
-          onChangeText={password =>
-            setForm(current => ({ ...current, password }))
-          }
-          secureTextEntry
-          placeholder="Enter password"
-        />
-        <Select
-          label="Role"
-          value={form.roleId}
-          options={roleOptions}
-          onChange={roleId => setForm(current => ({ ...current, roleId }))}
-          placeholder="Select Aamil role"
-        />
-        <Select
-          label="Jamaat"
-          value={form.jamaatId}
-          options={jamaatOptions}
-          onChange={jamaatId =>
-            setForm(current => ({ ...current, jamaatId }))
-          }
-          placeholder={
-            jamaatOptions.length ? "Select Jamaat" : "Create a Jamaat first"
-          }
-        />
-
-        {error ? <Text style={styles.errorText}>{error}</Text> : null}
-
-        <Button
-          title="Create Aamil"
-          loading={saving}
-          disabled={!jamaatOptions.length}
-          onPress={submit}
-        />
-      </Card>
-
-      <View style={styles.sideColumn}>
-        <Card style={styles.noticeCard}>
-          <Text style={styles.noticeTitle}>Aamil management</Text>
-          <Text style={styles.noticeText}>
-            Aamil creation is available here. Listing, editing and removing Aamil records will appear when those management actions are available.
-          </Text>
-        </Card>
-
-        {createdAamil ? (
-          <Card style={styles.successCard}>
-            <Text style={styles.successTitle}>Aamil created successfully</Text>
-            <Text style={styles.successName}>{createdAamil.name}</Text>
-            <Text style={styles.successMeta}>
-              ITS {createdAamil.itsNo} · User ID {createdAamil.userId}
-            </Text>
-            <Text style={styles.successMeta}>
-              Role {createdAamil.roleName || createdAamil.roleId} · Jamaat ID {createdAamil.jamaatId}
-            </Text>
-            <Text style={styles.successHint}>
-              The new Aamil is ready to use with the assigned Jamaat access.
-            </Text>
-          </Card>
-        ) : null}
-      </View>
-    </View>
-  );
+function AamilPanel({ jamaats }) {
+  return <AamilManagementPanel jamaats={jamaats} />;
 }
 
 export default function SuperAdminScreen() {
@@ -767,7 +604,6 @@ export default function SuperAdminScreen() {
   const [activeTab, setActiveTab] = useState("jamiat");
   const [jamiats, setJamiats] = useState([]);
   const [jamaats, setJamaats] = useState([]);
-  const [roles, setRoles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -775,14 +611,12 @@ export default function SuperAdminScreen() {
     try {
       setLoading(true);
       setError("");
-      const [jamiatItems, jamaatItems, roleItems] = await Promise.all([
+      const [jamiatItems, jamaatItems] = await Promise.all([
         jamiatApi.getAll(),
-        jamaatApi.getAll(),
-        authApi.getRoles()
+        jamaatApi.getAll()
       ]);
       setJamiats(Array.isArray(jamiatItems) ? jamiatItems : []);
       setJamaats(Array.isArray(jamaatItems) ? jamaatItems : []);
-      setRoles(Array.isArray(roleItems) ? roleItems : []);
     } catch (requestError) {
       setError(getErrorMessage(requestError));
     } finally {
@@ -861,10 +695,7 @@ export default function SuperAdminScreen() {
           onReload={loadDirectories}
         />
       ) : activeTab === "aamil" ? (
-        <AamilPanel
-          jamaats={jamaats.filter(item => item.isActive !== false)}
-          roles={roles}
-        />
+        <AamilPanel jamaats={jamaats.filter(item => item.isActive !== false)} />
       ) : PAYMENT_SETUP_TABS[activeTab] ? (
         <PaymentSetupPanel section={PAYMENT_SETUP_TABS[activeTab]} />
       ) : (

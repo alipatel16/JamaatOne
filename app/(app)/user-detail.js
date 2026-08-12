@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Alert, StyleSheet, Text, View } from "react-native";
-import { router, useLocalSearchParams } from "expo-router";
+import { Redirect, router, useLocalSearchParams } from "expo-router";
 
 import { mumineenApi } from "../../src/api/mumineenApi";
 import Button from "../../src/components/Button";
@@ -9,6 +9,8 @@ import Input from "../../src/components/Input";
 import LoadingView from "../../src/components/LoadingView";
 import Screen from "../../src/components/Screen";
 import Select from "../../src/components/Select";
+import { canAccessMumineen, canDeleteJamaatData, canManageMumineen } from "../../src/constants/roles";
+import { useAuth } from "../../src/context/AuthContext";
 import { colors, spacing } from "../../src/theme";
 
 const ACTIVE_OPTIONS = [
@@ -73,6 +75,10 @@ function ReadOnlyRow({ label, value }) {
 }
 
 export default function UserDetailScreen() {
+  const { user } = useAuth();
+  const canBrowse = canAccessMumineen(user);
+  const canManage = canManageMumineen(user);
+  const canDelete = canDeleteJamaatData(user);
   const params = useLocalSearchParams();
   const muminId = Array.isArray(params.muminId)
     ? params.muminId[0]
@@ -87,8 +93,10 @@ export default function UserDetailScreen() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    loadMumin();
-  }, [muminId]);
+    if (canBrowse) loadMumin();
+  }, [muminId, canBrowse]);
+
+  if (!canBrowse) return <Redirect href="/(app)" />;
 
   async function loadMumin() {
     if (!muminId) {
@@ -187,16 +195,17 @@ export default function UserDetailScreen() {
             ITS {mumin.itsId || "-"} · Mumin #{mumin.muminId}
           </Text>
         </View>
-        <Button
-          title={editing ? "Cancel" : "Edit"}
-          variant={editing ? "outline" : "primary"}
-          compact
-          disabled
-          onPress={() => {
-            if (editing) setForm(buildForm(mumin));
-            setEditing(current => !current);
-          }}
-        />
+        {canManage ? (
+          <Button
+            title={editing ? "Cancel" : "Edit"}
+            variant={editing ? "outline" : "primary"}
+            compact
+            onPress={() => {
+              if (editing) setForm(buildForm(mumin));
+              setEditing(current => !current);
+            }}
+          />
+        ) : null}
       </View>
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -426,14 +435,15 @@ export default function UserDetailScreen() {
         />
       ) : null}
 
-      <Button
-        title="Delete Mumin"
-        variant="danger"
-        loading={deleting}
-        disabled
-        style={styles.deleteButton}
-        onPress={confirmDelete}
-      />
+      {canDelete ? (
+        <Button
+          title="Delete Mumin"
+          variant="danger"
+          loading={deleting}
+          style={styles.deleteButton}
+          onPress={confirmDelete}
+        />
+      ) : null}
     </Screen>
   );
 }

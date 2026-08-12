@@ -1,11 +1,33 @@
 export const liveEndpoints = {
   auth: {
     login: "/api/Auth/login",
-    createUser: "/api/Auth/create-user",
-    createAamil: "/api/Auth/create-aamil",
     refreshToken: "/api/Auth/refresh-token",
     roles: "/api/Auth/roles",
     logout: "/api/Auth/logout"
+  },
+
+
+
+  users: {
+    aamils: "/api/Users/aamils",
+    aamilById: userId => `/api/Users/aamils/${userId}`,
+    committeeMembers: "/api/Users/committee-members",
+    committeeMemberById: userId => `/api/Users/committee-members/${userId}`,
+    fmbUsers: "/api/Users/fmb-users",
+    fmbUserById: userId => `/api/Users/fmb-users/${userId}`,
+    madarsaAdmins: "/api/Users/madarsa-admins",
+    madarsaAdminById: userId => `/api/Users/madarsa-admins/${userId}`,
+    paged: (path, { pageNumber = 1, pageSize = 20, search, jamaatId } = {}) => {
+      const params = new URLSearchParams({
+        pageNumber: String(pageNumber),
+        pageSize: String(pageSize)
+      });
+      if (String(search || "").trim()) params.set("search", String(search).trim());
+      if (jamaatId !== undefined && jamaatId !== null && jamaatId !== "") {
+        params.set("jamaatId", String(jamaatId));
+      }
+      return `${path}?${params.toString()}`;
+    }
   },
 
   jamiat: {

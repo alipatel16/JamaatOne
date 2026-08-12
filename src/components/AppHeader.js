@@ -12,21 +12,22 @@ import {
 import { usePathname, useRouter } from "expo-router";
 
 import { useAuth } from "../context/AuthContext";
-import { canManageJamaat } from "../constants/roles";
+import { canAccessFmb, canAccessMumineen, canManageJamaat, canManageUsers } from "../constants/roles";
 import { colors, radius, shadows, spacing, typography } from "../theme";
 
 const PRIMARY_ITEMS = [
   { label: "Home", route: "/(app)", match: "/", icon: "⌂" },
   { label: "Accounts", route: "/(app)/accounts", match: "/accounts", icon: "₹" },
-  { label: "Mumineen", route: "/(app)/users", match: "/users", icon: "◉", managerOnly: true },
+  { label: "Mumineen", route: "/(app)/users", match: "/users", icon: "◉", mumineenOnly: true },
   { label: "Profile", route: "/(app)/profile", match: "/profile", icon: "○" }
 ];
 
 const MENU_ITEMS = [
   { label: "Namaaz timings", route: "/(app)/namaz", icon: "◷", caption: "Location-based prayer schedule" },
   { label: "Hijri calendar", route: "/(app)/calendar", icon: "▦", caption: "Calendar and important dates" },
-  { label: "FMB services", route: "/(app)/fmb", icon: "◉", caption: "Menu and thali services" },
-  { label: "Announcements", route: "/(app)/announcements", icon: "◇", caption: "Community updates" }
+  { label: "FMB services", route: "/(app)/fmb", icon: "◉", caption: "Menu and thali services", access: "fmb" },
+  { label: "User management", route: "/(app)/user-management", icon: "◎", caption: "Committee, FMB and Madrasa access", access: "aamil" },
+  { label: "Announcements", route: "/(app)/announcements", icon: "◇", caption: "Create and manage community updates", access: "manager" }
 ];
 
 export default function AppHeader({ title, showBack = false, fallbackRoute = "/" }) {
@@ -59,7 +60,13 @@ export default function AppHeader({ title, showBack = false, fallbackRoute = "/"
     return pathname?.includes(match);
   }
 
-  const primaryItems = PRIMARY_ITEMS.filter(item => !item.managerOnly || manager);
+  const primaryItems = PRIMARY_ITEMS.filter(item => !item.mumineenOnly || canAccessMumineen(user));
+  const menuItems = MENU_ITEMS.filter(item => {
+    if (item.access === "fmb") return canAccessFmb(user);
+    if (item.access === "aamil") return canManageUsers(user);
+    if (item.access === "manager") return manager;
+    return true;
+  });
 
   return (
     <>
@@ -109,7 +116,7 @@ export default function AppHeader({ title, showBack = false, fallbackRoute = "/"
           {isDesktop ? (
             <View style={styles.userText}>
               <Text style={styles.userName} numberOfLines={1}>{user?.name || "Member"}</Text>
-              <Text style={styles.userRole}>{manager ? "Management" : "Member"}</Text>
+              <Text style={styles.userRole}>{user?.roleName || (manager ? "Management" : "Member")}</Text>
             </View>
           ) : null}
           <View style={[styles.avatar, isPhone && styles.avatarPhone]}>
@@ -155,7 +162,7 @@ export default function AppHeader({ title, showBack = false, fallbackRoute = "/"
               ) : null}
 
               <Text style={styles.sectionLabel}>SERVICES</Text>
-              {MENU_ITEMS.map(item => (
+              {menuItems.map(item => (
                 <Pressable
                   key={item.route}
                   onPress={() => navigate(item.route)}
@@ -177,7 +184,7 @@ export default function AppHeader({ title, showBack = false, fallbackRoute = "/"
               </View>
               <View style={styles.footerCopy}>
                 <Text style={styles.footerName}>{user?.name || "Jamaat member"}</Text>
-                <Text style={styles.footerRole}>ITS {user?.itsId || "-"} · {manager ? "Management" : "Member"}</Text>
+                <Text style={styles.footerRole}>ITS {user?.itsId || "-"} · {user?.roleName || (manager ? "Management" : "Member")}</Text>
               </View>
             </View>
           </View>

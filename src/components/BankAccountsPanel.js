@@ -60,7 +60,7 @@ function initials(value) {
   return words.slice(0, 2).map(word => word[0]?.toUpperCase()).join("") || "BK";
 }
 
-export default function BankAccountsPanel({ canManage = false }) {
+export default function BankAccountsPanel({ canManage = false, canDelete = false }) {
   const { width } = useWindowDimensions();
   const wide = width >= 820;
   const phone = width < 600;
@@ -154,6 +154,7 @@ export default function BankAccountsPanel({ canManage = false }) {
   }
 
   async function remove(item) {
+    if (!canDelete) return;
     const proceed = await confirmAction(
       "Delete bank account",
       `Delete ${item.bankAccountName || item.bankName || "this bank account"}?`,
@@ -263,12 +264,14 @@ export default function BankAccountsPanel({ canManage = false }) {
                     variant="outline"
                     onPress={() => openEdit(item)}
                   />
-                  <Button
-                    title="Delete"
-                    compact
-                    variant="danger"
-                    onPress={() => remove(item)}
-                  />
+                  {canDelete ? (
+                    <Button
+                      title="Delete"
+                      compact
+                      variant="danger"
+                      onPress={() => remove(item)}
+                    />
+                  ) : null}
                 </View>
               ) : null}
             </Card>

@@ -10,6 +10,7 @@ import {
   View,
 } from "react-native";
 import { accountsApi } from "../../src/api/accountsApi";
+import { mumineenApi } from "../../src/api/mumineenApi";
 import Card from "../../src/components/Card";
 import CashManagementPanel from "../../src/components/CashManagementPanel";
 import CustomerLedgerPanel from "../../src/components/CustomerLedgerPanel";
@@ -18,7 +19,7 @@ import Input from "../../src/components/Input";
 import PaymentPanel from "../../src/components/PaymentPanel";
 import RemoteMumineenSelect from "../../src/components/RemoteMumineenSelect";
 import Screen from "../../src/components/Screen";
-import { canManageJamaat, canRefundPayments } from "../../src/constants/roles";
+import { canDeleteJamaatData, canManageAccounts, canRefundPayments } from "../../src/constants/roles";
 import { useAuth } from "../../src/context/AuthContext";
 import { colors, radius, spacing } from "../../src/theme";
 const today = () => new Date().toISOString().slice(0, 10);
@@ -180,9 +181,10 @@ export default function AccountsScreen() {
   const phone = width < 600;
   const narrow = width < 380;
   const { user } = useAuth();
-  const manager = canManageJamaat(user?.role);
-  const canRefund = canRefundPayments(user?.role);
-  const [tab, setTab] = useState("STATS");
+  const manager = canManageAccounts(user);
+  const canRefund = canRefundPayments(user);
+  const canDelete = canDeleteJamaatData(user);
+  const [tab, setTab] = useState(manager ? "STATS" : "PAYMENTS");
   const [summary, setSummary] = useState(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [statsRange, setStatsRange] = useState("TODAY");
@@ -192,10 +194,83 @@ export default function AccountsScreen() {
   const [search, setSearch] = useState("");
   const [paymentMuminId, setPaymentMuminId] = useState("");
   const [paymentMumin, setPaymentMumin] = useState(null);
+  const [ownMuminId, setOwnMuminId] = useState("");
+  const [ownMuminLoading, setOwnMuminLoading] = useState(false);
+  const [ownMuminError, setOwnMuminError] = useState("");
   const [paymentCreateRequest, setPaymentCreateRequest] = useState(0);
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [error, setError] = useState("");
+  useEffect(() => {
+    if (!manager) setTab("PAYMENTS");
+  }, [manager]);
+
+  useEffect(() => {
+    if (manager) {
+      setOwnMuminId("");
+      setOwnMuminError("");
+      setOwnMuminLoading(false);
+      return undefined;
+    }
+
+    let active = true;
+
+    async function resolveOwnMuminId() {
+      const directMuminId = user?.muminId;
+      if (directMuminId) {
+        if (active) {
+          setOwnMuminId(String(directMuminId));
+          setOwnMuminError("");
+          setOwnMuminLoading(false);
+        }
+        return;
+      }
+
+      const itsNo = String(user?.itsNo || user?.itsId || "").trim();
+      if (!itsNo) {
+        if (active) {
+          setOwnMuminId("");
+          setOwnMuminError("Unable to identify your Mumineen record for payment history.");
+          setOwnMuminLoading(false);
+        }
+        return;
+      }
+
+      try {
+        setOwnMuminLoading(true);
+        setOwnMuminError("");
+        setOwnMuminId("");
+
+        const result = await mumineenApi.getPaged(1, 20, itsNo);
+        const items = Array.isArray(result?.items) ? result.items : [];
+        const ownMumin = items.find(
+          item =>
+            item?.isActive !== false &&
+            String(item?.itsId || "").trim() === itsNo
+        );
+
+        if (!ownMumin?.muminId) {
+          throw new Error("Unable to find your Mumineen record for payment history.");
+        }
+
+        if (active) setOwnMuminId(String(ownMumin.muminId));
+      } catch (requestError) {
+        if (active) {
+          setOwnMuminId("");
+          setOwnMuminError(
+            requestError.message || "Unable to identify your Mumineen record for payment history."
+          );
+        }
+      } finally {
+        if (active) setOwnMuminLoading(false);
+      }
+    }
+
+    resolveOwnMuminId();
+    return () => {
+      active = false;
+    };
+  }, [manager, user?.muminId, user?.itsNo, user?.itsId]);
 
   const statsDates = useMemo(() => {
     const now = new Date();
@@ -307,7 +382,7 @@ export default function AccountsScreen() {
           ))}
         </View>
       ) : null}
-      {tab === "PAYMENTS" ? (
+      {manager && tab === "PAYMENTS" ? (
         <Card style={styles.paymentSearchCard}>
           <View style={[styles.paymentSearchHeader, phone && styles.paymentSearchHeaderPhone]}>
             <View style={styles.flex}>
@@ -469,23 +544,39 @@ export default function AccountsScreen() {
         </>
       ) : null}
       {tab === "PAYMENTS" ? (
-        <PaymentPanel
-          manager={manager}
-          canRefund={canRefund}
-          createRequestKey={paymentCreateRequest}
-          onCreateRequestHandled={() => setPaymentCreateRequest(0)}
-          hideCreateButton
-          filters={{
-            muminId: paymentMuminId,
-            fromDate,
-            toDate
-          }}
-        />
+        manager || ownMuminId ? (
+          <PaymentPanel
+            manager={manager}
+            canRefund={canRefund}
+            createRequestKey={paymentCreateRequest}
+            onCreateRequestHandled={() => setPaymentCreateRequest(0)}
+            hideCreateButton
+            filters={{
+              muminId: manager ? paymentMuminId : ownMuminId,
+              fromDate,
+              toDate
+            }}
+          />
+        ) : (
+          <Card>
+            {ownMuminLoading ? (
+              <View style={styles.loadingRow}>
+                <ActivityIndicator color={colors.primary} />
+                <Text style={styles.meta}>Loading your payment history...</Text>
+              </View>
+            ) : (
+              <Text style={styles.error}>
+                {ownMuminError || "Unable to load your payment history."}
+              </Text>
+            )}
+          </Card>
+        )
       ) : null}
       {manager && tab === "DAYBOOK" ? (
         <DayBookPanel
           manager={manager}
-          canDelete={canRefund}
+          canDelete={canDelete}
+          canRefund={canRefund}
           filters={{
             search,
             fromDate,
@@ -497,7 +588,7 @@ export default function AccountsScreen() {
         <CustomerLedgerPanel />
       ) : null}
       {manager && tab === "MANAGEMENT" ? (
-        <CashManagementPanel canDelete={canRefund} />
+        <CashManagementPanel canDelete={canDelete} />
       ) : null}
     </Screen>
   );
@@ -696,6 +787,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: "row", gap: 12 },
   paymentTitle: { fontSize: 17, fontWeight: "800", color: colors.text },
   member: { color: colors.primary, fontWeight: "700", marginTop: 4 },
+  loadingRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   meta: { color: colors.muted, marginTop: 4 },
   paymentAmount: { fontSize: 18, fontWeight: "800", color: colors.primary },
   debit: { color: colors.danger },

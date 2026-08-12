@@ -30,28 +30,4 @@ export const authApi = {
     });
   },
 
-  createUser(payload) {
-    return liveApiRequest(liveEndpoints.auth.createUser, {
-      method: "POST",
-      body: {
-        itsNo: payload.itsNo,
-        name: payload.name,
-        password: payload.password,
-        roleId: Number(payload.roleId)
-      }
-    });
-  },
-
-  createAamil(payload) {
-    return liveApiRequest(liveEndpoints.auth.createAamil, {
-      method: "POST",
-      body: {
-        itsNo: payload.itsNo,
-        name: payload.name,
-        password: payload.password,
-        roleId: Number(payload.roleId),
-        jamaatId: Number(payload.jamaatId)
-      }
-    });
-  }
 };

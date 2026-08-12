@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { Redirect } from "expo-router";
 
 import { apiRequest } from "../../src/api/client";
 import { endpoints } from "../../src/api/endpoints";
@@ -7,13 +8,13 @@ import Button from "../../src/components/Button";
 import Card from "../../src/components/Card";
 import Input from "../../src/components/Input";
 import Screen from "../../src/components/Screen";
-import { canManageJamaat } from "../../src/constants/roles";
+import { canAccessFmb, canManageFmb } from "../../src/constants/roles";
 import { useAuth } from "../../src/context/AuthContext";
 import { colors, spacing } from "../../src/theme";
 
 export default function FmbScreen() {
   const { user } = useAuth();
-  const manager = canManageJamaat(user.role);
+  const manager = canManageFmb(user);
 
   const [tab, setTab] = useState("my");
   const [profile, setProfile] = useState(null);
@@ -45,8 +46,10 @@ export default function FmbScreen() {
   }
 
   useEffect(() => {
-    loadData();
-  }, [manager]);
+    if (canAccessFmb(user)) loadData();
+  }, [manager, user?.role]);
+
+  if (!canAccessFmb(user)) return <Redirect href="/(app)" />;
 
   async function pauseThali() {
     if (!resumeDate) {

@@ -611,9 +611,8 @@ export default function PaymentPanel({
     return {
       ...(editingId ? {} : { muminId: Number(form.muminId) }),
       categoryId: Number(form.categoryId),
-      // Swagger models subCategoryId as int32. When Super Admin has configured no
-      // subcategory for a category, 0 is sent and no field API is called.
-      subCategoryId: Number(form.subCategoryId || 0),
+      // No configured/selected subcategory must be sent as null, not 0.
+      subCategoryId: form.subCategoryId ? Number(form.subCategoryId) : null,
       amount: Number(form.amount),
       paymentMethodId: Number(form.paymentMethodId),
       paymentReference: form.paymentReference.trim() || null,
@@ -808,47 +807,47 @@ export default function PaymentPanel({
               <Text style={[styles.amount, phone && styles.amountPhone]}>{money(item.amount)}</Text>
             </View>
 
-            {manager ? (
-              <View style={styles.actions}>
-                <Button
-                  title="Receipt"
-                  compact
-                  variant="outline"
-                  onPress={() =>
-                    router.push({
-                      pathname: "/(app)/receipt",
-                      params: { paymentId: String(item.paymentId) }
-                    })
-                  }
-                />
-                <Button
-                  title="Details"
-                  compact
-                  variant="outline"
-                  onPress={() => openDetail(item.paymentId)}
-                />
+            <View style={styles.actions}>
+              <Button
+                title="Receipt"
+                compact
+                variant="outline"
+                onPress={() =>
+                  router.push({
+                    pathname: "/(app)/receipt",
+                    params: { paymentId: String(item.paymentId) }
+                  })
+                }
+              />
+              <Button
+                title="Details"
+                compact
+                variant="outline"
+                onPress={() => openDetail(item.paymentId)}
+              />
+              {manager ? (
                 <Button
                   title="Edit"
                   compact
                   variant="outline"
                   onPress={() => editPayment(item.paymentId)}
                 />
+              ) : null}
+              <Button
+                title="Logs"
+                compact
+                variant="outline"
+                onPress={() => openLogs(item.paymentId)}
+              />
+              {manager && canRefund && String(item.status || "").toUpperCase() !== "REFUNDED" ? (
                 <Button
-                  title="Logs"
+                  title="Refund"
                   compact
-                  variant="outline"
-                  onPress={() => openLogs(item.paymentId)}
+                  variant="danger"
+                  onPress={() => refundPayment(item)}
                 />
-                {canRefund && String(item.status || "").toUpperCase() !== "REFUNDED" ? (
-                  <Button
-                    title="Refund"
-                    compact
-                    variant="danger"
-                    onPress={() => refundPayment(item)}
-                  />
-                ) : null}
-              </View>
-            ) : null}
+              ) : null}
+            </View>
           </Card>
         </Pressable>
       ))}
@@ -1096,8 +1095,20 @@ export default function PaymentPanel({
                     </View>
                   ) : null}
 
-                  {manager ? (
-                    <View style={styles.detailActions}>
+                  <View style={styles.detailActions}>
+                    <Button
+                      title="Open receipt"
+                      variant="outline"
+                      onPress={() => {
+                        const paymentId = detail.paymentId;
+                        setDetail(null);
+                        router.push({
+                          pathname: "/(app)/receipt",
+                          params: { paymentId: String(paymentId) }
+                        });
+                      }}
+                    />
+                    {manager ? (
                       <Button
                         title="Edit payment"
                         variant="outline"
@@ -1107,25 +1118,25 @@ export default function PaymentPanel({
                           editPayment(paymentId);
                         }}
                       />
+                    ) : null}
+                    <Button
+                      title="View logs"
+                      variant="outline"
+                      onPress={() => {
+                        const paymentId = detail.paymentId;
+                        setDetail(null);
+                        openLogs(paymentId);
+                      }}
+                    />
+                    {manager && canRefund &&
+                    String(detail.status || "").toUpperCase() !== "REFUNDED" ? (
                       <Button
-                        title="View logs"
-                        variant="outline"
-                        onPress={() => {
-                          const paymentId = detail.paymentId;
-                          setDetail(null);
-                          openLogs(paymentId);
-                        }}
+                        title="Refund payment"
+                        variant="danger"
+                        onPress={() => refundPayment(detail)}
                       />
-                      {canRefund &&
-                      String(detail.status || "").toUpperCase() !== "REFUNDED" ? (
-                        <Button
-                          title="Refund payment"
-                          variant="danger"
-                          onPress={() => refundPayment(detail)}
-                        />
-                      ) : null}
-                    </View>
-                  ) : null}
+                    ) : null}
+                  </View>
                 </View>
               </ScrollView>
             ) : null}

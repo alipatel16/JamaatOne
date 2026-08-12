@@ -75,7 +75,7 @@ async function confirmAction(title, message, actionLabel) {
   });
 }
 
-export default function DayBookPanel({ manager, canDelete = false, filters = {} }) {
+export default function DayBookPanel({ manager, canDelete = false, canRefund = false, filters = {} }) {
   const { width } = useWindowDimensions();
   const phone = width < 600;
   const narrow = width < 380;
@@ -301,7 +301,7 @@ export default function DayBookPanel({ manager, canDelete = false, filters = {} 
   }
 
   async function refundEntry(item) {
-    if (!canDelete || item?.isRefunded) return;
+    if (!canRefund || item?.isRefunded) return;
     const proceed = await confirmAction(
       "Refund Day Book entry?",
       `Refund Day Book entry #${item.dayBookId}? The entry stays in history and is marked refunded.`,
@@ -469,7 +469,7 @@ export default function DayBookPanel({ manager, canDelete = false, filters = {} 
                 variant="outline"
                 onPress={() => openLogs(item.dayBookId)}
               />
-              {canDelete && !item.isRefunded ? (
+              {canRefund && !item.isRefunded ? (
                 <Button
                   title="Refund"
                   compact
@@ -682,7 +682,7 @@ export default function DayBookPanel({ manager, canDelete = false, filters = {} 
                           openLogs(id);
                         }}
                       />
-                      {canDelete && !detail.isRefunded ? (
+                      {canRefund && !detail.isRefunded ? (
                         <Button
                           title="Refund entry"
                           variant="danger"

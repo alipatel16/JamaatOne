@@ -7,7 +7,7 @@ import { endpoints } from "../../src/api/endpoints";
 import Card from "../../src/components/Card";
 import LoadingView from "../../src/components/LoadingView";
 import Screen from "../../src/components/Screen";
-import { canManageJamaat } from "../../src/constants/roles";
+import { canAccessFmb, canAccessMumineen, canManageJamaat, canManageUsers } from "../../src/constants/roles";
 import { useAuth } from "../../src/context/AuthContext";
 import { colors, radius, spacing } from "../../src/theme";
 
@@ -15,8 +15,9 @@ const QUICK_LINKS = [
   { title: "Accounts", caption: "Payments & ledgers", icon: "₹", route: "/(app)/accounts", managerOnly: false },
   { title: "Namaaz", caption: "Prayer timings", icon: "◷", route: "/(app)/namaz", managerOnly: false },
   { title: "Calendar", caption: "Hijri calendar", icon: "▦", route: "/(app)/calendar", managerOnly: false },
-  { title: "FMB", caption: "Menu & thali", icon: "◉", route: "/(app)/fmb", managerOnly: false },
-  { title: "Mumineen", caption: "Member directory", icon: "◎", route: "/(app)/users", managerOnly: true }
+  { title: "FMB", caption: "Menu & thali", icon: "◉", route: "/(app)/fmb", access: "fmb" },
+  { title: "Mumineen", caption: "Member directory", icon: "◎", route: "/(app)/users", access: "mumineen" },
+  { title: "User Management", caption: "Manage Jamaat roles", icon: "◇", route: "/(app)/user-management", access: "aamil" }
 ];
 
 export default function DashboardScreen() {
@@ -30,7 +31,13 @@ export default function DashboardScreen() {
     apiRequest(endpoints.dashboard).then(setData).catch(e => setError(e.message));
   }, []);
 
-  const quickLinks = useMemo(() => QUICK_LINKS.filter(item => !item.managerOnly || manager), [manager]);
+  const quickLinks = useMemo(() => QUICK_LINKS.filter(item => {
+    if (item.access === "manager") return manager;
+    if (item.access === "mumineen") return canAccessMumineen(user);
+    if (item.access === "aamil") return canManageUsers(user);
+    if (item.access === "fmb") return canAccessFmb(user);
+    return true;
+  }), [manager, user?.role]);
   const wide = width >= 850;
   const phone = width < 600;
   const narrow = width < 340;
@@ -109,17 +116,19 @@ export default function DashboardScreen() {
         </View>
 
         <View style={styles.sideColumn}>
-          <Pressable onPress={() => router.push("/(app)/fmb")}> 
-            <Card style={styles.fmbCard}>
-              <View style={styles.fmbIcon}><Text style={styles.fmbIconText}>◉</Text></View>
-              <Text style={styles.fmbLabel}>TODAY'S FMB</Text>
-              <Text style={styles.fmbStatus}>
-                {data?.fmb?.status === "NO_FMB" ? "No FMB today" : data?.fmb?.status === "DELIVERED" ? "FMB delivered" : "FMB scheduled"}
-              </Text>
-              {data?.fmb?.menu ? <Text style={styles.fmbMenu}>{data.fmb.menu}</Text> : null}
-              <Text style={styles.fmbLink}>View FMB ›</Text>
-            </Card>
-          </Pressable>
+          {canAccessFmb(user) ? (
+            <Pressable onPress={() => router.push("/(app)/fmb")}> 
+              <Card style={styles.fmbCard}>
+                <View style={styles.fmbIcon}><Text style={styles.fmbIconText}>◉</Text></View>
+                <Text style={styles.fmbLabel}>TODAY'S FMB</Text>
+                <Text style={styles.fmbStatus}>
+                  {data?.fmb?.status === "NO_FMB" ? "No FMB today" : data?.fmb?.status === "DELIVERED" ? "FMB delivered" : "FMB scheduled"}
+                </Text>
+                {data?.fmb?.menu ? <Text style={styles.fmbMenu}>{data.fmb.menu}</Text> : null}
+                <Text style={styles.fmbLink}>View FMB ›</Text>
+              </Card>
+            </Pressable>
+          ) : null}
 
           <Pressable onPress={() => router.push("/(app)/namaz")}> 
             <Card style={styles.namazCard}>
