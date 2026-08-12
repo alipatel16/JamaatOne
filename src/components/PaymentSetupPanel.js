@@ -216,7 +216,7 @@ export default function PaymentSetupPanel({ section = "all" }) {
       <View style={styles.intro}>
         <Text style={styles.introTitle}>Payment configuration</Text>
         <Text style={styles.introText}>
-          These values drive the Add Payment form for every Jamaat. This page reads and writes the live Accounts configuration APIs; the Accounts payment dialog does not use static category, subcategory, field or payment-method constants.
+          Configure the categories, subcategories, custom fields and payment methods used while recording payments.
         </Text>
       </View>
       {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -306,7 +306,7 @@ const styles = StyleSheet.create({
   introTitle: { color: colors.text, fontSize: 22, fontWeight: "900" },
   introText: { color: colors.muted, marginTop: spacing.xs, lineHeight: 20 },
   error: { color: colors.danger, fontWeight: "700" },
-  section: { padding: spacing.lg },
+  section: { padding: spacing.md },
   sectionTitle: { color: colors.text, fontSize: 18, fontWeight: "900" },
   sectionDescription: { color: colors.muted, marginTop: 4, marginBottom: spacing.lg, lineHeight: 19 },
   formActions: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginBottom: spacing.md },
@@ -314,7 +314,7 @@ const styles = StyleSheet.create({
   switchLabel: { color: colors.text, fontWeight: "700" },
   list: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, marginTop: spacing.sm },
   row: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: spacing.sm, paddingVertical: spacing.md, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
-  flex: { flex: 1, minWidth: 190 },
+  flex: { flex: 1, minWidth: 180, flexShrink: 1 },
   name: { color: colors.text, fontWeight: "800" },
   meta: { color: colors.muted, marginTop: 3, fontSize: 12 },
   badge: { borderRadius: 999, paddingHorizontal: 9, paddingVertical: 5 },

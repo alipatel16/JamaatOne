@@ -4,6 +4,7 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View
 } from "react-native";
 
@@ -35,6 +36,9 @@ export default function MumineenSearchList({
   selectActionLabel = "Select ›",
   embedded = false
 }) {
+  const { width } = useWindowDimensions();
+  const phone = width < 600;
+  const narrow = width < 380;
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
   const [items, setItems] = useState([]);
@@ -86,7 +90,7 @@ export default function MumineenSearchList({
   if (selectedItem) {
     return (
       <Card style={styles.selectedCard}>
-        <View style={styles.row}>
+        <View style={[styles.row, phone && styles.rowPhone]}>
           <View style={styles.flex}>
             <Text style={styles.title}>{memberName(selectedItem)}</Text>
             <Text style={styles.meta}>
@@ -151,7 +155,7 @@ export default function MumineenSearchList({
             }}
           >
             <Card style={styles.memberCard}>
-              <View style={styles.row}>
+              <View style={[styles.row, phone && styles.rowPhone]}>
                 <View style={styles.flex}>
                   <Text style={styles.title}>{memberName(item)}</Text>
                   <Text style={styles.meta}>
@@ -174,7 +178,7 @@ export default function MumineenSearchList({
         </Card>
       )}
 
-      <View style={styles.pagination}>
+      <View style={[styles.pagination, narrow && styles.paginationNarrow]}>
         <Button
           title="Previous"
           compact
@@ -198,7 +202,8 @@ export default function MumineenSearchList({
 const styles = StyleSheet.create({
   selectedCard: { marginBottom: spacing.md },
   row: { flexDirection: "row", gap: spacing.md, alignItems: "flex-start" },
-  flex: { flex: 1 },
+  rowPhone: { flexWrap: "wrap", gap: spacing.sm },
+  flex: { flex: 1, minWidth: 0 },
   title: { color: colors.text, fontSize: 16, fontWeight: "800" },
   meta: { color: colors.muted, marginTop: 4, fontSize: 13 },
   hint: { color: colors.muted, fontSize: 12, marginTop: -spacing.xs },
@@ -233,5 +238,6 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     marginVertical: spacing.md
   },
+  paginationNarrow: { gap: spacing.xs },
   pageText: { color: colors.muted, fontSize: 12, fontWeight: "700" }
 });

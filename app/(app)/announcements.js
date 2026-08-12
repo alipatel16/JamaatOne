@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 import { Alert, StyleSheet, Text, View } from "react-native";
-import { router } from "expo-router";
 
 import { apiRequest } from "../../src/api/client";
 import { endpoints } from "../../src/api/endpoints";
@@ -83,10 +82,7 @@ export default function AnnouncementsScreen() {
   return (
     <Screen>
       <View style={styles.header}>
-        <Text style={styles.back} onPress={() => router.back()}>
-          ‹
-        </Text>
-        <View>
+        <View style={styles.headerCopy}>
           <Text style={styles.title}>Announcements</Text>
           <Text style={styles.subtitle}>
             {activeCount}/5 active dashboard announcements
@@ -220,11 +216,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: spacing.lg
   },
-  back: {
-    color: colors.primary,
-    fontSize: 44,
-    marginRight: spacing.sm
-  },
+  headerCopy: { flex: 1 },
   title: {
     color: colors.text,
     fontSize: 26,
@@ -265,11 +257,12 @@ const styles = StyleSheet.create({
   },
   actions: {
     flexDirection: "row",
-    marginHorizontal: -4,
+    flexWrap: "wrap",
+    gap: spacing.sm,
     marginTop: spacing.md
   },
   action: {
     flex: 1,
-    marginHorizontal: 4
+    minWidth: 120
   }
 });

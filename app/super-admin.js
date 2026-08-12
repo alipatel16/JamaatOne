@@ -3,6 +3,7 @@ import {
   Alert,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Switch,
   Text,
@@ -92,11 +93,46 @@ async function confirmDelete(title, message) {
   });
 }
 
-function PageHeader({ user, onLogout }) {
+function PageHeader({ user, onLogout, phone, narrow }) {
+  if (phone) {
+    return (
+      <View style={[styles.header, styles.headerPhone, shadows.card]}>
+        <View style={styles.mobileHeaderTop}>
+          <View style={[styles.brandBlock, styles.brandBlockPhone]}>
+            <View style={[styles.brandMark, narrow && styles.brandMarkNarrow]}>
+              <Text style={styles.brandInitial}>J</Text>
+            </View>
+            <View style={styles.brandText}>
+              <Text style={styles.eyebrow}>JAMAATONE</Text>
+              <Text style={styles.headerTitle}>Super Admin</Text>
+            </View>
+          </View>
+          <Button
+            title="Sign out"
+            variant="outline"
+            compact
+            onPress={onLogout}
+            style={styles.mobileSignOut}
+          />
+        </View>
+
+        <View style={styles.mobileUserStrip}>
+          <View style={styles.mobileUserAvatar}>
+            <Text style={styles.mobileUserAvatarText}>{(user?.name || "S").slice(0, 1).toUpperCase()}</Text>
+          </View>
+          <View style={styles.mobileUserCopy}>
+            <Text style={styles.mobileUserName} numberOfLines={1}>{user?.name || "Super Admin"}</Text>
+            <Text style={styles.mobileUserMeta}>ITS {user?.itsNo || "-"}</Text>
+          </View>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.header, shadows.card]}>
       <View style={styles.brandBlock}>
-        <View style={styles.brandMark}>
+        <View style={[styles.brandMark, narrow && styles.brandMarkNarrow]}>
           <Text style={styles.brandInitial}>J</Text>
         </View>
         <View style={styles.brandText}>
@@ -121,16 +157,16 @@ function PageHeader({ user, onLogout }) {
   );
 }
 
-function TabBar({ activeTab, onChange }) {
-  return (
-    <View style={styles.tabs}>
+function TabBar({ activeTab, onChange, phone }) {
+  const tabs = (
+    <View style={[styles.tabs, phone && styles.tabsPhone]}>
       {TABS.map(tab => {
         const selected = tab.id === activeTab;
         return (
           <Pressable
             key={tab.id}
             onPress={() => onChange(tab.id)}
-            style={[styles.tab, selected && styles.tabSelected]}
+            style={[styles.tab, phone && styles.tabPhone, selected && styles.tabSelected]}
           >
             <Text style={[styles.tabText, selected && styles.tabTextSelected]}>
               {tab.label}
@@ -139,6 +175,18 @@ function TabBar({ activeTab, onChange }) {
         );
       })}
     </View>
+  );
+
+  if (!phone) return tabs;
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.tabsScrollContent}
+      style={styles.tabsScroll}
+    >
+      {tabs}
+    </ScrollView>
   );
 }
 
@@ -224,7 +272,7 @@ function JamiatPanel({ items, loading, onReload }) {
   async function remove(item) {
     const confirmed = await confirmDelete(
       "Delete Jamiyat?",
-      `This will call DELETE /api/Jamiat/${item.jamiatId}.`
+      `Delete ${item.name || "this Jamiyat"}? This action cannot be undone.`
     );
     if (!confirmed) return;
 
@@ -247,7 +295,7 @@ function JamiatPanel({ items, loading, onReload }) {
         <SectionHeading
           eyebrow={editing ? "UPDATE" : "CREATE"}
           title={editing ? "Edit Jamiyat" : "Add Jamiyat"}
-          description="The create endpoint accepts a list; this form sends one item inside that list."
+          description="Create a Jamiyat or update an existing record."
         />
 
         <Input
@@ -263,7 +311,7 @@ function JamiatPanel({ items, loading, onReload }) {
             <View style={styles.switchText}>
               <Text style={styles.switchLabel}>Active status</Text>
               <Text style={styles.switchHint}>
-                UpdateJamiatRequest includes isActive.
+                Choose whether this Jamiyat should be available.
               </Text>
             </View>
             <Switch
@@ -300,7 +348,7 @@ function JamiatPanel({ items, loading, onReload }) {
           <SectionHeading
             eyebrow="DIRECTORY"
             title="Jamiyat list"
-            description={`${items.length} record${items.length === 1 ? "" : "s"} returned by GET /api/Jamiat.`}
+            description={`${items.length} Jamiyat record${items.length === 1 ? "" : "s"}.`}
           />
           <Button
             title="Refresh"
@@ -413,7 +461,7 @@ function JamaatPanel({ items, jamiats, loading, onReload }) {
   async function remove(item) {
     const confirmed = await confirmDelete(
       "Delete Jamaat?",
-      `This will call DELETE /api/Jamaat/${item.jamaatId}.`
+      `Delete ${item.name || "this Jamaat"}? This action cannot be undone.`
     );
     if (!confirmed) return;
 
@@ -502,7 +550,7 @@ function JamaatPanel({ items, jamiats, loading, onReload }) {
           <SectionHeading
             eyebrow="DIRECTORY"
             title="Jamaat list"
-            description={`${items.length} record${items.length === 1 ? "" : "s"} returned by GET /api/Jamaat.`}
+            description={`${items.length} Jamaat record${items.length === 1 ? "" : "s"}.`}
           />
           <Button
             title="Refresh"
@@ -594,7 +642,7 @@ function AamilPanel({ jamaats, roles }) {
       return;
     }
     if (!Number.isInteger(roleId) || roleId <= 0) {
-      setError("Select the Aamil role configured by the backend.");
+      setError("Select the Aamil role.");
       return;
     }
     if (!Number.isInteger(jamaatId) || jamaatId <= 0) {
@@ -627,7 +675,7 @@ function AamilPanel({ jamaats, roles }) {
         <SectionHeading
           eyebrow="SUPER ADMIN ONLY"
           title="Create Aamil"
-          description="This form uses POST /api/Auth/create-aamil with the exact CreateAamilRequest fields."
+          description="Create an Aamil and assign the correct role and Jamaat."
         />
 
         <Input
@@ -685,22 +733,9 @@ function AamilPanel({ jamaats, roles }) {
 
       <View style={styles.sideColumn}>
         <Card style={styles.noticeCard}>
-          <Text style={styles.noticeTitle}>Aamil CRUD API status</Text>
+          <Text style={styles.noticeTitle}>Aamil management</Text>
           <Text style={styles.noticeText}>
-            Aamil creation remains the published Aamil write API. The role is now loaded from GET /api/Auth/roles instead of asking Super Admin to type a numeric role ID.
-          </Text>
-          <View style={styles.endpointBox}>
-            <Text style={styles.endpointAvailable}>AVAILABLE</Text>
-            <Text style={styles.endpointText}>POST /api/Auth/create-aamil</Text>
-          </View>
-          <View style={styles.endpointBox}>
-            <Text style={styles.endpointMissing}>NOT PUBLISHED</Text>
-            <Text style={styles.endpointText}>
-              GET / PUT / DELETE Aamil endpoints
-            </Text>
-          </View>
-          <Text style={styles.noticeFootnote}>
-            No fake Aamil list or guessed CRUD route is used. Once list/update/delete endpoints are published, they can be added without changing this create flow.
+            Aamil creation is available here. Listing, editing and removing Aamil records will appear when those management actions are available.
           </Text>
         </Card>
 
@@ -715,7 +750,7 @@ function AamilPanel({ jamaats, roles }) {
               Role {createdAamil.roleName || createdAamil.roleId} · Jamaat ID {createdAamil.jamaatId}
             </Text>
             <Text style={styles.successHint}>
-              This is the response from the create call, not a server-backed Aamil list.
+              The new Aamil is ready to use with the assigned Jamaat access.
             </Text>
           </Card>
         ) : null}
@@ -726,6 +761,8 @@ function AamilPanel({ jamaats, roles }) {
 
 export default function SuperAdminScreen() {
   const { width } = useWindowDimensions();
+  const phone = width < 600;
+  const narrow = width < 380;
   const { user, bootstrapping, logout } = useAuth();
   const [activeTab, setActiveTab] = useState("jamiat");
   const [jamiats, setJamiats] = useState([]);
@@ -767,32 +804,32 @@ export default function SuperAdminScreen() {
   if (!isSuperAdmin(user)) return <Redirect href="/(app)" />;
 
   return (
-    <Screen contentStyle={[styles.page, width >= 1080 && styles.pageWide]}>
-      <PageHeader user={user} onLogout={handleLogout} />
+    <Screen contentStyle={[styles.page, phone && styles.pagePhone, width >= 1080 && styles.pageWide]}>
+      <PageHeader user={user} onLogout={handleLogout} phone={phone} narrow={narrow} />
 
-      <View style={styles.heroRow}>
-        <View style={styles.heroCopy}>
+      <View style={[styles.heroRow, phone && styles.heroRowPhone, phone && shadows.card]}>
+        <View style={[styles.heroCopy, phone && styles.heroCopyPhone]}>
           <Text style={styles.heroEyebrow}>MULTI-TENANT SETUP</Text>
-          <Text style={styles.heroTitle}>Manage the JamaatOne network</Text>
-          <Text style={styles.heroDescription}>
-            Create Jamiyat and Jamaat records, assign an Aamil to the correct Jamaat,
-            configure every payment category/subcategory/field/method, and audit API calls.
-            Normal Jamaat users remain scoped by the jamaatId returned at login.
+          <Text style={[styles.heroTitle, phone && styles.heroTitlePhone]}>Manage the JamaatOne network</Text>
+          <Text style={[styles.heroDescription, phone && styles.heroDescriptionPhone]}>
+            {phone
+              ? "Manage Jamiyat, Jamaat, Aamil and payment configuration from one place."
+              : "Create Jamiyat and Jamaat records, assign an Aamil to the correct Jamaat, configure payment setup, and review request activity. Each Jamaat remains separated by its assigned access scope."}
           </Text>
         </View>
-        <View style={styles.statsRow}>
-          <View style={styles.statCard}>
+        <View style={[styles.statsRow, phone && styles.statsRowPhone]}>
+          <View style={[styles.statCard, phone && styles.statCardPhone]}>
             <Text style={styles.statValue}>{jamiats.length}</Text>
             <Text style={styles.statLabel}>Jamiyat</Text>
           </View>
-          <View style={styles.statCard}>
+          <View style={[styles.statCard, phone && styles.statCardPhone]}>
             <Text style={styles.statValue}>{jamaats.length}</Text>
             <Text style={styles.statLabel}>Jamaat</Text>
           </View>
         </View>
       </View>
 
-      <TabBar activeTab={activeTab} onChange={setActiveTab} />
+      <TabBar activeTab={activeTab} onChange={setActiveTab} phone={phone} />
 
       {error ? (
         <Card style={styles.pageErrorCard}>
@@ -842,6 +879,7 @@ const styles = StyleSheet.create({
     maxWidth: 1320,
     paddingTop: spacing.md
   },
+  pagePhone: { paddingTop: spacing.sm },
   pageWide: {
     paddingHorizontal: spacing.xl
   },
@@ -858,11 +896,14 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: spacing.xl
   },
+  headerPhone: { minHeight: 0, paddingHorizontal: spacing.md, paddingVertical: spacing.md, display: "flex", flexDirection: "column", alignItems: "stretch", gap: spacing.sm, marginBottom: spacing.md, borderRadius: 20 },
+  mobileHeaderTop: { width: "100%", flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm },
   brandBlock: {
     flexDirection: "row",
     alignItems: "center",
     flexShrink: 1
   },
+  brandBlockPhone: { flex: 1, minWidth: 0 },
   brandMark: {
     width: 44,
     height: 44,
@@ -871,13 +912,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center"
   },
+  brandMarkNarrow: { width: 38, height: 38, borderRadius: 12 },
   brandInitial: {
     color: "#FFFFFF",
     fontSize: 23,
     fontWeight: "800"
   },
   brandText: {
-    marginLeft: spacing.sm
+    marginLeft: spacing.sm,
+    flexShrink: 1
   },
   eyebrow: {
     color: colors.accent,
@@ -897,10 +940,19 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginLeft: spacing.md
   },
+  headerActionsPhone: { marginLeft: 0, flexShrink: 0 },
   userInfo: {
     alignItems: "flex-end",
     marginRight: spacing.md
   },
+  userInfoPhone: { marginRight: spacing.sm },
+  mobileSignOut: { flexShrink: 0, minWidth: 92 },
+  mobileUserStrip: { width: "100%", minHeight: 48, borderRadius: radius.md, backgroundColor: colors.surfaceTint, borderWidth: 1, borderColor: colors.border, paddingHorizontal: spacing.sm, paddingVertical: 8, flexDirection: "row", alignItems: "center" },
+  mobileUserAvatar: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center", backgroundColor: colors.accentSoft },
+  mobileUserAvatarText: { color: colors.accentStrong, fontSize: 13, fontWeight: "900" },
+  mobileUserCopy: { flex: 1, minWidth: 0, marginLeft: spacing.sm },
+  mobileUserName: { color: colors.text, fontSize: 13, fontWeight: "800" },
+  mobileUserMeta: { color: colors.muted, fontSize: 10.5, marginTop: 1 },
   userName: {
     color: colors.text,
     fontSize: 13,
@@ -918,12 +970,14 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: spacing.lg
   },
+  heroRowPhone: { width: "100%", flexDirection: "column", flexWrap: "nowrap", alignItems: "stretch", justifyContent: "flex-start", marginBottom: spacing.md, padding: spacing.md, borderRadius: 20, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
   heroCopy: {
     flex: 1,
     minWidth: 280,
     maxWidth: 760,
     marginRight: spacing.lg
   },
+  heroCopyPhone: { flex: 0, flexGrow: 0, flexShrink: 0, flexBasis: "auto", minWidth: 0, width: "100%", maxWidth: "100%", marginRight: 0 },
   heroEyebrow: {
     color: colors.accent,
     fontSize: 11,
@@ -938,16 +992,19 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     marginTop: spacing.xs
   },
+  heroTitlePhone: { fontSize: 26, lineHeight: 31 },
   heroDescription: {
     color: colors.textSoft,
     fontSize: 15,
     lineHeight: 24,
     marginTop: spacing.sm
   },
+  heroDescriptionPhone: { fontSize: 13.5, lineHeight: 20, marginTop: 8, maxWidth: "100%" },
   statsRow: {
     flexDirection: "row",
     marginTop: spacing.md
   },
+  statsRowPhone: { width: "100%", flex: 0, flexGrow: 0, flexShrink: 0, flexDirection: "row", gap: spacing.sm, flexWrap: "nowrap", alignItems: "stretch", justifyContent: "space-between", marginTop: spacing.md },
   statCard: {
     minWidth: 108,
     paddingHorizontal: spacing.lg,
@@ -956,6 +1013,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primarySoft,
     marginLeft: spacing.sm
   },
+  statCardPhone: { width: "47.5%", maxWidth: "47.5%", flexGrow: 0, flexShrink: 0, flexBasis: "47.5%", minWidth: 0, minHeight: 78, maxHeight: 90, marginLeft: 0, paddingHorizontal: spacing.md, paddingVertical: 12, justifyContent: "center" },
   statValue: {
     color: colors.primaryStrong,
     fontSize: 24,
@@ -978,6 +1036,9 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     marginBottom: spacing.lg
   },
+  tabsScroll: { width: "100%", marginBottom: spacing.md },
+  tabsScrollContent: { paddingRight: spacing.md },
+  tabsPhone: { flexWrap: "nowrap", alignSelf: "stretch", marginBottom: 0, borderRadius: 16, padding: 4 },
   tab: {
     minWidth: 104,
     minHeight: 42,
@@ -986,6 +1047,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center"
   },
+  tabPhone: { minWidth: 104, minHeight: 40, paddingHorizontal: 14 },
   tabSelected: {
     backgroundColor: colors.surface,
     ...shadows.card
@@ -1001,25 +1063,25 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     alignItems: "flex-start",
-    marginHorizontal: -spacing.sm
+    gap: spacing.md
   },
   formCard: {
     flexGrow: 1,
     flexBasis: 340,
-    minWidth: 300,
-    marginHorizontal: spacing.sm
+    minWidth: 0,
+    flexShrink: 1
   },
   listCard: {
     flexGrow: 2,
     flexBasis: 610,
-    minWidth: 300,
-    marginHorizontal: spacing.sm
+    minWidth: 0,
+    flexShrink: 1
   },
   sideColumn: {
     flexGrow: 2,
     flexBasis: 520,
-    minWidth: 300,
-    marginHorizontal: spacing.sm
+    minWidth: 0,
+    flexShrink: 1
   },
   sectionHeading: {
     flex: 1,
@@ -1082,8 +1144,10 @@ const styles = StyleSheet.create({
   },
   listHeader: {
     flexDirection: "row",
+    flexWrap: "wrap",
     alignItems: "flex-start",
-    justifyContent: "space-between"
+    justifyContent: "space-between",
+    gap: spacing.sm
   },
   recordRow: {
     flexDirection: "row",

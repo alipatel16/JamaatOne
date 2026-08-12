@@ -9,6 +9,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View
 } from "react-native";
 import { router } from "expo-router";
@@ -19,7 +20,7 @@ import { colors, radius, spacing } from "../theme";
 import Button from "./Button";
 import Card from "./Card";
 import Input from "./Input";
-import MumineenSearchList from "./MumineenSearchList";
+import RemoteMumineenSelect from "./RemoteMumineenSelect";
 import Select from "./Select";
 
 const PAGE_SIZE = 20;
@@ -225,9 +226,7 @@ function DynamicFields({ fields, values, onChange, payer, family, familyLoading 
                 }
               />
               {!payer ? (
-                <Text style={styles.helper}>
-                  Select the payer first. The family list is loaded using that Mumin's HOF ID.
-                </Text>
+                <Text style={styles.helper}>Select the payer first.</Text>
               ) : null}
             </View>
           );
@@ -279,11 +278,6 @@ function DynamicFields({ fields, values, onChange, payer, family, familyLoading 
               }
               onChangeText={next => onChange(id, next)}
             />
-            {(type === "DROPDOWN" || type === "SELECT") && !isMemberField(field) ? (
-              <Text style={styles.helper}>
-                This field is configured as a dropdown, but the current API does not expose dropdown option values. It is rendered as a text value until an option-source API is available.
-              </Text>
-            ) : null}
           </View>
         );
       })}
@@ -296,7 +290,17 @@ function paymentFilterDate(value, endOfDay = false) {
   return `${value}T${endOfDay ? "23:59:59.999" : "00:00:00"}`;
 }
 
-export default function PaymentPanel({ manager, canRefund = false, filters = {} }) {
+export default function PaymentPanel({
+  manager,
+  canRefund = false,
+  filters = {},
+  createRequestKey = 0,
+  onCreateRequestHandled,
+  hideCreateButton = false
+}) {
+  const { width } = useWindowDimensions();
+  const phone = width < 600;
+  const narrow = width < 380;
   const [categories, setCategories] = useState([]);
   const [subCategories, setSubCategories] = useState([]);
   const [fields, setFields] = useState([]);
@@ -365,6 +369,13 @@ export default function PaymentPanel({ manager, canRefund = false, filters = {} 
   useEffect(() => {
     if (pageNumber !== 1) loadPayments(pageNumber);
   }, [pageNumber]);
+
+  useEffect(() => {
+    if (manager && createRequestKey > 0) {
+      onCreateRequestHandled?.();
+      openCreate();
+    }
+  }, [createRequestKey, manager]);
 
   async function loadPaymentConfiguration() {
     try {
@@ -726,7 +737,7 @@ export default function PaymentPanel({ manager, canRefund = false, filters = {} 
         : await new Promise(resolve => {
             Alert.alert(
               "Refund payment?",
-              "This uses the payment refund API. The payment will remain in history with its refunded status.",
+              "The payment will remain in history with its refunded status.",
               [
                 { text: "Cancel", style: "cancel", onPress: () => resolve(false) },
                 {
@@ -754,15 +765,15 @@ export default function PaymentPanel({ manager, canRefund = false, filters = {} 
 
   return (
     <View>
-      <View style={styles.panelHeader}>
+      <View style={[styles.panelHeader, phone && styles.panelHeaderPhone]}>
         <View style={styles.flex}>
           <Text style={styles.title}>Payment history</Text>
           <Text style={styles.subtitle}>
-            {totalCount} payments · live Accounts API
+            {totalCount} payment{totalCount === 1 ? "" : "s"}
           </Text>
         </View>
-        {manager ? (
-          <Button title="Add payment" compact onPress={openCreate} />
+        {manager && !hideCreateButton ? (
+          <Button title="Add payment" compact onPress={openCreate} style={phone && styles.headerButtonPhone} />
         ) : null}
       </View>
 
@@ -777,7 +788,7 @@ export default function PaymentPanel({ manager, canRefund = false, filters = {} 
           onPress={() => openDetail(item.paymentId)}
         >
           <Card style={styles.paymentCard}>
-            <View style={styles.row}>
+            <View style={[styles.row, phone && styles.rowPhone]}>
               <View style={styles.flex}>
                 <Text style={styles.paymentTitle}>
                   {item.categoryName || "Payment"}
@@ -794,7 +805,7 @@ export default function PaymentPanel({ manager, canRefund = false, filters = {} 
                 ) : null}
                 <Text style={styles.status}>{item.status || "-"}</Text>
               </View>
-              <Text style={styles.amount}>{money(item.amount)}</Text>
+              <Text style={[styles.amount, phone && styles.amountPhone]}>{money(item.amount)}</Text>
             </View>
 
             {manager ? (
@@ -848,7 +859,7 @@ export default function PaymentPanel({ manager, canRefund = false, filters = {} 
         </Card>
       ) : null}
 
-      <View style={styles.pagination}>
+      <View style={[styles.pagination, narrow && styles.paginationNarrow]}>
         <Button
           title="Previous"
           compact
@@ -875,17 +886,17 @@ export default function PaymentPanel({ manager, canRefund = false, filters = {} 
         onRequestClose={() => !saving && setShowForm(false)}
       >
         <KeyboardAvoidingView
-          style={styles.backdrop}
+          style={[styles.backdrop, phone && styles.backdropPhone]}
           behavior={Platform.OS === "ios" ? "padding" : undefined}
         >
-          <View style={styles.formSheet}>
-            <View style={styles.modalHeader}>
+          <View style={[styles.formSheet, phone && styles.formSheetPhone]}>
+            <View style={[styles.modalHeader, phone && styles.modalHeaderPhone]}>
               <View style={styles.flex}>
                 <Text style={styles.modalTitle}>
                   {editingId ? "Edit payment" : "Add payment"}
                 </Text>
                 <Text style={styles.subtitle}>
-                  Search a Mumin, then load category, subcategory and configured fields from the backend.
+                  Record a payment with the configured category and payment details.
                 </Text>
               </View>
               <Pressable onPress={() => !saving && setShowForm(false)}>
@@ -897,17 +908,15 @@ export default function PaymentPanel({ manager, canRefund = false, filters = {} 
               contentContainerStyle={styles.formContent}
               keyboardShouldPersistTaps="handled"
             >
-              <View style={styles.formCard}>
+              <View style={[styles.formCard, phone && styles.formCardPhone]}>
                 <Text style={styles.formSectionTitle}>Payment member</Text>
-                <MumineenSearchList
-                  selectedItem={selectedPayer}
-                  disabled={Boolean(editingId)}
-                  embedded
+                <RemoteMumineenSelect
                   label="Search and select Mumin"
-                  hint="Search by name, ITS ID, mobile or family ID, then select the Mumin making this payment."
-                  selectActionLabel="Select ›"
-                  onSelect={item => handlePayerChange(String(item.muminId), item)}
-                  onClear={() => handlePayerChange("", null)}
+                  value={form.muminId}
+                  initialItem={selectedPayer}
+                  disabled={Boolean(editingId)}
+                  placeholder="Search name, ITS ID, mobile or family ID"
+                  onChange={(muminId, item) => handlePayerChange(String(muminId || ""), item)}
                 />
 
                 <Text style={styles.formSectionTitle}>Payment for</Text>
@@ -1023,13 +1032,13 @@ export default function PaymentPanel({ manager, canRefund = false, filters = {} 
         animationType="fade"
         onRequestClose={() => setDetail(null)}
       >
-        <View style={styles.backdrop}>
-          <View style={styles.detailSheet}>
+        <View style={[styles.backdrop, phone && styles.backdropPhone]}>
+          <View style={[styles.detailSheet, phone && styles.detailSheetPhone]}>
             {detailLoading ? (
               <ActivityIndicator color={colors.primary} />
             ) : detail ? (
               <ScrollView>
-                <View style={styles.modalHeader}>
+                <View style={[styles.modalHeader, phone && styles.modalHeaderPhone]}>
                   <View style={styles.flex}>
                     <Text style={styles.modalTitle}>
                       Payment #{detail.paymentId}
@@ -1074,12 +1083,12 @@ export default function PaymentPanel({ manager, canRefund = false, filters = {} 
                       {detail.fieldValues.map((field, index) => (
                         <View
                           key={`${field.fieldId}-${index}`}
-                          style={styles.detailRow}
+                          style={[styles.detailRow, narrow && styles.detailRowNarrow]}
                         >
-                          <Text style={styles.detailLabelInline}>
+                          <Text style={[styles.detailLabelInline, narrow && styles.detailLabelInlineNarrow]}>
                             {field.fieldName || `Field ${field.fieldId}`}
                           </Text>
-                          <Text style={styles.detailValueInline}>
+                          <Text style={[styles.detailValueInline, narrow && styles.detailValueInlineNarrow]}>
                             {field.value || "-"}
                           </Text>
                         </View>
@@ -1130,13 +1139,13 @@ export default function PaymentPanel({ manager, canRefund = false, filters = {} 
         animationType="fade"
         onRequestClose={() => setLogs(null)}
       >
-        <View style={styles.backdrop}>
-          <View style={styles.detailSheet}>
+        <View style={[styles.backdrop, phone && styles.backdropPhone]}>
+          <View style={[styles.detailSheet, phone && styles.detailSheetPhone]}>
             {logsLoading ? (
               <ActivityIndicator color={colors.primary} />
             ) : logs ? (
               <ScrollView>
-                <View style={styles.modalHeader}>
+                <View style={[styles.modalHeader, phone && styles.modalHeaderPhone]}>
                   <View style={styles.flex}>
                     <Text style={styles.modalTitle}>Payment #{logs.paymentId} logs</Text>
                     <Text style={styles.subtitle}>{logs.items.length} audit entries</Text>
@@ -1188,22 +1197,31 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     marginBottom: spacing.md
   },
-  title: { color: colors.text, fontSize: 20, fontWeight: "800" },
+  panelHeaderPhone: { alignItems: "stretch", flexWrap: "wrap", gap: spacing.sm },
+  headerButtonPhone: { width: "100%" },
+  title: { color: colors.text, fontSize: 22, fontWeight: "900" },
   subtitle: { color: colors.muted, marginTop: 3, fontSize: 12 },
   error: { color: colors.danger, marginBottom: spacing.md },
   loader: { marginVertical: spacing.lg },
-  paymentCard: { marginBottom: spacing.sm },
+  paymentCard: { marginBottom: spacing.sm, padding: spacing.lg },
   row: { flexDirection: "row", alignItems: "flex-start", gap: spacing.md },
-  paymentTitle: { color: colors.text, fontWeight: "800", fontSize: 16 },
-  member: { color: colors.primary, fontWeight: "700", marginTop: 4 },
+  rowPhone: { flexWrap: "wrap", gap: spacing.sm },
+  paymentTitle: { color: colors.text, fontWeight: "900", fontSize: 16 },
+  member: { color: colors.primaryStrong, fontWeight: "800", marginTop: 5 },
   meta: { color: colors.muted, marginTop: 4, fontSize: 12 },
   status: {
+    alignSelf: "flex-start",
     color: colors.primaryStrong,
-    fontWeight: "700",
-    marginTop: 6,
-    fontSize: 12
+    backgroundColor: colors.primarySoft,
+    borderRadius: radius.pill,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    fontWeight: "900",
+    marginTop: 8,
+    fontSize: 10
   },
-  amount: { color: colors.primaryStrong, fontWeight: "900", fontSize: 17 },
+  amount: { color: colors.primaryStrong, fontWeight: "900", fontSize: 19 },
+  amountPhone: { width: "100%", marginTop: spacing.xs },
   actions: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -1217,30 +1235,34 @@ const styles = StyleSheet.create({
     marginTop: spacing.md
   },
   pageText: { color: colors.muted, fontWeight: "700" },
+  paginationNarrow: { gap: spacing.xs },
   backdrop: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,.4)",
+    backgroundColor: colors.overlay,
     justifyContent: "center",
     padding: spacing.md
   },
+  backdropPhone: { justifyContent: "flex-end", padding: 0 },
   formSheet: {
     width: "100%",
     maxWidth: 720,
     maxHeight: "92%",
     alignSelf: "center",
     backgroundColor: colors.surface,
-    borderRadius: radius.lg,
+    borderRadius: radius.xl,
     overflow: "hidden"
   },
+  formSheetPhone: { maxHeight: "94%", borderTopLeftRadius: 24, borderTopRightRadius: 24, borderBottomLeftRadius: 0, borderBottomRightRadius: 0 },
   detailSheet: {
     width: "100%",
     maxWidth: 620,
     maxHeight: "86%",
     alignSelf: "center",
     backgroundColor: colors.surface,
-    borderRadius: radius.lg,
+    borderRadius: radius.xl,
     overflow: "hidden"
   },
+  detailSheetPhone: { maxHeight: "92%", borderTopLeftRadius: 24, borderTopRightRadius: 24, borderBottomLeftRadius: 0, borderBottomRightRadius: 0 },
   modalHeader: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -1249,19 +1271,21 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border
   },
-  modalTitle: { color: colors.text, fontSize: 20, fontWeight: "900" },
+  modalHeaderPhone: { padding: spacing.md },
+  modalTitle: { color: colors.text, fontSize: 22, fontWeight: "900" },
   close: { color: colors.muted, fontSize: 30, lineHeight: 30 },
   formContent: { padding: spacing.md },
   formCard: {
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.lg,
+    borderRadius: radius.xl,
     padding: spacing.md,
     backgroundColor: colors.surface
   },
+  formCardPhone: { borderRadius: 18, padding: spacing.sm },
   formSectionTitle: {
     color: colors.text,
-    fontWeight: "800",
+    fontWeight: "900",
     fontSize: 16,
     marginTop: spacing.xs,
     marginBottom: spacing.sm
@@ -1317,7 +1341,7 @@ const styles = StyleSheet.create({
     maxWidth: 520,
     alignSelf: "center",
     backgroundColor: colors.surface,
-    borderRadius: radius.lg,
+    borderRadius: radius.xl,
     padding: spacing.lg
   },
   monthHeader: {
@@ -1361,13 +1385,16 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border
   },
+  detailRowNarrow: { flexDirection: "column", gap: 4 },
   detailLabelInline: { color: colors.muted, flex: 1 },
+  detailLabelInlineNarrow: { flex: 0 },
   detailValueInline: {
     color: colors.text,
     fontWeight: "700",
     flex: 1,
     textAlign: "right"
   },
+  detailValueInlineNarrow: { flex: 0, textAlign: "left" },
   detailActions: { gap: spacing.sm, marginTop: spacing.lg },
   logCard: { marginBottom: spacing.md },
   logData: {

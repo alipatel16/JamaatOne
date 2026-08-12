@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, StyleSheet, Text, View } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 
 import { mumineenApi } from "../../src/api/mumineenApi";
@@ -168,9 +168,6 @@ export default function UserDetailScreen() {
   if (!mumin || !form) {
     return (
       <Screen>
-        <Pressable onPress={() => router.back()}>
-          <Text style={styles.back}>‹ Back</Text>
-        </Pressable>
         <Card>
           <Text style={styles.error}>{error || "Mumin record not found."}</Text>
           <Button title="Try again" variant="outline" onPress={loadMumin} />
@@ -182,9 +179,6 @@ export default function UserDetailScreen() {
   return (
     <Screen>
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()}>
-          <Text style={styles.back}>‹</Text>
-        </Pressable>
         <View style={styles.headerContent}>
           <Text style={styles.title}>
             {mumin.fullName || mumin.firstName || "Mumin details"}
@@ -448,13 +442,9 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
+    flexWrap: "wrap",
+    gap: spacing.sm,
     marginBottom: spacing.lg
-  },
-  back: {
-    color: colors.primaryStrong,
-    fontSize: 32,
-    fontWeight: "700",
-    marginRight: spacing.sm
   },
   headerContent: {
     flex: 1

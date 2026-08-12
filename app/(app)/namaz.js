@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import * as Location from "expo-location";
-import { Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 
 import Screen from "../../src/components/Screen";
 import LoadingView from "../../src/components/LoadingView";
@@ -55,6 +55,8 @@ function getNearestPrayer(items, now = new Date()) {
 export default function NamazScreen() {
   const { width } = useWindowDimensions();
   const isWide = width >= 820;
+  const phone = width < 600;
+  const narrow = width < 380;
   const [selectedDate, setSelectedDate] = useState(toIsoDate(new Date()));
   const [location, setLocation] = useState(null);
   const [locationName, setLocationName] = useState("Current location");
@@ -186,13 +188,13 @@ export default function NamazScreen() {
       <View style={[styles.hero, isWide && styles.heroWide]}>
         <View style={styles.heroCopy}>
           <Text style={styles.eyebrow}>LOCATION-BASED NAMAAZ</Text>
-          <Text style={styles.title}>Timings that move with you.</Text>
+          <Text style={[styles.title, phone && styles.titlePhone]}>Timings that move with you.</Text>
           <Text style={styles.subtitle}>
-            The frontend uses your device location, loads real timings, and decides the nearest timing from the current clock itself.
+            Prayer timings are based on your current location, with the nearest prayer highlighted for today.
           </Text>
         </View>
 
-        <View style={styles.locationCard}>
+        <View style={[styles.locationCard, phone && styles.locationCardPhone]}>
           <Text style={styles.locationLabel}>YOUR LOCATION</Text>
           <Text style={styles.locationValue}>{locationName}</Text>
           {location ? (
@@ -216,7 +218,7 @@ export default function NamazScreen() {
       {result ? (
         <>
           <View style={styles.toolbar}>
-            <View style={styles.segmented}>
+            <View style={[styles.segmented, phone && styles.segmentedPhone]}>
               {["DAY", "MONTH"].map(item => (
                 <Pressable key={item} onPress={() => setMode(item)} style={[styles.segment, mode === item && styles.segmentActive]}>
                   <Text style={[styles.segmentText, mode === item && styles.segmentTextActive]}>{item === "DAY" ? "Day" : "Month"}</Text>
@@ -236,12 +238,12 @@ export default function NamazScreen() {
 
           {mode === "DAY" ? (
             <View style={[styles.contentLayout, isWide && styles.contentLayoutWide]}>
-              <View style={[styles.nowCard, isWide && styles.nowCardWide]}>
+              <View style={[styles.nowCard, phone && styles.nowCardPhone, isWide && styles.nowCardWide]}>
                 <Text style={styles.nowEyebrow}>{nearest ? "NEAREST TO CURRENT TIME" : "SELECTED DATE"}</Text>
                 <Text style={styles.nowPrayer}>{nearest?.name || "Prayer schedule"}</Text>
                 <Text style={styles.nowTime}>{nearest?.time || result?.date?.readable || "—"}</Text>
                 {nearest ? (
-                  <Text style={styles.nowHint}>Highlighted below based on your device time, not a backend status flag.</Text>
+                  <Text style={styles.nowHint}>Highlighted below based on the current time.</Text>
                 ) : (
                   <Text style={styles.nowHint}>Nearest-time highlighting is shown only for today.</Text>
                 )}
@@ -254,7 +256,7 @@ export default function NamazScreen() {
                     {section.items.map(item => {
                       const active = nearest?.key === item.key;
                       return (
-                        <View key={item.key} style={[styles.prayerCard, active && styles.prayerCardActive]}>
+                        <View key={item.key} style={[styles.prayerCard, narrow && styles.prayerCardNarrow, active && styles.prayerCardActive]}>
                           <View>
                             <Text style={[styles.prayerName, active && styles.prayerNameActive]}>{item.name}</Text>
                             <Text style={[styles.prayerMeta, active && styles.prayerMetaActive]}>{active ? "Nearest now" : GROUP_LABELS[item.group]}</Text>
@@ -270,31 +272,35 @@ export default function NamazScreen() {
           ) : (
             <View style={styles.monthCard}>
               <Text style={styles.monthTitle}>Monthly prayer timings</Text>
-              <Text style={styles.monthSubtitle}>Live monthly values for the same device location.</Text>
-              <View style={styles.monthHeader}>
-                <Text style={[styles.monthCell, styles.monthDate]}>Date</Text>
-                <Text style={styles.monthCell}>Fajr</Text>
-                <Text style={styles.monthCell}>Sunrise</Text>
-                <Text style={styles.monthCell}>Asr</Text>
-                <Text style={styles.monthCell}>Maghrib</Text>
-              </View>
-              {monthDays.map(day => (
-                <Pressable
-                  key={day.date.gregorian.date}
-                  style={styles.monthRow}
-                  onPress={() => {
-                    const [dd, mm, yyyy] = day.date.gregorian.date.split("-");
-                    setSelectedDate(`${yyyy}-${mm}-${dd}`);
-                    setMode("DAY");
-                  }}
-                >
-                  <Text style={[styles.monthCell, styles.monthDate]}>{day.date.gregorian.day} {day.date.gregorian.month.en.slice(0, 3)}</Text>
-                  <Text style={styles.monthCell}>{cleanPrayerTime(day.timings.Fajr)}</Text>
-                  <Text style={styles.monthCell}>{cleanPrayerTime(day.timings.Sunrise)}</Text>
-                  <Text style={styles.monthCell}>{cleanPrayerTime(day.timings.Asr)}</Text>
-                  <Text style={styles.monthCell}>{cleanPrayerTime(day.timings.Maghrib)}</Text>
-                </Pressable>
-              ))}
+              <Text style={styles.monthSubtitle}>Monthly timings for the same location.</Text>
+              <ScrollView horizontal={phone} showsHorizontalScrollIndicator={false} contentContainerStyle={phone ? styles.monthScrollContent : undefined}>
+                <View style={phone ? styles.monthTablePhone : styles.monthTable}>
+                  <View style={styles.monthHeader}>
+                    <Text style={[styles.monthCell, styles.monthDate]}>Date</Text>
+                    <Text style={styles.monthCell}>Fajr</Text>
+                    <Text style={styles.monthCell}>Sunrise</Text>
+                    <Text style={styles.monthCell}>Asr</Text>
+                    <Text style={styles.monthCell}>Maghrib</Text>
+                  </View>
+                  {monthDays.map(day => (
+                    <Pressable
+                      key={day.date.gregorian.date}
+                      style={styles.monthRow}
+                      onPress={() => {
+                        const [dd, mm, yyyy] = day.date.gregorian.date.split("-");
+                        setSelectedDate(`${yyyy}-${mm}-${dd}`);
+                        setMode("DAY");
+                      }}
+                    >
+                      <Text style={[styles.monthCell, styles.monthDate]}>{day.date.gregorian.day} {day.date.gregorian.month.en.slice(0, 3)}</Text>
+                      <Text style={styles.monthCell}>{cleanPrayerTime(day.timings.Fajr)}</Text>
+                      <Text style={styles.monthCell}>{cleanPrayerTime(day.timings.Sunrise)}</Text>
+                      <Text style={styles.monthCell}>{cleanPrayerTime(day.timings.Asr)}</Text>
+                      <Text style={styles.monthCell}>{cleanPrayerTime(day.timings.Maghrib)}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </ScrollView>
             </View>
           )}
         </>
@@ -309,8 +315,10 @@ const styles = StyleSheet.create({
   heroCopy: { flex: 1, maxWidth: 640 },
   eyebrow: { color: colors.accent, fontWeight: "900", fontSize: 11, letterSpacing: 1.3 },
   title: { color: colors.text, fontSize: 31, lineHeight: 37, fontWeight: "900", marginTop: 7 },
+  titlePhone: { fontSize: 27, lineHeight: 33 },
   subtitle: { color: colors.muted, lineHeight: 21, marginTop: 8, maxWidth: 610 },
   locationCard: { marginTop: spacing.lg, minWidth: 230, backgroundColor: "#EEF4F0", borderRadius: 18, padding: 16, borderWidth: 1, borderColor: "#D9E4DD" },
+  locationCardPhone: { minWidth: 0, width: "100%", marginTop: spacing.md },
   locationLabel: { color: "#64806D", fontSize: 10, fontWeight: "900", letterSpacing: 1 },
   locationValue: { color: "#1D3325", fontWeight: "900", fontSize: 16, marginTop: 5 },
   coordinates: { color: "#718078", fontSize: 11, marginTop: 3 },
@@ -321,6 +329,7 @@ const styles = StyleSheet.create({
   permissionText: { color: "#FFF", fontWeight: "800" },
   toolbar: { gap: 12, marginBottom: spacing.md },
   segmented: { flexDirection: "row", alignSelf: "flex-start", backgroundColor: "#ECEAE5", borderRadius: 13, padding: 4 },
+  segmentedPhone: { alignSelf: "stretch" },
   segment: { minWidth: 76, paddingVertical: 9, paddingHorizontal: 14, borderRadius: 10, alignItems: "center" },
   segmentActive: { backgroundColor: colors.surface },
   segmentText: { color: colors.muted, fontWeight: "800", fontSize: 12 },
@@ -334,6 +343,7 @@ const styles = StyleSheet.create({
   contentLayout: { gap: spacing.md },
   contentLayoutWide: { flexDirection: "row", alignItems: "flex-start" },
   nowCard: { backgroundColor: "#1F2D27", borderRadius: 22, padding: 22 },
+  nowCardPhone: { padding: spacing.lg, borderRadius: 18 },
   nowCardWide: { width: 300 },
   nowEyebrow: { color: "#DCCB82", fontSize: 10, letterSpacing: 1.1, fontWeight: "900" },
   nowPrayer: { color: "#FFF", fontSize: 25, fontWeight: "900", marginTop: 12 },
@@ -343,6 +353,7 @@ const styles = StyleSheet.create({
   groupSection: { gap: 9 },
   groupTitle: { color: colors.muted, textTransform: "uppercase", letterSpacing: .8, fontSize: 11, fontWeight: "900", marginLeft: 2 },
   prayerCard: { minHeight: 72, borderRadius: 18, paddingHorizontal: 17, paddingVertical: 14, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  prayerCardNarrow: { paddingHorizontal: spacing.sm },
   prayerCardActive: { backgroundColor: "#FFF4C4", borderColor: "#E1C45A" },
   prayerName: { color: colors.text, fontWeight: "900", fontSize: 16 },
   prayerNameActive: { color: "#3E3513" },
@@ -353,6 +364,9 @@ const styles = StyleSheet.create({
   monthCard: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 20, padding: 14, overflow: "hidden" },
   monthTitle: { color: colors.text, fontWeight: "900", fontSize: 18 },
   monthSubtitle: { color: colors.muted, marginTop: 4, marginBottom: 14, fontSize: 12 },
+  monthTable: { width: "100%" },
+  monthTablePhone: { minWidth: 560 },
+  monthScrollContent: { paddingBottom: 2 },
   monthHeader: { flexDirection: "row", paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.background },
   monthRow: { flexDirection: "row", paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
   monthCell: { flex: 1, textAlign: "center", color: colors.text, fontSize: 11 },

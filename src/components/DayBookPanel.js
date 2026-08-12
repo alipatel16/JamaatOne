@@ -9,6 +9,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View
 } from "react-native";
 
@@ -75,6 +76,9 @@ async function confirmAction(title, message, actionLabel) {
 }
 
 export default function DayBookPanel({ manager, canDelete = false, filters = {} }) {
+  const { width } = useWindowDimensions();
+  const phone = width < 600;
+  const narrow = width < 380;
   const [methods, setMethods] = useState([]);
   const [entries, setEntries] = useState([]);
   const [pageNumber, setPageNumber] = useState(1);
@@ -321,7 +325,7 @@ export default function DayBookPanel({ manager, canDelete = false, filters = {} 
     if (!canDelete) return;
     const proceed = await confirmAction(
       "Delete Day Book entry?",
-      `Delete Day Book entry #${item.dayBookId}? This uses the Day Book DELETE API.`,
+      `Delete Day Book entry #${item.dayBookId}? This action cannot be undone.`,
       "Delete"
     );
     if (!proceed) return;
@@ -357,22 +361,22 @@ export default function DayBookPanel({ manager, canDelete = false, filters = {} 
 
   return (
     <View>
-      <View style={styles.panelHeader}>
+      <View style={[styles.panelHeader, phone && styles.panelHeaderPhone]}>
         <View style={styles.flex}>
           <Text style={styles.title}>Day Book</Text>
           <Text style={styles.subtitle}>
-            {totalCount} entries · live Accounts API
+            {totalCount} entr{totalCount === 1 ? "y" : "ies"}
           </Text>
         </View>
         {manager ? (
-          <Button title="Add debit / credit entry" compact onPress={openCreate} />
+          <Button title="Add debit / credit entry" compact onPress={openCreate} style={phone && styles.headerButtonPhone} />
         ) : null}
       </View>
 
       <Card style={styles.serverFilters}>
         <Text style={styles.filterTitle}>Day Book filters</Text>
         <View style={styles.filterGrid}>
-          <View style={styles.filterCell}>
+          <View style={[styles.filterCell, phone && styles.filterCellPhone]}>
             <Select
               label="Entry type"
               value={entryTypeFilter}
@@ -380,7 +384,7 @@ export default function DayBookPanel({ manager, canDelete = false, filters = {} 
               onChange={setEntryTypeFilter}
             />
           </View>
-          <View style={styles.filterCell}>
+          <View style={[styles.filterCell, phone && styles.filterCellPhone]}>
             <Select
               label="Payment method"
               value={paymentMethodFilter}
@@ -409,7 +413,7 @@ export default function DayBookPanel({ manager, canDelete = false, filters = {} 
 
       {visibleEntries.map(item => (
         <Card key={String(item.dayBookId)} style={styles.entryCard}>
-          <View style={styles.row}>
+          <View style={[styles.row, phone && styles.rowPhone]}>
             <View style={styles.flex}>
               <Text style={styles.entryTitle}>{item.paymentFor || "Day Book entry"}</Text>
               <Text style={styles.meta}>
@@ -436,6 +440,7 @@ export default function DayBookPanel({ manager, canDelete = false, filters = {} 
             <Text
               style={[
                 styles.amount,
+                phone && styles.amountPhone,
                 isDebitEntry(item.entryType) && styles.debitAmount
               ]}
             >
@@ -491,7 +496,7 @@ export default function DayBookPanel({ manager, canDelete = false, filters = {} 
         </Card>
       ) : null}
 
-      <View style={styles.pagination}>
+      <View style={[styles.pagination, narrow && styles.paginationNarrow]}>
         <Button
           title="Previous"
           compact
@@ -518,17 +523,17 @@ export default function DayBookPanel({ manager, canDelete = false, filters = {} 
         onRequestClose={() => !saving && setShowForm(false)}
       >
         <KeyboardAvoidingView
-          style={styles.backdrop}
+          style={[styles.backdrop, phone && styles.backdropPhone]}
           behavior={Platform.OS === "ios" ? "padding" : undefined}
         >
-          <View style={styles.formSheet}>
-            <View style={styles.modalHeader}>
+          <View style={[styles.formSheet, phone && styles.formSheetPhone]}>
+            <View style={[styles.modalHeader, phone && styles.modalHeaderPhone]}>
               <View style={styles.flex}>
                 <Text style={styles.modalTitle}>
                   {editingId ? "Edit Day Book entry" : "Add debit / credit entry"}
                 </Text>
                 <Text style={styles.subtitle}>
-                  Entry type remains Credit/Debit and payment methods are loaded from the Payment Method API.
+                  Record a debit or credit entry with its payment method and details.
                 </Text>
               </View>
               <Pressable disabled={saving} onPress={() => setShowForm(false)}>
@@ -601,13 +606,13 @@ export default function DayBookPanel({ manager, canDelete = false, filters = {} 
         animationType="fade"
         onRequestClose={() => setDetail(null)}
       >
-        <View style={styles.backdrop}>
-          <View style={styles.detailSheet}>
+        <View style={[styles.backdrop, phone && styles.backdropPhone]}>
+          <View style={[styles.detailSheet, phone && styles.detailSheetPhone]}>
             {detailLoading ? (
               <ActivityIndicator color={colors.primary} />
             ) : detail ? (
               <ScrollView>
-                <View style={styles.modalHeader}>
+                <View style={[styles.modalHeader, phone && styles.modalHeaderPhone]}>
                   <View style={styles.flex}>
                     <Text style={styles.modalTitle}>Day Book #{detail.dayBookId}</Text>
                     <Text style={styles.subtitle}>
@@ -706,13 +711,13 @@ export default function DayBookPanel({ manager, canDelete = false, filters = {} 
         animationType="fade"
         onRequestClose={() => setLogs(null)}
       >
-        <View style={styles.backdrop}>
-          <View style={styles.detailSheet}>
+        <View style={[styles.backdrop, phone && styles.backdropPhone]}>
+          <View style={[styles.detailSheet, phone && styles.detailSheetPhone]}>
             {logsLoading ? (
               <ActivityIndicator color={colors.primary} />
             ) : logs ? (
               <ScrollView>
-                <View style={styles.modalHeader}>
+                <View style={[styles.modalHeader, phone && styles.modalHeaderPhone]}>
                   <View style={styles.flex}>
                     <Text style={styles.modalTitle}>Day Book #{logs.dayBookId} logs</Text>
                     <Text style={styles.subtitle}>{logs.items.length} audit entries</Text>
@@ -763,21 +768,26 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     marginBottom: spacing.md
   },
+  panelHeaderPhone: { alignItems: "stretch", flexWrap: "wrap", gap: spacing.sm },
+  headerButtonPhone: { width: "100%" },
   title: { color: colors.text, fontSize: 20, fontWeight: "800" },
   subtitle: { color: colors.muted, marginTop: 3, fontSize: 12 },
   serverFilters: { marginBottom: spacing.md },
   filterTitle: { color: colors.text, fontWeight: "800", marginBottom: spacing.sm },
   filterGrid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.md },
   filterCell: { flex: 1, minWidth: 220 },
+  filterCellPhone: { minWidth: "100%" },
   error: { color: colors.danger, marginBottom: spacing.md },
   loader: { marginVertical: spacing.lg },
   entryCard: { marginBottom: spacing.sm },
   row: { flexDirection: "row", alignItems: "flex-start", gap: spacing.md },
+  rowPhone: { flexWrap: "wrap", gap: spacing.sm },
   entryTitle: { color: colors.text, fontWeight: "800", fontSize: 16 },
   meta: { color: colors.muted, marginTop: 4, fontSize: 12 },
   amount: { color: colors.primaryStrong, fontWeight: "900", fontSize: 17 },
+  amountPhone: { width: "100%", marginTop: spacing.xs },
   debitAmount: { color: colors.danger },
-  statusRow: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.sm },
+  statusRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.sm },
   typeBadge: {
     alignSelf: "flex-start",
     paddingHorizontal: spacing.sm,
@@ -813,12 +823,14 @@ const styles = StyleSheet.create({
     marginTop: spacing.md
   },
   pageText: { color: colors.muted, fontWeight: "700" },
+  paginationNarrow: { gap: spacing.xs },
   backdrop: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,.4)",
     justifyContent: "center",
     padding: spacing.md
   },
+  backdropPhone: { justifyContent: "flex-end", padding: 0 },
   formSheet: {
     width: "100%",
     maxWidth: 680,
@@ -828,6 +840,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     overflow: "hidden"
   },
+  formSheetPhone: { maxHeight: "94%", borderTopLeftRadius: 24, borderTopRightRadius: 24, borderBottomLeftRadius: 0, borderBottomRightRadius: 0 },
   detailSheet: {
     width: "100%",
     maxWidth: 680,
@@ -837,6 +850,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     overflow: "hidden"
   },
+  detailSheetPhone: { maxHeight: "92%", borderTopLeftRadius: 24, borderTopRightRadius: 24, borderBottomLeftRadius: 0, borderBottomRightRadius: 0 },
   modalHeader: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -845,6 +859,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border
   },
+  modalHeaderPhone: { padding: spacing.md },
   modalTitle: { color: colors.text, fontSize: 20, fontWeight: "900" },
   close: { color: colors.muted, fontSize: 30, lineHeight: 30 },
   formScroll: { flexGrow: 0 },

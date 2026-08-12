@@ -8,6 +8,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View
 } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
@@ -72,6 +73,9 @@ async function confirmAction(title, message, actionLabel = "Delete") {
 }
 
 export default function CashManagementPanel({ canDelete = false }) {
+  const { width } = useWindowDimensions();
+  const phone = width < 600;
+  const narrow = width < 380;
   const router = useRouter();
   const [cashSummary, setCashSummary] = useState([]);
   const [bankAccounts, setBankAccounts] = useState([]);
@@ -305,16 +309,16 @@ export default function CashManagementPanel({ canDelete = false }) {
     <View>
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
-      <View style={styles.summaryRow}>
-        <Card style={styles.summaryCard}>
+      <View style={[styles.summaryRow, phone && styles.summaryRowPhone]}>
+        <Card style={[styles.summaryCard, phone && styles.summaryCardPhone]}>
           <Text style={styles.label}>Total cash received</Text>
           <Text style={styles.amount}>{money(totals.collected)}</Text>
         </Card>
-        <Card style={styles.summaryCard}>
+        <Card style={[styles.summaryCard, phone && styles.summaryCardPhone]}>
           <Text style={styles.label}>Total cash deposited</Text>
           <Text style={styles.amount}>{money(totals.deposited)}</Text>
         </Card>
-        <Card style={styles.summaryCard}>
+        <Card style={[styles.summaryCard, phone && styles.summaryCardPhone]}>
           <Text style={styles.label}>Pending to deposit</Text>
           <Text style={[styles.amount, totals.pending > 0 && styles.pending]}>
             {money(totals.pending)}
@@ -326,7 +330,7 @@ export default function CashManagementPanel({ canDelete = false }) {
         <Card>
           <Text style={styles.sectionTitle}>Collection method summary</Text>
           {cashSummary.map(item => (
-            <View key={String(item.paymentMethodId)} style={styles.summaryLine}>
+            <View key={String(item.paymentMethodId)} style={[styles.summaryLine, phone && styles.summaryLinePhone]}>
               <View style={styles.flex}>
                 <Text style={styles.title}>{item.paymentMethodName || "Payment method"}</Text>
                 <Text style={styles.meta}>
@@ -336,6 +340,7 @@ export default function CashManagementPanel({ canDelete = false }) {
               <Text
                 style={[
                   styles.lineAmount,
+                  phone && styles.lineAmountPhone,
                   Number(item.pendingToDeposit) > 0 && styles.pending
                 ]}
               >
@@ -347,7 +352,7 @@ export default function CashManagementPanel({ canDelete = false }) {
       ) : null}
 
       <Pressable onPress={() => router.push("/bank-accounts")}>
-        <View style={[styles.manageCard, shadows.card]}>
+        <View style={[styles.manageCard, phone && styles.manageCardPhone, shadows.card]}>
           <View style={styles.manageIcon}>
             <Text style={styles.manageIconText}>₹</Text>
           </View>
@@ -364,7 +369,7 @@ export default function CashManagementPanel({ canDelete = false }) {
         </View>
       </Pressable>
 
-      <View style={styles.sectionHeader}>
+      <View style={[styles.sectionHeader, phone && styles.sectionHeaderPhone]}>
         <View>
           <Text style={styles.sectionTitle}>Bank deposits</Text>
           <Text style={styles.meta}>{meta.totalCount} deposit entries</Text>
@@ -374,6 +379,7 @@ export default function CashManagementPanel({ canDelete = false }) {
           compact
           disabled={!bankOptions.length || !paymentMethodOptions.length}
           onPress={openCreateDeposit}
+          style={phone && styles.sectionButtonPhone}
         />
       </View>
 
@@ -390,7 +396,7 @@ export default function CashManagementPanel({ canDelete = false }) {
       ) : deposits.length ? (
         deposits.map(item => (
           <Card key={String(item.bankDepositId)}>
-            <View style={styles.row}>
+            <View style={[styles.row, phone && styles.rowPhone]}>
               <View style={styles.flex}>
                 <Text style={styles.title}>{item.bankAccountName || "Bank deposit"}</Text>
                 <Text style={styles.meta}>
@@ -402,7 +408,7 @@ export default function CashManagementPanel({ canDelete = false }) {
                 </Text>
                 {item.remarks ? <Text style={styles.meta}>{item.remarks}</Text> : null}
               </View>
-              <Text style={styles.amount}>{money(item.amount)}</Text>
+              <Text style={[styles.amount, phone && styles.amountPhone]}>{money(item.amount)}</Text>
             </View>
             <View style={styles.actionsRow}>
               <Button
@@ -432,7 +438,7 @@ export default function CashManagementPanel({ canDelete = false }) {
         <Card><Text style={styles.empty}>No bank deposits recorded yet.</Text></Card>
       )}
 
-      <View style={styles.pagination}>
+      <View style={[styles.pagination, narrow && styles.paginationNarrow]}>
         <Button
           title="Previous"
           compact
@@ -457,10 +463,10 @@ export default function CashManagementPanel({ canDelete = false }) {
         onRequestClose={() => !depositSaving && setDepositModal(false)}
       >
         <Pressable
-          style={styles.backdrop}
+          style={[styles.backdrop, phone && styles.backdropPhone]}
           onPress={() => !depositSaving && setDepositModal(false)}
         >
-          <Pressable style={styles.modalCard} onPress={() => {}}>
+          <Pressable style={[styles.modalCard, phone && styles.modalCardPhone]} onPress={() => {}}>
             <ScrollView keyboardShouldPersistTaps="handled">
               <Text style={styles.modalTitle}>
                 {editingDepositId ? "Edit bank deposit" : "Record bank deposit"}
@@ -533,8 +539,8 @@ export default function CashManagementPanel({ canDelete = false }) {
         animationType="fade"
         onRequestClose={() => setLogsVisible(false)}
       >
-        <Pressable style={styles.backdrop} onPress={() => setLogsVisible(false)}>
-          <Pressable style={styles.modalCard} onPress={() => {}}>
+        <Pressable style={[styles.backdrop, phone && styles.backdropPhone]} onPress={() => setLogsVisible(false)}>
+          <Pressable style={[styles.modalCard, phone && styles.modalCardPhone]} onPress={() => {}}>
             <Text style={styles.modalTitle}>Deposit logs</Text>
             <ScrollView>
               {logsLoading ? (
@@ -563,12 +569,16 @@ export default function CashManagementPanel({ canDelete = false }) {
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1 },
+  flex: { flex: 1, minWidth: 0 },
   row: { flexDirection: "row", gap: spacing.md, alignItems: "flex-start" },
+  rowPhone: { flexWrap: "wrap", gap: spacing.sm },
   summaryRow: { flexDirection: "row", flexWrap: "wrap", marginHorizontal: -4 },
   summaryCard: { flex: 1, minWidth: 180, marginHorizontal: 4 },
+  summaryRowPhone: { marginHorizontal: 0, gap: spacing.sm },
+  summaryCardPhone: { flexBasis: "100%", minWidth: "100%", marginHorizontal: 0 },
   label: { color: colors.muted },
   amount: { color: colors.primary, fontSize: 20, fontWeight: "800", marginTop: 4 },
+  amountPhone: { width: "100%" },
   pending: { color: colors.danger },
   title: { color: colors.text, fontWeight: "800", fontSize: 16 },
   meta: { color: colors.muted, marginTop: 4, fontSize: 12 },
@@ -580,6 +590,8 @@ const styles = StyleSheet.create({
     marginTop: spacing.lg,
     marginBottom: spacing.sm
   },
+  sectionHeaderPhone: { alignItems: "stretch", flexWrap: "wrap" },
+  sectionButtonPhone: { width: "100%" },
   sectionTitle: { color: colors.text, fontSize: 19, fontWeight: "800" },
   summaryLine: {
     flexDirection: "row",
@@ -589,7 +601,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border
   },
+  summaryLinePhone: { alignItems: "flex-start", flexWrap: "wrap" },
   lineAmount: { color: colors.text, fontWeight: "800", textAlign: "right" },
+  lineAmountPhone: { width: "100%", textAlign: "left" },
   manageCard: {
     flexDirection: "row",
     alignItems: "center",
@@ -601,6 +615,7 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     marginTop: spacing.md
   },
+  manageCardPhone: { padding: spacing.md, alignItems: "flex-start" },
   manageIcon: {
     width: 48,
     height: 48,
@@ -625,8 +640,11 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     marginVertical: spacing.md
   },
+  paginationNarrow: { gap: spacing.xs },
   backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,.45)", justifyContent: "center", padding: spacing.md },
+  backdropPhone: { justifyContent: "flex-end", padding: 0 },
   modalCard: { width: "100%", maxWidth: 680, maxHeight: "90%", alignSelf: "center", backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.md },
+  modalCardPhone: { maxHeight: "94%", borderTopLeftRadius: 24, borderTopRightRadius: 24, borderBottomLeftRadius: 0, borderBottomRightRadius: 0, padding: spacing.md },
   modalTitle: { color: colors.text, fontSize: 21, fontWeight: "800", marginBottom: spacing.md },
   modalActions: { flexDirection: "row", justifyContent: "flex-end", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.sm },
   logItem: { paddingVertical: spacing.md, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },

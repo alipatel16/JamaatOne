@@ -63,6 +63,8 @@ function initials(value) {
 export default function BankAccountsPanel({ canManage = false }) {
   const { width } = useWindowDimensions();
   const wide = width >= 820;
+  const phone = width < 600;
+  const narrow = width < 380;
   const [accounts, setAccounts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -173,7 +175,7 @@ export default function BankAccountsPanel({ canManage = false }) {
 
   return (
     <View>
-      <View style={styles.hero}>
+      <View style={[styles.hero, phone && styles.heroPhone, narrow && styles.heroNarrow]}>
         <View style={styles.heroCopy}>
           <Text style={styles.eyebrow}>CASH MANAGEMENT</Text>
           <Text style={styles.heroTitle}>Bank accounts</Text>
@@ -181,19 +183,19 @@ export default function BankAccountsPanel({ canManage = false }) {
             Manage the Jamaat bank accounts available when recording cash deposits.
           </Text>
         </View>
-        <View style={styles.heroCount}>
+        <View style={[styles.heroCount, phone && styles.heroCountPhone]}>
           <Text style={styles.heroCountValue}>{activeAccounts.length}</Text>
           <Text style={styles.heroCountLabel}>ACTIVE</Text>
         </View>
       </View>
 
-      <View style={styles.toolbar}>
+      <View style={[styles.toolbar, phone && styles.toolbarPhone]}>
         <View style={styles.flex}>
           <Text style={styles.sectionTitle}>Configured accounts</Text>
           <Text style={styles.meta}>Only active accounts are shown.</Text>
         </View>
         {canManage ? (
-          <Button title="Add bank account" compact onPress={openCreate} />
+          <Button title="Add bank account" compact onPress={openCreate} style={phone && styles.toolbarButtonPhone} />
         ) : null}
       </View>
 
@@ -208,7 +210,7 @@ export default function BankAccountsPanel({ canManage = false }) {
               key={String(item.bankAccountId)}
               style={[styles.accountCard, wide && styles.accountCardWide]}
             >
-              <View style={styles.cardTop}>
+              <View style={[styles.cardTop, narrow && styles.cardTopNarrow]}>
                 <View style={styles.bankMark}>
                   <Text style={styles.bankMarkText}>
                     {initials(item.bankName || item.bankAccountName)}
@@ -291,10 +293,10 @@ export default function BankAccountsPanel({ canManage = false }) {
         onRequestClose={() => !saving && setModalVisible(false)}
       >
         <Pressable
-          style={styles.backdrop}
+          style={[styles.backdrop, phone && styles.backdropPhone]}
           onPress={() => !saving && setModalVisible(false)}
         >
-          <Pressable style={styles.modalCard} onPress={() => {}}>
+          <Pressable style={[styles.modalCard, phone && styles.modalCardPhone]} onPress={() => {}}>
             <ScrollView keyboardShouldPersistTaps="handled">
               <View style={styles.modalHeader}>
                 <View style={styles.flex}>
@@ -386,7 +388,9 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
     ...shadows.card
   },
-  heroCopy: { flex: 1 },
+  heroPhone: { padding: spacing.md, gap: spacing.md, alignItems: "flex-start" },
+  heroNarrow: { flexDirection: "column" },
+  heroCopy: { flex: 1, minWidth: 0 },
   eyebrow: {
     color: "#D8E6E0",
     fontSize: 10,
@@ -406,6 +410,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,255,255,.16)"
   },
+  heroCountPhone: { width: 68, height: 68, borderRadius: 20 },
   heroCountValue: { color: "#FFFFFF", fontSize: 28, fontWeight: "900" },
   heroCountLabel: { color: "#D8E6E0", fontSize: 9, fontWeight: "800", letterSpacing: 1.1 },
   toolbar: {
@@ -415,12 +420,15 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     marginBottom: spacing.md
   },
+  toolbarPhone: { alignItems: "stretch", flexWrap: "wrap" },
+  toolbarButtonPhone: { width: "100%" },
   sectionTitle: { color: colors.text, fontSize: 20, fontWeight: "800" },
   meta: { color: colors.muted, fontSize: 12, marginTop: 3 },
   grid: { flexDirection: "row", flexWrap: "wrap", marginHorizontal: -spacing.xs },
   accountCard: { width: "100%", marginHorizontal: spacing.xs, marginBottom: spacing.sm },
   accountCardWide: { width: "48.5%" },
   cardTop: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  cardTopNarrow: { flexWrap: "wrap", alignItems: "flex-start" },
   bankMark: {
     width: 46,
     height: 46,
@@ -462,7 +470,9 @@ const styles = StyleSheet.create({
   loader: { marginVertical: spacing.xl },
   error: { color: colors.danger, marginBottom: spacing.md },
   backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,.45)", justifyContent: "center", padding: spacing.md },
+  backdropPhone: { justifyContent: "flex-end", padding: 0 },
   modalCard: { width: "100%", maxWidth: 680, maxHeight: "90%", alignSelf: "center", backgroundColor: colors.surface, borderRadius: radius.xl, padding: spacing.lg },
+  modalCardPhone: { maxHeight: "94%", borderTopLeftRadius: 24, borderTopRightRadius: 24, borderBottomLeftRadius: 0, borderBottomRightRadius: 0, padding: spacing.md },
   modalHeader: { flexDirection: "row", alignItems: "center", marginBottom: spacing.md },
   modalEyebrow: { color: colors.accent, fontSize: 10, fontWeight: "800", letterSpacing: 1.3 },
   modalTitle: { color: colors.text, fontSize: 23, fontWeight: "800", marginTop: 3 },

@@ -1,70 +1,94 @@
 import React from "react";
-import { StyleSheet, Text } from "react-native";
+import { StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { router } from "expo-router";
 import Button from "../../src/components/Button";
 import Card from "../../src/components/Card";
 import Screen from "../../src/components/Screen";
 import { useAuth } from "../../src/context/AuthContext";
-import { colors, spacing } from "../../src/theme";
-
-function formatExpiry(value) {
-  if (!value) return "Not provided";
-  const date = new Date(value);
-  return Number.isFinite(date.getTime()) ? date.toLocaleString() : String(value);
-}
+import { colors, radius, spacing } from "../../src/theme";
 
 export default function ProfileScreen() {
-  const { user, session, logout } = useAuth();
+  const { width } = useWindowDimensions();
+  const phone = width < 600;
+  const narrow = width < 390;
+  const { user, logout } = useAuth();
 
   async function handleLogout() {
     await logout();
     router.replace("/login");
   }
 
+  const initial = (user?.name || "J").slice(0, 1).toUpperCase();
+
   return (
     <Screen>
-      <Text style={styles.title}>Profile</Text>
-      <Card>
-        <Text style={styles.name}>{user?.name}</Text>
-        <Text style={styles.meta}>ITS ID: {user?.itsId}</Text>
-        <Text style={styles.meta}>Role: {user?.role}</Text>
-        <Text style={styles.meta}>Jamaat ID: {user?.jamaatId || "-"}</Text>
+      <View style={styles.heading}>
+        <Text style={styles.eyebrow}>YOUR ACCOUNT</Text>
+        <Text style={styles.title}>Profile</Text>
+        <Text style={styles.subtitle}>Your JamaatOne identity and access details.</Text>
+      </View>
+
+      <Card style={[styles.profileCard, phone && styles.profileCardPhone]}>
+        <View style={[styles.profileTop, narrow && styles.profileTopNarrow]}>
+          <View style={styles.avatar}><Text style={styles.avatarText}>{initial}</Text></View>
+          <View style={[styles.profileCopy, narrow && styles.profileCopyNarrow]}>
+            <Text style={styles.name}>{user?.name || "Member"}</Text>
+            <Text style={styles.role}>{user?.role || "Member"}</Text>
+          </View>
+        </View>
+
+        <View style={styles.infoGrid}>
+          <View style={[styles.infoItem, phone && styles.infoItemPhone]}>
+            <Text style={styles.infoLabel}>ITS ID</Text>
+            <Text style={styles.infoValue}>{user?.itsId || "-"}</Text>
+          </View>
+          <View style={[styles.infoItem, phone && styles.infoItemPhone]}>
+            <Text style={styles.infoLabel}>Jamaat</Text>
+            <Text style={styles.infoValue}>{user?.jamaatId || "-"}</Text>
+          </View>
+          <View style={[styles.infoItem, phone && styles.infoItemPhone]}>
+            <Text style={styles.infoLabel}>Access</Text>
+            <Text style={styles.infoValue}>{user?.roleName || user?.role || "Member"}</Text>
+          </View>
+        </View>
       </Card>
 
-      <Card>
-        <Text style={styles.sectionTitle}>Session</Text>
-        <Text style={styles.meta}>
-          Access token validity: {session?.accessTokenExpiresInMinutes ?? "-"} minutes
-        </Text>
-        <Text style={styles.meta}>
-          Access token expires: {formatExpiry(session?.accessTokenExpiresAt)}
-        </Text>
-        <Text style={styles.meta}>
-          Refresh token validity: {session?.refreshTokenExpiresInDays ?? "-"} days
-        </Text>
-        <Text style={styles.meta}>
-          Refresh token expires: {formatExpiry(session?.refreshTokenExpiresAt)}
-        </Text>
+      <Card style={[styles.actionCard, phone && styles.actionCardPhone]} elevated={false}>
+        <View style={styles.actionCopy}>
+          <Text style={styles.actionTitle}>Sign out of JamaatOne</Text>
+          <Text style={styles.actionText}>End this session on the current device.</Text>
+        </View>
+        <Button title="Sign out" variant="danger" onPress={handleLogout} style={[styles.signOutButton, phone && styles.signOutButtonPhone]} />
       </Card>
-
-      <Button title="Sign out" variant="danger" onPress={handleLogout} />
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  title: {
-    fontSize: 25,
-    fontWeight: "800",
-    color: colors.text,
-    marginBottom: spacing.md
-  },
-  name: { fontSize: 20, fontWeight: "800", color: colors.text },
-  sectionTitle: {
-    fontSize: 17,
-    fontWeight: "800",
-    color: colors.text,
-    marginBottom: spacing.xs
-  },
-  meta: { color: colors.muted, marginTop: spacing.xs }
+  heading: { marginBottom: spacing.lg },
+  eyebrow: { color: colors.accentStrong, fontSize: 10, fontWeight: "900", letterSpacing: 1.3 },
+  title: { fontSize: 30, fontWeight: "900", color: colors.text, marginTop: 4 },
+  subtitle: { color: colors.muted, marginTop: 5 },
+  profileCard: { padding: spacing.xl },
+  profileCardPhone: { padding: spacing.lg },
+  profileTop: { flexDirection: "row", alignItems: "center" },
+  profileTopNarrow: { flexDirection: "column", alignItems: "flex-start" },
+  avatar: { width: 72, height: 72, borderRadius: 24, backgroundColor: colors.primaryStrong, alignItems: "center", justifyContent: "center" },
+  avatarText: { color: "#FFFFFF", fontSize: 30, fontWeight: "900" },
+  profileCopy: { flex: 1, marginLeft: spacing.md },
+  profileCopyNarrow: { marginLeft: 0, marginTop: spacing.md },
+  name: { fontSize: 23, fontWeight: "900", color: colors.text },
+  role: { color: colors.primaryStrong, fontWeight: "800", marginTop: 4 },
+  infoGrid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.xl },
+  infoItem: { flex: 1, minWidth: 160, padding: spacing.md, borderRadius: radius.lg, backgroundColor: colors.backgroundAlt },
+  infoItemPhone: { minWidth: "100%", width: "100%" },
+  infoLabel: { color: colors.muted, fontSize: 10, fontWeight: "900", letterSpacing: 0.8 },
+  infoValue: { color: colors.text, fontWeight: "900", marginTop: 6, fontSize: 15 },
+  actionCard: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: spacing.md, borderColor: colors.border, backgroundColor: colors.surfaceMuted },
+  actionCardPhone: { alignItems: "stretch" },
+  actionCopy: { flex: 1, minWidth: 220 },
+  actionTitle: { color: colors.text, fontWeight: "900", fontSize: 16 },
+  actionText: { color: colors.muted, fontSize: 12, marginTop: 4 },
+  signOutButton: { minWidth: 120 },
+  signOutButtonPhone: { width: "100%" }
 });

@@ -74,8 +74,14 @@ function makeLiveReceipt(payment, mumin) {
     paymentMethod: payment?.paymentMethodName || "-",
     referenceNumber: payment?.paymentReference || "",
     notes: payment?.remarks || "",
-    recordedByName: payment?.updatedByName || "-",
-    recordedByItsId: payment?.updatedByItsNo || "-",
+    recordedByName: payment?.updatedByName || payment?.createdByName || "-",
+    recordedByItsId:
+      payment?.updatedByItsNo ||
+      payment?.createdByItsNo ||
+      payment?.createdByItsId ||
+      "-",
+    createdByName: payment?.createdByName || "",
+    createdByItsNo: payment?.createdByItsNo || payment?.createdByItsId || "",
     fieldValues: payment?.fieldValues || []
   };
 }
@@ -84,6 +90,8 @@ export default function Receipt() {
   const { paymentId } = useLocalSearchParams();
   const { width } = useWindowDimensions();
   const isWide = width >= 760;
+  const phone = width < 600;
+  const narrow = width < 380;
   const [receipt, setReceipt] = useState(null);
   const [error, setError] = useState("");
 
@@ -164,15 +172,15 @@ export default function Receipt() {
           </Text>
         </View>
 
-        <View style={styles.actions}>
-          <View style={styles.action}>
+        <View style={[styles.actions, phone && styles.actionsPhone]}>
+          <View style={[styles.action, phone && styles.actionPhone]}>
             <Button
               title="Print"
               variant="outline"
               onPress={printReceipt}
             />
           </View>
-          <View style={styles.action}>
+          <View style={[styles.action, phone && styles.actionPhone]}>
             <Button
               title="Download PDF"
               onPress={downloadPdf}
@@ -185,7 +193,7 @@ export default function Receipt() {
 
       {receipt ? (
         <Card style={styles.receiptCard}>
-          <View style={styles.receiptTop}>
+          <View style={[styles.receiptTop, phone && styles.receiptTopPhone]}>
             <View style={styles.brandBlock}>
               <Text style={styles.brandKicker}>JAMAATONE</Text>
               <Text style={styles.brand}>
@@ -194,7 +202,7 @@ export default function Receipt() {
               <Text style={styles.muted}>{receipt.jamaatName}</Text>
             </View>
 
-            <View style={styles.receiptNumberBox}>
+            <View style={[styles.receiptNumberBox, phone && styles.receiptNumberBoxPhone]}>
               <Text style={styles.small}>RECEIPT NUMBER</Text>
               <Text style={styles.receiptNumber}>
                 {receipt.receiptNumber}
@@ -203,12 +211,12 @@ export default function Receipt() {
             </View>
           </View>
 
-          <View style={styles.amountPanel}>
+          <View style={[styles.amountPanel, phone && styles.amountPanelPhone]}>
             <View>
               <Text style={styles.small}>AMOUNT RECEIVED</Text>
               <Text style={styles.category}>{receipt.paymentFor}</Text>
             </View>
-            <View style={styles.amountRight}>
+            <View style={[styles.amountRight, phone && styles.amountRightPhone]}>
               <Text style={styles.amount}>
                 ₹{Number(receipt.amount || 0).toLocaleString("en-IN", {
                   minimumFractionDigits: 2,
@@ -219,15 +227,17 @@ export default function Receipt() {
             </View>
           </View>
 
-          <Text style={styles.sectionLabel}>MEMBER DETAILS</Text>
-          <View style={styles.detailGrid}>
-            <Row label="Paid by" value={receipt.userName} />
+          <Text style={[styles.sectionLabel, phone && styles.sectionLabelPhone]}>MEMBER DETAILS</Text>
+          <View style={[styles.detailGrid, phone && styles.detailGridPhone]}>
+            <Row compact={phone} label="Paid by" value={receipt.userName} />
             <Row
+              compact={phone}
               label="ITS ID / Grade"
               value={`${receipt.itsId || "-"} / ${receipt.userGrade || "-"}`}
             />
             {receipt.paidForUserName ? (
               <Row
+                compact={phone}
                 label="Madrasa fee paid for"
                 value={`${receipt.paidForUserName}${
                   receipt.paidForItsId
@@ -238,9 +248,10 @@ export default function Receipt() {
             ) : null}
           </View>
 
-          <Text style={styles.sectionLabel}>PAYMENT DETAILS</Text>
-          <View style={styles.detailGrid}>
+          <Text style={[styles.sectionLabel, phone && styles.sectionLabelPhone]}>PAYMENT DETAILS</Text>
+          <View style={[styles.detailGrid, phone && styles.detailGridPhone]}>
             <Row
+              compact={phone}
               label="Payment for"
               value={
                 receipt.otherDescription ||
@@ -250,6 +261,7 @@ export default function Receipt() {
               }
             />
             <Row
+              compact={phone}
               label="Payment method"
               value={`${receipt.paymentMethod || "-"}${
                 receipt.referenceNumber
@@ -257,29 +269,29 @@ export default function Receipt() {
                   : ""
               }`}
             />
-            <Row label="Notes" value={receipt.notes || "-"} />
+            <Row compact={phone} label="Notes" value={receipt.notes || "-"} />
           </View>
 
-          <View style={styles.recorderCard}>
+          <View style={[styles.recorderCard, phone && styles.recorderCardPhone]}>
             <View>
               <Text style={styles.small}>PAYMENT RECORDED BY</Text>
               <Text style={styles.recorderName}>
                 {receipt.recordedByName || receipt.createdByName || "-"}
               </Text>
             </View>
-            <View style={styles.amountRight}>
+            <View style={[styles.amountRight, phone && styles.amountRightPhone]}>
               <Text style={styles.small}>ITS ID</Text>
               <Text style={styles.recorderName}>
-                {receipt.recordedByItsId || receipt.createdByItsId || "-"}
+                {receipt.recordedByItsId || receipt.createdByItsNo || "-"}
               </Text>
             </View>
           </View>
 
-          <View style={styles.signature}>
+          <View style={[styles.signature, phone && styles.signaturePhone]}>
             <Text style={styles.signatureText}>Authorised Signature</Text>
           </View>
 
-          <Text style={styles.footerNote}>
+          <Text style={[styles.footerNote, phone && styles.footerNotePhone]}>
             Computer-generated receipt · Generated by JamaatOne
           </Text>
         </Card>
@@ -288,11 +300,11 @@ export default function Receipt() {
   );
 }
 
-function Row({ label, value }) {
+function Row({ label, value, compact = false }) {
   return (
-    <View style={styles.row}>
-      <Text style={styles.rowLabel}>{label}</Text>
-      <Text style={styles.rowValue}>{value || "-"}</Text>
+    <View style={[styles.row, compact && styles.rowPhone]}>
+      <Text style={[styles.rowLabel, compact && styles.rowLabelPhone]}>{label}</Text>
+      <Text style={[styles.rowValue, compact && styles.rowValuePhone]}>{value || "-"}</Text>
     </View>
   );
 }
@@ -306,6 +318,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center"
   },
+  amountPanelPhone: { margin: spacing.md, marginBottom: 0, padding: spacing.md, flexDirection: "column", alignItems: "flex-start", gap: spacing.md },
   eyebrow: {
     color: colors.accent,
     fontSize: 11,
@@ -332,6 +345,8 @@ const styles = StyleSheet.create({
     marginHorizontal: 4,
     minWidth: 130
   },
+  actionsPhone: { width: "100%", marginHorizontal: 0, gap: spacing.sm },
+  actionPhone: { flex: 1, minWidth: 0, marginHorizontal: 0 },
   receiptCard: {
     maxWidth: 860,
     width: "100%",
@@ -339,12 +354,15 @@ const styles = StyleSheet.create({
     padding: 0,
     overflow: "hidden"
   },
+  detailGridPhone: { marginHorizontal: spacing.md },
   receiptTop: {
     padding: spacing.xl,
     backgroundColor: colors.primaryStrong,
     flexDirection: "row",
     justifyContent: "space-between"
   },
+  recorderCardPhone: { margin: spacing.md, flexDirection: "column", gap: spacing.md },
+  receiptTopPhone: { padding: spacing.lg, flexDirection: "column", gap: spacing.lg },
   brandBlock: {
     flex: 1,
     paddingRight: spacing.md
@@ -373,6 +391,7 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     alignItems: "flex-end"
   },
+  receiptNumberBoxPhone: { alignItems: "flex-start", width: "100%" },
   small: {
     color: colors.muted,
     fontSize: 10,
@@ -408,6 +427,7 @@ const styles = StyleSheet.create({
   amountRight: {
     alignItems: "flex-end"
   },
+  amountRightPhone: { alignItems: "flex-start", width: "100%" },
   amount: {
     color: colors.primaryStrong,
     fontSize: 29,
@@ -422,6 +442,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.xl,
     marginBottom: spacing.sm
   },
+  sectionLabelPhone: { marginHorizontal: spacing.md, marginTop: spacing.lg },
   detailGrid: {
     marginHorizontal: spacing.xl,
     borderWidth: 1,
@@ -434,6 +455,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border
   },
+  rowPhone: { flexDirection: "column" },
   rowLabel: {
     width: "36%",
     backgroundColor: colors.surfaceMuted,
@@ -442,6 +464,8 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "600"
   },
+  rowValuePhone: { width: "100%", paddingVertical: spacing.sm, paddingHorizontal: spacing.md },
+  rowLabelPhone: { width: "100%", paddingVertical: spacing.sm, paddingHorizontal: spacing.md },
   rowValue: {
     flex: 1,
     color: colors.text,
@@ -472,6 +496,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingTop: spacing.sm
   },
+  signaturePhone: { width: "55%", marginRight: spacing.md, marginTop: spacing.lg },
   signatureText: {
     color: colors.muted,
     fontSize: 11
@@ -482,6 +507,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
     padding: spacing.xl
   },
+  footerNotePhone: { padding: spacing.lg },
   error: {
     color: colors.danger,
     marginBottom: spacing.md
