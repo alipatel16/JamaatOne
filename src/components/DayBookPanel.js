@@ -16,6 +16,7 @@ import {
 import { accountsApi } from "../api/accountsApi";
 import { ENTRY_TYPES } from "../constants/accounts";
 import { colors, radius, spacing } from "../theme";
+import ActivityTimeline from "./ActivityTimeline";
 import Button from "./Button";
 import Card from "./Card";
 import Input from "./Input";
@@ -353,7 +354,7 @@ export default function DayBookPanel({ manager, canDelete = false, canRefund = f
         items: Array.isArray(result) ? result : []
       });
     } catch (requestError) {
-      setError(requestError.message || "Unable to load Day Book logs.");
+      setError(requestError.message || "Unable to load Day Book timeline.");
     } finally {
       setLogsLoading(false);
     }
@@ -464,7 +465,7 @@ export default function DayBookPanel({ manager, canDelete = false, canRefund = f
                 onPress={() => editEntry(item.dayBookId)}
               />
               <Button
-                title="Logs"
+                title="Timeline"
                 compact
                 variant="outline"
                 onPress={() => openLogs(item.dayBookId)}
@@ -674,7 +675,7 @@ export default function DayBookPanel({ manager, canDelete = false, canRefund = f
                         }}
                       />
                       <Button
-                        title="View logs"
+                        title="View timeline"
                         variant="outline"
                         onPress={() => {
                           const id = detail.dayBookId;
@@ -719,37 +720,22 @@ export default function DayBookPanel({ manager, canDelete = false, canRefund = f
               <ScrollView>
                 <View style={[styles.modalHeader, phone && styles.modalHeaderPhone]}>
                   <View style={styles.flex}>
-                    <Text style={styles.modalTitle}>Day Book #{logs.dayBookId} logs</Text>
-                    <Text style={styles.subtitle}>{logs.items.length} audit entries</Text>
+                    <Text style={styles.modalTitle}>Day Book #{logs.dayBookId} timeline</Text>
+                    <Text style={styles.subtitle}>
+                      {logs.items.length} activit{logs.items.length === 1 ? "y" : "ies"}
+                    </Text>
                   </View>
                   <Pressable onPress={() => setLogs(null)}>
                     <Text style={styles.close}>×</Text>
                   </Pressable>
                 </View>
                 <View style={styles.detailContent}>
-                  {logs.items.map(log => (
-                    <Card key={String(log.dayBookLogId)} style={styles.logCard}>
-                      <Text style={styles.entryTitle}>{log.actionType || "Action"}</Text>
-                      <Text style={styles.meta}>
-                        {log.performedByName || `User ${log.performedBy}`} · {formatDateTime(log.performedAt)}
-                      </Text>
-                      {log.oldData ? (
-                        <>
-                          <Text style={styles.detailLabel}>Old data</Text>
-                          <Text style={styles.logData}>{log.oldData}</Text>
-                        </>
-                      ) : null}
-                      {log.newData ? (
-                        <>
-                          <Text style={styles.detailLabel}>New data</Text>
-                          <Text style={styles.logData}>{log.newData}</Text>
-                        </>
-                      ) : null}
-                    </Card>
-                  ))}
-                  {!logs.items.length ? (
-                    <Text style={styles.meta}>No logs found for this entry.</Text>
-                  ) : null}
+                  <ActivityTimeline
+                    entries={logs.items}
+                    entityLabel="Day Book entry"
+                    getKey={log => String(log.dayBookLogId)}
+                    formatDateTime={formatDateTime}
+                  />
                 </View>
               </ScrollView>
             ) : null}

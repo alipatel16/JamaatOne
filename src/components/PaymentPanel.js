@@ -17,6 +17,7 @@ import { router } from "expo-router";
 import { accountsApi } from "../api/accountsApi";
 import { mumineenApi } from "../api/mumineenApi";
 import { colors, radius, spacing } from "../theme";
+import ActivityTimeline from "./ActivityTimeline";
 import Button from "./Button";
 import Card from "./Card";
 import Input from "./Input";
@@ -724,7 +725,7 @@ export default function PaymentPanel({
         items: Array.isArray(result) ? result : []
       });
     } catch (requestError) {
-      setError(requestError.message || "Unable to load payment logs.");
+      setError(requestError.message || "Unable to load payment timeline.");
     } finally {
       setLogsLoading(false);
     }
@@ -837,7 +838,7 @@ export default function PaymentPanel({
                 />
               ) : null}
               <Button
-                title="Logs"
+                title="Timeline"
                 compact
                 variant="outline"
                 onPress={() => openLogs(item.paymentId)}
@@ -1123,7 +1124,7 @@ export default function PaymentPanel({
                       />
                     ) : null}
                     <Button
-                      title="View logs"
+                      title="View timeline"
                       variant="outline"
                       onPress={() => {
                         const paymentId = detail.paymentId;
@@ -1161,8 +1162,10 @@ export default function PaymentPanel({
               <ScrollView>
                 <View style={[styles.modalHeader, phone && styles.modalHeaderPhone]}>
                   <View style={styles.flex}>
-                    <Text style={styles.modalTitle}>Payment #{logs.paymentId} logs</Text>
-                    <Text style={styles.subtitle}>{logs.items.length} audit entries</Text>
+                    <Text style={styles.modalTitle}>Payment #{logs.paymentId} timeline</Text>
+                    <Text style={styles.subtitle}>
+                      {logs.items.length} activit{logs.items.length === 1 ? "y" : "ies"}
+                    </Text>
                   </View>
                   <Pressable onPress={() => setLogs(null)}>
                     <Text style={styles.close}>×</Text>
@@ -1170,29 +1173,12 @@ export default function PaymentPanel({
                 </View>
 
                 <View style={styles.detailContent}>
-                  {logs.items.map(log => (
-                    <Card key={String(log.paymentLogId)} style={styles.logCard}>
-                      <Text style={styles.paymentTitle}>{log.actionType || "Action"}</Text>
-                      <Text style={styles.meta}>
-                        {log.performedByName || `User ${log.performedBy}`} · {formatDateTime(log.performedAt)}
-                      </Text>
-                      {log.oldData ? (
-                        <>
-                          <Text style={styles.detailLabel}>Old data</Text>
-                          <Text style={styles.logData}>{log.oldData}</Text>
-                        </>
-                      ) : null}
-                      {log.newData ? (
-                        <>
-                          <Text style={styles.detailLabel}>New data</Text>
-                          <Text style={styles.logData}>{log.newData}</Text>
-                        </>
-                      ) : null}
-                    </Card>
-                  ))}
-                  {!logs.items.length ? (
-                    <Text style={styles.meta}>No logs found for this payment.</Text>
-                  ) : null}
+                  <ActivityTimeline
+                    entries={logs.items}
+                    entityLabel="Payment"
+                    getKey={log => String(log.paymentLogId)}
+                    formatDateTime={formatDateTime}
+                  />
                 </View>
               </ScrollView>
             ) : null}

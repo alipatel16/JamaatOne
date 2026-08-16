@@ -15,6 +15,7 @@ import { useFocusEffect, useRouter } from "expo-router";
 
 import { accountsApi } from "../api/accountsApi";
 import { colors, radius, shadows, spacing } from "../theme";
+import ActivityTimeline from "./ActivityTimeline";
 import Button from "./Button";
 import Card from "./Card";
 import Input from "./Input";
@@ -52,6 +53,19 @@ function formatDate(value) {
     day: "2-digit",
     month: "short",
     year: "numeric"
+  });
+}
+
+function formatDateTime(value) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return String(value);
+  return date.toLocaleString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
   });
 }
 
@@ -299,7 +313,7 @@ export default function CashManagementPanel({ canDelete = false }) {
       const result = await accountsApi.getBankDepositLogs(item.bankDepositId);
       setLogs(Array.isArray(result) ? result : []);
     } catch (requestError) {
-      setError(requestError.message || "Unable to load deposit logs.");
+      setError(requestError.message || "Unable to load deposit timeline.");
     } finally {
       setLogsLoading(false);
     }
@@ -418,7 +432,7 @@ export default function CashManagementPanel({ canDelete = false }) {
                 onPress={() => openEditDeposit(item)}
               />
               <Button
-                title="Logs"
+                title="Timeline"
                 compact
                 variant="outline"
                 onPress={() => viewDepositLogs(item)}
@@ -541,23 +555,24 @@ export default function CashManagementPanel({ canDelete = false }) {
       >
         <Pressable style={[styles.backdrop, phone && styles.backdropPhone]} onPress={() => setLogsVisible(false)}>
           <Pressable style={[styles.modalCard, phone && styles.modalCardPhone]} onPress={() => {}}>
-            <Text style={styles.modalTitle}>Deposit logs</Text>
-            <ScrollView>
+            <View style={styles.timelineHeader}>
+              <View style={styles.flex}>
+                <Text style={[styles.modalTitle, styles.timelineTitle]}>Deposit timeline</Text>
+                <Text style={styles.meta}>
+                  {logs.length} activit{logs.length === 1 ? "y" : "ies"}
+                </Text>
+              </View>
+            </View>
+            <ScrollView contentContainerStyle={styles.timelineContent}>
               {logsLoading ? (
                 <ActivityIndicator color={colors.primary} />
-              ) : logs.length ? (
-                logs.map(log => (
-                  <View key={String(log.bankDepositLogId)} style={styles.logItem}>
-                    <Text style={styles.title}>{log.actionType || "Action"}</Text>
-                    <Text style={styles.meta}>
-                      {log.performedByName || `User ${log.performedBy}`} · {formatDate(log.performedAt)}
-                    </Text>
-                    {log.oldData ? <Text style={styles.logData}>Old: {log.oldData}</Text> : null}
-                    {log.newData ? <Text style={styles.logData}>New: {log.newData}</Text> : null}
-                  </View>
-                ))
               ) : (
-                <Text style={styles.empty}>No logs found.</Text>
+                <ActivityTimeline
+                  entries={logs}
+                  entityLabel="Bank deposit"
+                  getKey={log => String(log.bankDepositLogId)}
+                  formatDateTime={formatDateTime}
+                />
               )}
             </ScrollView>
             <Button title="Close" variant="outline" onPress={() => setLogsVisible(false)} />
@@ -647,6 +662,9 @@ const styles = StyleSheet.create({
   modalCardPhone: { maxHeight: "94%", borderTopLeftRadius: 24, borderTopRightRadius: 24, borderBottomLeftRadius: 0, borderBottomRightRadius: 0, padding: spacing.md },
   modalTitle: { color: colors.text, fontSize: 21, fontWeight: "800", marginBottom: spacing.md },
   modalActions: { flexDirection: "row", justifyContent: "flex-end", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.sm },
+  timelineHeader: { flexDirection: "row", alignItems: "center", marginBottom: spacing.sm },
+  timelineTitle: { marginBottom: 2 },
+  timelineContent: { paddingTop: spacing.sm, paddingBottom: spacing.sm },
   logItem: { paddingVertical: spacing.md, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   logData: { color: colors.text, fontSize: 12, marginTop: spacing.xs }
 });
