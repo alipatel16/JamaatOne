@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { router } from "expo-router";
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 
 import { apiRequest } from "../../src/api/client";
 import { endpoints } from "../../src/api/endpoints";
@@ -12,12 +13,12 @@ import { useAuth } from "../../src/context/AuthContext";
 import { colors, radius, spacing } from "../../src/theme";
 
 const QUICK_LINKS = [
-  { title: "Accounts", caption: "Payments & ledgers", icon: "₹", route: "/(app)/accounts", managerOnly: false },
-  { title: "Namaaz", caption: "Prayer timings", icon: "◷", route: "/(app)/namaz", managerOnly: false },
-  { title: "Calendar", caption: "Hijri calendar", icon: "▦", route: "/(app)/calendar", managerOnly: false },
-  { title: "FMB", caption: "Menu & thali", icon: "◉", route: "/(app)/fmb", access: "fmb" },
-  { title: "Mumineen", caption: "Member directory", icon: "◎", route: "/(app)/users", access: "mumineen" },
-  { title: "User Management", caption: "Manage Jamaat roles", icon: "◇", route: "/(app)/user-management", access: "aamil" }
+  { title: "Accounts", caption: "Payments & ledgers", icon: "wallet-outline", route: "/(app)/accounts", managerOnly: false },
+  { title: "Namaaz", caption: "Prayer timings", icon: "mosque", route: "/(app)/namaz", managerOnly: false },
+  { title: "Calendar", caption: "Hijri calendar", icon: "calendar-month-outline", route: "/(app)/calendar", managerOnly: false },
+  { title: "FMB", caption: "Menu & thali", icon: "silverware-fork-knife", route: "/(app)/fmb", access: "fmb" },
+  { title: "Mumineen", caption: "Member directory", icon: "account-group-outline", route: "/(app)/users", access: "mumineen" },
+  { title: "User Management", caption: "Manage Jamaat roles", icon: "account-cog-outline", route: "/(app)/user-management", access: "aamil" }
 ];
 
 export default function DashboardScreen() {
@@ -76,13 +77,13 @@ export default function DashboardScreen() {
             ]}
           >
             <View style={[styles.quickIcon, phone && styles.quickIconPhone]}>
-              <Text style={styles.quickIconText}>{item.icon}</Text>
+              <MaterialCommunityIcons name={item.icon} size={phone ? 19 : 21} color={colors.primaryStrong} />
             </View>
             <View style={phone ? styles.quickCopyPhone : undefined}>
               <Text numberOfLines={1} style={[styles.quickTitle, phone && styles.quickTitlePhone]}>{item.title}</Text>
               <Text numberOfLines={2} style={[styles.quickCaption, phone && styles.quickCaptionPhone]}>{item.caption}</Text>
             </View>
-            <Text style={[styles.quickArrow, phone && styles.quickArrowPhone]}>›</Text>
+            <MaterialCommunityIcons name="chevron-right" size={phone ? 21 : 24} color={colors.accentStrong} style={[styles.quickArrow, phone && styles.quickArrowPhone]} />
           </Pressable>
         ))}
       </View>
@@ -119,13 +120,13 @@ export default function DashboardScreen() {
           {canAccessFmb(user) ? (
             <Pressable onPress={() => router.push("/(app)/fmb")}> 
               <Card style={styles.fmbCard}>
-                <View style={styles.fmbIcon}><Text style={styles.fmbIconText}>◉</Text></View>
+                <View style={styles.fmbIcon}><MaterialCommunityIcons name="silverware-fork-knife" size={22} color={colors.accentStrong} /></View>
                 <Text style={styles.fmbLabel}>TODAY'S FMB</Text>
                 <Text style={styles.fmbStatus}>
                   {data?.fmb?.status === "NO_FMB" ? "No FMB today" : data?.fmb?.status === "DELIVERED" ? "FMB delivered" : "FMB scheduled"}
                 </Text>
                 {data?.fmb?.menu ? <Text style={styles.fmbMenu}>{data.fmb.menu}</Text> : null}
-                <Text style={styles.fmbLink}>View FMB ›</Text>
+                <View style={styles.linkRow}><Text style={styles.fmbLink}>View FMB</Text><MaterialCommunityIcons name="chevron-right" size={18} color={colors.accentStrong} /></View>
               </Card>
             </Pressable>
           ) : null}
@@ -135,7 +136,7 @@ export default function DashboardScreen() {
               <Text style={styles.namazEyebrow}>NAMAAZ</Text>
               <Text style={styles.namazTitle}>Prayer timings</Text>
               <Text style={styles.namazText}>View the prayer schedule for your current location.</Text>
-              <Text style={styles.namazLink}>Open timings ›</Text>
+              <View style={styles.linkRow}><Text style={styles.namazLink}>Open timings</Text><MaterialCommunityIcons name="chevron-right" size={18} color={colors.primaryStrong} /></View>
             </Card>
           </Pressable>
         </View>
@@ -172,14 +173,13 @@ const styles = StyleSheet.create({
   pressed: { opacity: 0.7, transform: [{ scale: 0.99 }] },
   quickIcon: { width: 40, height: 40, borderRadius: 13, backgroundColor: colors.primarySoft, alignItems: "center", justifyContent: "center" },
   quickIconPhone: { width: 36, height: 36, borderRadius: 12 },
-  quickIconText: { color: colors.primaryStrong, fontWeight: "900", fontSize: 18 },
   quickTitle: { color: colors.text, fontWeight: "900", marginTop: spacing.md, fontSize: 15 },
   quickTitlePhone: { marginTop: 10, fontSize: 14, lineHeight: 18, paddingRight: 18 },
   quickCaption: { color: colors.muted, fontSize: 11, marginTop: 3 },
   quickCaptionPhone: { fontSize: 10.5, lineHeight: 14, paddingRight: 8 },
   quickCopyPhone: { minWidth: 0 },
-  quickArrow: { color: colors.accentStrong, fontSize: 23, position: "absolute", right: 14, top: 12 },
-  quickArrowPhone: { right: 11, top: 9, fontSize: 21 },
+  quickArrow: { position: "absolute", right: 12, top: 12 },
+  quickArrowPhone: { right: 9, top: 9 },
   contentGrid: { gap: spacing.md },
   contentGridWide: { flexDirection: "row", alignItems: "flex-start", gap: spacing.lg },
   mainColumn: { flex: 1, minWidth: 0 },
@@ -199,14 +199,14 @@ const styles = StyleSheet.create({
   empty: { color: colors.muted },
   fmbCard: { backgroundColor: colors.accentSoft, borderColor: "#F0DFC0" },
   fmbIcon: { width: 42, height: 42, borderRadius: 14, backgroundColor: "#F3E2BF", alignItems: "center", justifyContent: "center" },
-  fmbIconText: { color: colors.accentStrong, fontWeight: "900" },
   fmbLabel: { color: colors.accentStrong, fontSize: 9, fontWeight: "900", letterSpacing: 1.2, marginTop: spacing.md },
   fmbStatus: { color: colors.text, fontWeight: "900", fontSize: 20, marginTop: 4 },
   fmbMenu: { color: colors.textSoft, lineHeight: 20, marginTop: spacing.sm },
-  fmbLink: { color: colors.accentStrong, fontWeight: "900", marginTop: spacing.md },
+  linkRow: { flexDirection: "row", alignItems: "center", gap: 2, marginTop: spacing.md },
+  fmbLink: { color: colors.accentStrong, fontWeight: "900" },
   namazCard: { backgroundColor: colors.surfaceTint, borderColor: colors.primarySoftStrong },
   namazEyebrow: { color: colors.primary, fontSize: 9, fontWeight: "900", letterSpacing: 1.2 },
   namazTitle: { color: colors.text, fontWeight: "900", fontSize: 20, marginTop: 4 },
   namazText: { color: colors.textSoft, lineHeight: 20, marginTop: spacing.sm },
-  namazLink: { color: colors.primaryStrong, fontWeight: "900", marginTop: spacing.md }
+  namazLink: { color: colors.primaryStrong, fontWeight: "900" }
 });

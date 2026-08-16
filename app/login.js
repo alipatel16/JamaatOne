@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { router } from "expo-router";
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 
 import Button from "../src/components/Button";
 import Card from "../src/components/Card";
@@ -11,9 +12,9 @@ import { isSuperAdmin } from "../src/constants/roles";
 import { colors, radius, spacing, typography } from "../src/theme";
 
 const FEATURES = [
-  { icon: "₹", title: "Accounts", text: "Payments, receipts and ledgers" },
-  { icon: "◷", title: "Namaaz", text: "Location-aware prayer timings" },
-  { icon: "▦", title: "Calendar", text: "Hijri dates and community updates" }
+  { icon: "wallet-outline", title: "Accounts", text: "Payments, receipts and ledgers" },
+  { icon: "mosque", title: "Namaaz", text: "Location-aware prayer timings" },
+  { icon: "calendar-month-outline", title: "Calendar", text: "Hijri dates and community updates" }
 ];
 
 export default function LoginScreen() {
@@ -67,7 +68,7 @@ export default function LoginScreen() {
         <View style={[styles.featureGrid, isPhone && styles.featureGridPhone]}>
           {FEATURES.map(item => (
             <View key={item.title} style={[styles.featureCard, isPhone && styles.featureCardPhone, isNarrow && styles.featureCardNarrow]}>
-              <View style={styles.featureIcon}><Text style={styles.featureIconText}>{item.icon}</Text></View>
+              <View style={styles.featureIcon}><MaterialCommunityIcons name={item.icon} size={20} color={colors.primaryStrong} /></View>
               <Text style={styles.featureTitle}>{item.title}</Text>
               <Text style={styles.featureText}>{item.text}</Text>
             </View>
@@ -105,7 +106,7 @@ export default function LoginScreen() {
         </View>
 
         <View style={styles.secureRow}>
-          <Text style={styles.secureIcon}>◇</Text>
+          <MaterialCommunityIcons name="shield-check-outline" size={17} color={colors.success} />
           <Text style={styles.secureText}>Secure sign-in · session protected</Text>
         </View>
       </Card>
@@ -134,7 +135,6 @@ const styles = StyleSheet.create({
   featureCardPhone: { width: "48%", minHeight: 118 },
   featureCardNarrow: { width: "100%", minHeight: 104 },
   featureIcon: { width: 36, height: 36, borderRadius: 12, backgroundColor: colors.primarySoft, alignItems: "center", justifyContent: "center" },
-  featureIconText: { color: colors.primaryStrong, fontWeight: "900" },
   featureTitle: { color: colors.text, fontWeight: "900", marginTop: spacing.sm },
   featureText: { color: colors.muted, fontSize: 11, lineHeight: 16, marginTop: 4 },
   loginCard: { width: "100%", maxWidth: 450, alignSelf: "center", borderRadius: radius.xl, padding: spacing.xl, overflow: "hidden" },
@@ -148,6 +148,5 @@ const styles = StyleSheet.create({
   errorBox: { backgroundColor: colors.dangerSoft, borderRadius: radius.md, padding: spacing.sm, marginBottom: spacing.md },
   error: { color: colors.danger, fontSize: 13, fontWeight: "700" },
   secureRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7, marginTop: spacing.lg },
-  secureIcon: { color: colors.success, fontWeight: "900" },
   secureText: { color: colors.muted, fontSize: 11, fontWeight: "700" }
 });

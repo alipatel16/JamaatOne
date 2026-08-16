@@ -1,6 +1,7 @@
 import React from "react";
 import { Redirect, Tabs } from "expo-router";
-import { Text, useWindowDimensions } from "react-native";
+import { useWindowDimensions } from "react-native";
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 
 import { useAuth } from "../../src/context/AuthContext";
 import { canAccessMumineen, isSuperAdmin } from "../../src/constants/roles";
@@ -23,8 +24,8 @@ const ROUTE_TITLES = {
   announcements: "Announcements"
 };
 
-const tabIcon = symbol => ({ color }) => (
-  <Text style={{ color, fontSize: 20, fontWeight: "900" }}>{symbol}</Text>
+const tabIcon = (outlineName, activeName = outlineName) => ({ color, focused }) => (
+  <MaterialCommunityIcons name={focused ? activeName : outlineName} size={22} color={color} />
 );
 
 export default function AppLayout() {
@@ -72,10 +73,10 @@ export default function AppLayout() {
         tabBarLabelStyle: { fontSize: narrowPhone ? 9 : 10, fontWeight: "800", marginTop: 1 }
       })}
     >
-      <Tabs.Screen name="index" options={{ title: "Home", tabBarIcon: tabIcon("⌂") }} />
-      <Tabs.Screen name="accounts" options={{ title: "Accounts", tabBarIcon: tabIcon("₹") }} />
-      <Tabs.Screen name="users" options={{ title: "Mumineen", href: canBrowseMumineen ? undefined : null, tabBarIcon: tabIcon("◉") }} />
-      <Tabs.Screen name="profile" options={{ title: "Profile", tabBarIcon: tabIcon("○") }} />
+      <Tabs.Screen name="index" options={{ title: "Home", tabBarIcon: tabIcon("view-dashboard-outline", "view-dashboard") }} />
+      <Tabs.Screen name="accounts" options={{ title: "Accounts", tabBarIcon: tabIcon("wallet-outline", "wallet") }} />
+      <Tabs.Screen name="users" options={{ title: "Mumineen", href: canBrowseMumineen ? undefined : null, tabBarIcon: tabIcon("account-group-outline", "account-group") }} />
+      <Tabs.Screen name="profile" options={{ title: "Profile", tabBarIcon: tabIcon("account-circle-outline", "account-circle") }} />
 
       <Tabs.Screen name="namaz" options={{ title: "Namaaz", href: null }} />
       <Tabs.Screen name="calendar" options={{ title: "Hijri Calendar", href: null }} />

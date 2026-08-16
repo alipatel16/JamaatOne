@@ -10,24 +10,25 @@ import {
   View
 } from "react-native";
 import { usePathname, useRouter } from "expo-router";
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 
 import { useAuth } from "../context/AuthContext";
 import { canAccessFmb, canAccessMumineen, canManageJamaat, canManageUsers } from "../constants/roles";
 import { colors, radius, shadows, spacing, typography } from "../theme";
 
 const PRIMARY_ITEMS = [
-  { label: "Home", route: "/(app)", match: "/", icon: "⌂" },
-  { label: "Accounts", route: "/(app)/accounts", match: "/accounts", icon: "₹" },
-  { label: "Mumineen", route: "/(app)/users", match: "/users", icon: "◉", mumineenOnly: true },
-  { label: "Profile", route: "/(app)/profile", match: "/profile", icon: "○" }
+  { label: "Home", route: "/(app)", match: "/", icon: "view-dashboard-outline", activeIcon: "view-dashboard" },
+  { label: "Accounts", route: "/(app)/accounts", match: "/accounts", icon: "wallet-outline", activeIcon: "wallet" },
+  { label: "Mumineen", route: "/(app)/users", match: "/users", icon: "account-group-outline", activeIcon: "account-group", mumineenOnly: true },
+  { label: "Profile", route: "/(app)/profile", match: "/profile", icon: "account-circle-outline", activeIcon: "account-circle" }
 ];
 
 const MENU_ITEMS = [
-  { label: "Namaaz timings", route: "/(app)/namaz", icon: "◷", caption: "Location-based prayer schedule" },
-  { label: "Hijri calendar", route: "/(app)/calendar", icon: "▦", caption: "Calendar and important dates" },
-  { label: "FMB services", route: "/(app)/fmb", icon: "◉", caption: "Menu and thali services", access: "fmb" },
-  { label: "User management", route: "/(app)/user-management", icon: "◎", caption: "Committee, FMB and Madrasa access", access: "aamil" },
-  { label: "Announcements", route: "/(app)/announcements", icon: "◇", caption: "Create and manage community updates", access: "manager" }
+  { label: "Namaaz timings", route: "/(app)/namaz", icon: "mosque", caption: "Location-based prayer schedule" },
+  { label: "Hijri calendar", route: "/(app)/calendar", icon: "calendar-month-outline", caption: "Calendar and important dates" },
+  { label: "FMB services", route: "/(app)/fmb", icon: "silverware-fork-knife", caption: "Menu and thali services", access: "fmb" },
+  { label: "User management", route: "/(app)/user-management", icon: "account-cog-outline", caption: "Committee, FMB and Madrasa access", access: "aamil" },
+  { label: "Announcements", route: "/(app)/announcements", icon: "bullhorn-outline", caption: "Create and manage community updates", access: "manager" }
 ];
 
 export default function AppHeader({ title, showBack = false, fallbackRoute = "/" }) {
@@ -78,7 +79,7 @@ export default function AppHeader({ title, showBack = false, fallbackRoute = "/"
             onPress={showBack ? goBack : () => setOpen(true)}
             style={styles.menuButton}
           >
-            <Text style={[styles.menuIcon, showBack && styles.backIcon]}>{showBack ? "‹" : "☰"}</Text>
+            <MaterialCommunityIcons name={showBack ? "arrow-left" : "menu"} size={showBack ? 23 : 25} color={colors.primaryStrong} />
           </Pressable>
 
           <View style={[styles.brandMark, isNarrow && styles.brandMarkNarrow]}>
@@ -104,7 +105,7 @@ export default function AppHeader({ title, showBack = false, fallbackRoute = "/"
                     pressed && styles.pressed
                   ]}
                 >
-                  <Text style={[styles.desktopNavIcon, active && styles.desktopNavTextActive]}>{item.icon}</Text>
+                  <MaterialCommunityIcons name={active ? item.activeIcon : item.icon} size={18} color={active ? colors.primaryStrong : colors.muted} />
                   <Text style={[styles.desktopNavText, active && styles.desktopNavTextActive]}>{item.label}</Text>
                 </Pressable>
               );
@@ -138,7 +139,7 @@ export default function AppHeader({ title, showBack = false, fallbackRoute = "/"
                 </View>
               </View>
               <Pressable onPress={() => setOpen(false)} style={styles.closeButton}>
-                <Text style={styles.closeText}>×</Text>
+                <MaterialCommunityIcons name="close" size={23} color={colors.textSoft} />
               </Pressable>
             </View>
 
@@ -153,7 +154,7 @@ export default function AppHeader({ title, showBack = false, fallbackRoute = "/"
                   <View style={styles.mobilePrimaryGrid}>
                     {primaryItems.map(item => (
                       <Pressable key={item.label} onPress={() => navigate(item.route)} style={styles.mobilePrimaryItem}>
-                        <Text style={styles.mobilePrimaryIcon}>{item.icon}</Text>
+                        <MaterialCommunityIcons name={item.icon} size={23} color={colors.primaryStrong} />
                         <Text style={styles.mobilePrimaryLabel}>{item.label}</Text>
                       </Pressable>
                     ))}
@@ -168,12 +169,12 @@ export default function AppHeader({ title, showBack = false, fallbackRoute = "/"
                   onPress={() => navigate(item.route)}
                   style={({ pressed }) => [styles.menuItem, pressed && styles.pressed]}
                 >
-                  <View style={styles.menuGlyph}><Text style={styles.menuGlyphText}>{item.icon}</Text></View>
+                  <View style={styles.menuGlyph}><MaterialCommunityIcons name={item.icon} size={21} color={colors.primaryStrong} /></View>
                   <View style={styles.menuContent}>
                     <Text style={styles.menuLabel}>{item.label}</Text>
                     <Text style={styles.menuCaption}>{item.caption}</Text>
                   </View>
-                  <Text style={styles.chevron}>›</Text>
+                  <MaterialCommunityIcons name="chevron-right" size={22} color={colors.muted} />
                 </Pressable>
               ))}
             </ScrollView>
@@ -218,8 +219,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border
   },
-  menuIcon: { fontSize: 20, color: colors.primaryStrong, fontWeight: "800" },
-  backIcon: { fontSize: 32, lineHeight: 32, fontWeight: "400" },
   brandMark: { width: 38, height: 38, marginLeft: spacing.sm, borderRadius: 12, backgroundColor: colors.primaryStrong, alignItems: "center", justifyContent: "center" },
   brandMarkNarrow: { width: 34, height: 34, borderRadius: 11, marginLeft: spacing.xs },
   brandInitial: { color: "#FFFFFF", fontSize: 20, fontWeight: "900" },
@@ -229,7 +228,6 @@ const styles = StyleSheet.create({
   desktopNav: { flex: 1, flexDirection: "row", justifyContent: "center", alignItems: "center", gap: spacing.xs, paddingHorizontal: spacing.md },
   desktopNavItem: { flexDirection: "row", alignItems: "center", paddingHorizontal: spacing.md, minHeight: 42, borderRadius: radius.pill, gap: 7 },
   desktopNavItemActive: { backgroundColor: colors.primarySoft },
-  desktopNavIcon: { color: colors.muted, fontSize: 15, fontWeight: "900" },
   desktopNavText: { color: colors.textSoft, fontSize: 13, fontWeight: "800" },
   desktopNavTextActive: { color: colors.primaryStrong },
   userSummary: { minWidth: 44, flexDirection: "row", alignItems: "center", justifyContent: "flex-end", marginLeft: "auto", flexShrink: 0 },
@@ -252,11 +250,9 @@ const styles = StyleSheet.create({
   drawerEyebrow: { color: colors.accentStrong, fontSize: 10, fontWeight: "900", letterSpacing: 1.4 },
   drawerTitle: { color: colors.text, fontSize: 21, fontWeight: "900", marginTop: 2 },
   closeButton: { width: 40, height: 40, borderRadius: radius.md, alignItems: "center", justifyContent: "center", backgroundColor: colors.backgroundAlt },
-  closeText: { fontSize: 26, color: colors.textSoft },
   sectionLabel: { color: colors.muted, fontSize: 10, fontWeight: "900", letterSpacing: 1.2, marginBottom: spacing.sm, marginTop: spacing.xs },
   mobilePrimaryGrid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginBottom: spacing.lg },
   mobilePrimaryItem: { width: "48%", minHeight: 72, borderRadius: radius.lg, backgroundColor: colors.surfaceTint, borderWidth: 1, borderColor: colors.border, padding: spacing.md, justifyContent: "space-between" },
-  mobilePrimaryIcon: { color: colors.primaryStrong, fontSize: 20, fontWeight: "900" },
   mobilePrimaryLabel: { color: colors.text, fontWeight: "800", fontSize: 13 },
   menuItem: { flexDirection: "row", alignItems: "center", minHeight: 72, borderRadius: radius.lg, paddingHorizontal: spacing.sm, marginBottom: 4 },
   pressed: { opacity: 0.68 },
