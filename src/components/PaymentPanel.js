@@ -292,6 +292,7 @@ function paymentFilterDate(value, endOfDay = false) {
 
 export default function PaymentPanel({
   manager,
+  canEdit = false,
   canRefund = false,
   filters = {},
   createRequestKey = 0,
@@ -661,6 +662,8 @@ export default function PaymentPanel({
   }
 
   async function editPayment(paymentId) {
+    if (!canEdit) return;
+
     try {
       setDetailLoading(true);
       setError("");
@@ -732,15 +735,15 @@ export default function PaymentPanel({
 
     const proceed =
       Platform.OS === "web"
-        ? globalThis.confirm?.(`Refund payment #${item.paymentId}?`) ?? false
+        ? globalThis.confirm?.(`Delete payment #${item.paymentId}?`) ?? false
         : await new Promise(resolve => {
             Alert.alert(
-              "Refund payment?",
+              "Delete payment?",
               "The payment will remain in history with its refunded status.",
               [
                 { text: "Cancel", style: "cancel", onPress: () => resolve(false) },
                 {
-                  text: "Refund",
+                  text: "Delete",
                   style: "destructive",
                   onPress: () => resolve(true)
                 }
@@ -825,7 +828,7 @@ export default function PaymentPanel({
                 variant="outline"
                 onPress={() => openDetail(item.paymentId)}
               />
-              {manager ? (
+              {manager && canEdit ? (
                 <Button
                   title="Edit"
                   compact
@@ -841,7 +844,7 @@ export default function PaymentPanel({
               />
               {manager && canRefund && String(item.status || "").toUpperCase() !== "REFUNDED" ? (
                 <Button
-                  title="Refund"
+                  title="Delete"
                   compact
                   variant="danger"
                   onPress={() => refundPayment(item)}
@@ -1108,7 +1111,7 @@ export default function PaymentPanel({
                         });
                       }}
                     />
-                    {manager ? (
+                    {manager && canEdit ? (
                       <Button
                         title="Edit payment"
                         variant="outline"
@@ -1131,7 +1134,7 @@ export default function PaymentPanel({
                     {manager && canRefund &&
                     String(detail.status || "").toUpperCase() !== "REFUNDED" ? (
                       <Button
-                        title="Refund payment"
+                        title="Delete payment"
                         variant="danger"
                         onPress={() => refundPayment(detail)}
                       />

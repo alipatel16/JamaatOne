@@ -547,7 +547,8 @@ export default function AccountsScreen() {
         manager || ownMuminId ? (
           <PaymentPanel
             manager={manager}
-            canRefund={canRefund}
+            canEdit={canDelete}
+            canRefund={canDelete}
             createRequestKey={paymentCreateRequest}
             onCreateRequestHandled={() => setPaymentCreateRequest(0)}
             hideCreateButton

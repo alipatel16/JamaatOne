@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { router } from "expo-router";
+import { jamaatApi } from "../../src/api/jamaatApi";
 import Button from "../../src/components/Button";
 import Card from "../../src/components/Card";
 import Screen from "../../src/components/Screen";
@@ -12,6 +13,31 @@ export default function ProfileScreen() {
   const phone = width < 600;
   const narrow = width < 390;
   const { user, logout } = useAuth();
+  const [jamaatName, setJamaatName] = useState("");
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadJamaatName() {
+      const jamaatId = user?.jamaatId;
+      if (!jamaatId) {
+        if (active) setJamaatName("");
+        return;
+      }
+
+      try {
+        const jamaat = await jamaatApi.getById(jamaatId);
+        if (active) setJamaatName(jamaat?.name || "");
+      } catch {
+        if (active) setJamaatName("");
+      }
+    }
+
+    loadJamaatName();
+    return () => {
+      active = false;
+    };
+  }, [user?.jamaatId]);
 
   async function handleLogout() {
     await logout();
@@ -42,10 +68,10 @@ export default function ProfileScreen() {
             <Text style={styles.infoLabel}>ITS ID</Text>
             <Text style={styles.infoValue}>{user?.itsId || "-"}</Text>
           </View>
-          <View style={[styles.infoItem, phone && styles.infoItemPhone]}>
+          {/* <View style={[styles.infoItem, phone && styles.infoItemPhone]}>
             <Text style={styles.infoLabel}>Jamaat</Text>
-            <Text style={styles.infoValue}>{user?.jamaatId || "-"}</Text>
-          </View>
+            <Text style={styles.infoValue}>{jamaatName || "-"}</Text>
+          </View> */}
           <View style={[styles.infoItem, phone && styles.infoItemPhone]}>
             <Text style={styles.infoLabel}>Access</Text>
             <Text style={styles.infoValue}>{user?.roleName || user?.role || "Member"}</Text>
