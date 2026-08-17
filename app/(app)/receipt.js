@@ -61,7 +61,7 @@ function makeLiveReceipt(payment, mumin) {
     jamaatName: payment?.jamaatName || "JamaatOne",
     jamaatAddress: "",
     receiptNumber: deriveReceiptNumber(payment),
-    paymentDate: formatReceiptDate(payment?.createdAt),
+    paymentDate: formatReceiptDate(payment?.transactionDate || payment?.createdAt),
     paymentFor: category || "Payment",
     amount: Number(payment?.amount || 0),
     amountInWords: `Rupees ${Number(payment?.amount || 0).toLocaleString("en-IN", {

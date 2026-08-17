@@ -20,6 +20,7 @@ import { colors, radius, spacing } from "../theme";
 import ActivityTimeline from "./ActivityTimeline";
 import Button from "./Button";
 import Card from "./Card";
+import DatePickerField, { localDateValue, transactionDateToIso } from "./DatePickerField";
 import Input from "./Input";
 import RemoteMumineenSelect from "./RemoteMumineenSelect";
 import Select from "./Select";
@@ -30,16 +31,19 @@ const MONTHS = [
   "July", "August", "September", "October", "November", "December"
 ];
 
-const EMPTY_FORM = {
-  muminId: "",
-  categoryId: "",
-  subCategoryId: "",
-  amount: "",
-  paymentMethodId: "",
-  paymentReference: "",
-  remarks: "",
-  fieldValues: {}
-};
+function createEmptyForm() {
+  return {
+    muminId: "",
+    categoryId: "",
+    subCategoryId: "",
+    amount: "",
+    paymentMethodId: "",
+    paymentReference: "",
+    remarks: "",
+    transactionDate: localDateValue(),
+    fieldValues: {}
+  };
+}
 
 const money = value =>
   new Intl.NumberFormat("en-IN", {
@@ -319,7 +323,7 @@ export default function PaymentPanel({
 
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
-  const [form, setForm] = useState(EMPTY_FORM);
+  const [form, setForm] = useState(createEmptyForm);
   const [selectedPayer, setSelectedPayer] = useState(null);
   const [family, setFamily] = useState([]);
   const [familyLoading, setFamilyLoading] = useState(false);
@@ -506,7 +510,7 @@ export default function PaymentPanel({
 
   function resetForm() {
     setEditingId(null);
-    setForm(EMPTY_FORM);
+    setForm(createEmptyForm());
     setSelectedPayer(null);
     setSubCategories([]);
     setFields([]);
@@ -592,6 +596,7 @@ export default function PaymentPanel({
     }
     if (!form.amount || Number(form.amount) <= 0) return "Enter a valid payment amount.";
     if (!form.paymentMethodId) return "Please select a payment method.";
+    if (!form.transactionDate) return "Please select a transaction date.";
 
     const missing = fields.find(
       field =>
@@ -619,6 +624,7 @@ export default function PaymentPanel({
       paymentMethodId: Number(form.paymentMethodId),
       paymentReference: form.paymentReference.trim() || null,
       remarks: form.remarks.trim() || null,
+      transactionDate: transactionDateToIso(form.transactionDate),
       fieldValues
     };
   }
@@ -705,6 +711,7 @@ export default function PaymentPanel({
         paymentMethodId: String(item.paymentMethodId),
         paymentReference: item.paymentReference || "",
         remarks: item.remarks || "",
+        transactionDate: localDateValue(item.transactionDate || item.createdAt),
         fieldValues: savedValues
       });
       setShowForm(true);
@@ -801,7 +808,7 @@ export default function PaymentPanel({
                   {item.muminName || `Mumin ${item.muminId}`}
                 </Text>
                 <Text style={styles.meta}>
-                  {item.paymentMethodName || "-"} · {formatDateTime(item.createdAt)}
+                  {item.paymentMethodName || "-"} · {formatDateTime(item.transactionDate || item.createdAt)}
                 </Text>
                 {item.paymentReference ? (
                   <Text style={styles.meta}>Ref: {item.paymentReference}</Text>
@@ -997,6 +1004,14 @@ export default function PaymentPanel({
                   }
                   placeholder="Select payment method"
                 />
+                <DatePickerField
+                  label="Transaction date"
+                  value={form.transactionDate}
+                  required
+                  onChange={transactionDate =>
+                    setForm(current => ({ ...current, transactionDate }))
+                  }
+                />
                 <Input
                   label="Reference / cheque / UPI number"
                   value={form.paymentReference}
@@ -1075,6 +1090,10 @@ export default function PaymentPanel({
                   </Text>
                   <Text style={styles.detailLabel}>Remarks</Text>
                   <Text style={styles.detailValue}>{detail.remarks || "-"}</Text>
+                  <Text style={styles.detailLabel}>Transaction date</Text>
+                  <Text style={styles.detailValue}>
+                    {formatDateTime(detail.transactionDate || detail.createdAt)}
+                  </Text>
                   <Text style={styles.detailLabel}>Created</Text>
                   <Text style={styles.detailValue}>
                     {formatDateTime(detail.createdAt)}

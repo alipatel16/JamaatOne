@@ -19,19 +19,23 @@ import { colors, radius, spacing } from "../theme";
 import ActivityTimeline from "./ActivityTimeline";
 import Button from "./Button";
 import Card from "./Card";
+import DatePickerField, { localDateValue, transactionDateToIso } from "./DatePickerField";
 import Input from "./Input";
 import Select from "./Select";
 
 const PAGE_SIZE = 20;
 
-const EMPTY_FORM = {
-  entryType: "DEBIT",
-  paymentFor: "",
-  amount: "",
-  paymentMethodId: "",
-  paymentReferenceNo: "",
-  remarks: ""
-};
+function createEmptyForm() {
+  return {
+    entryType: "DEBIT",
+    paymentFor: "",
+    amount: "",
+    paymentMethodId: "",
+    paymentReferenceNo: "",
+    remarks: "",
+    transactionDate: localDateValue()
+  };
+}
 
 const money = value =>
   new Intl.NumberFormat("en-IN", {
@@ -93,7 +97,7 @@ export default function DayBookPanel({ manager, canDelete = false, canRefund = f
 
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
-  const [form, setForm] = useState(EMPTY_FORM);
+  const [form, setForm] = useState(createEmptyForm);
   const [saving, setSaving] = useState(false);
 
   const [detail, setDetail] = useState(null);
@@ -210,7 +214,7 @@ export default function DayBookPanel({ manager, canDelete = false, canRefund = f
 
   function resetForm() {
     setEditingId(null);
-    setForm(EMPTY_FORM);
+    setForm(createEmptyForm());
     setError("");
   }
 
@@ -225,6 +229,7 @@ export default function DayBookPanel({ manager, canDelete = false, canRefund = f
     if (!form.paymentFor.trim()) return "Enter payment for / account head.";
     if (!form.amount || Number(form.amount) <= 0) return "Enter a valid amount.";
     if (!form.paymentMethodId) return "Select a payment method.";
+    if (!form.transactionDate) return "Select a transaction date.";
     return "";
   }
 
@@ -235,7 +240,8 @@ export default function DayBookPanel({ manager, canDelete = false, canRefund = f
       amount: Number(form.amount),
       paymentMethodId: Number(form.paymentMethodId),
       paymentReferenceNo: form.paymentReferenceNo.trim() || null,
-      remarks: form.remarks.trim() || null
+      remarks: form.remarks.trim() || null,
+      transactionDate: transactionDateToIso(form.transactionDate)
     };
   }
 
@@ -291,7 +297,8 @@ export default function DayBookPanel({ manager, canDelete = false, canRefund = f
         amount: String(item.amount ?? ""),
         paymentMethodId: String(item.paymentMethodId ?? ""),
         paymentReferenceNo: item.paymentReferenceNo || "",
-        remarks: item.remarks || ""
+        remarks: item.remarks || "",
+        transactionDate: localDateValue(item.transactionDate || item.createdAt)
       });
       setShowForm(true);
     } catch (requestError) {
@@ -418,7 +425,7 @@ export default function DayBookPanel({ manager, canDelete = false, canRefund = f
             <View style={styles.flex}>
               <Text style={styles.entryTitle}>{item.paymentFor || "Day Book entry"}</Text>
               <Text style={styles.meta}>
-                {item.paymentMethodName || "-"} · {formatDateTime(item.createdAt)}
+                {item.paymentMethodName || "-"} · {formatDateTime(item.transactionDate || item.createdAt)}
               </Text>
               {item.paymentReferenceNo ? (
                 <Text style={styles.meta}>Ref: {item.paymentReferenceNo}</Text>
@@ -578,6 +585,14 @@ export default function DayBookPanel({ manager, canDelete = false, canRefund = f
                 }
                 placeholder="Select payment method"
               />
+              <DatePickerField
+                label="Transaction date"
+                value={form.transactionDate}
+                required
+                onChange={transactionDate =>
+                  setForm(current => ({ ...current, transactionDate }))
+                }
+              />
               <Input
                 label="Reference number"
                 value={form.paymentReferenceNo}
@@ -644,6 +659,10 @@ export default function DayBookPanel({ manager, canDelete = false, canRefund = f
                   <Text style={styles.detailValue}>{detail.paymentReferenceNo || "-"}</Text>
                   <Text style={styles.detailLabel}>Remarks</Text>
                   <Text style={styles.detailValue}>{detail.remarks || "-"}</Text>
+                  <Text style={styles.detailLabel}>Transaction date</Text>
+                  <Text style={styles.detailValue}>
+                    {formatDateTime(detail.transactionDate || detail.createdAt)}
+                  </Text>
                   <Text style={styles.detailLabel}>Recorded by</Text>
                   <Text style={styles.detailValue}>
                     {detail.createdByName || "-"}

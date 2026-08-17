@@ -9,7 +9,8 @@ function normalizeDayBookPayload(payload) {
     amount: Number(payload?.amount),
     paymentMethodId: Number(payload?.paymentMethodId),
     paymentReferenceNo: payload?.paymentReferenceNo || null,
-    remarks: payload?.remarks || null
+    remarks: payload?.remarks || null,
+    transactionDate: payload?.transactionDate || null
   };
 }
 
@@ -31,6 +32,7 @@ function normalizePaymentPayload(payload, includeMuminId) {
     paymentMethodId: Number(payload?.paymentMethodId),
     paymentReference: payload?.paymentReference || null,
     remarks: payload?.remarks || null,
+    transactionDate: payload?.transactionDate || null,
     fieldValues
   };
 }
