@@ -31,6 +31,7 @@ function createEmptyForm() {
     paymentFor: "",
     amount: "",
     paymentMethodId: "",
+    bankAccountId: "",
     paymentReferenceNo: "",
     remarks: "",
     transactionDate: localDateValue()
@@ -85,6 +86,7 @@ export default function DayBookPanel({ manager, canDelete = false, canRefund = f
   const phone = width < 600;
   const narrow = width < 380;
   const [methods, setMethods] = useState([]);
+  const [bankAccounts, setBankAccounts] = useState([]);
   const [entries, setEntries] = useState([]);
   const [pageNumber, setPageNumber] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -114,6 +116,19 @@ export default function DayBookPanel({ manager, canDelete = false, canRefund = f
           value: String(item.paymentMethodId)
         })),
     [methods]
+  );
+
+  const bankOptions = useMemo(
+    () =>
+      bankAccounts
+        .filter(item => item?.isActive !== false)
+        .map(item => ({
+          label: `${item.bankAccountName || item.bankName || "Bank account"}${
+            item.bankAccountNumber ? ` · ${String(item.bankAccountNumber).slice(-4)}` : ""
+          }`,
+          value: String(item.bankAccountId)
+        })),
+    [bankAccounts]
   );
 
   const filterMethodOptions = useMemo(
@@ -169,10 +184,18 @@ export default function DayBookPanel({ manager, canDelete = false, canRefund = f
 
   async function loadMethods() {
     try {
-      const result = await accountsApi.getPaymentMethods();
-      setMethods(Array.isArray(result) ? result : []);
+      const [methodResult, bankResult] = await Promise.all([
+        accountsApi.getPaymentMethods(),
+        accountsApi.getBankAccounts()
+      ]);
+      setMethods(Array.isArray(methodResult) ? methodResult : []);
+      setBankAccounts(
+        (Array.isArray(bankResult) ? bankResult : []).filter(
+          item => item?.isActive !== false
+        )
+      );
     } catch (requestError) {
-      setError(requestError.message || "Unable to load payment methods.");
+      setError(requestError.message || "Unable to load payment methods and bank accounts.");
     }
   }
 
@@ -229,6 +252,7 @@ export default function DayBookPanel({ manager, canDelete = false, canRefund = f
     if (!form.paymentFor.trim()) return "Enter payment for / account head.";
     if (!form.amount || Number(form.amount) <= 0) return "Enter a valid amount.";
     if (!form.paymentMethodId) return "Select a payment method.";
+    if (!form.bankAccountId) return "Select a bank account.";
     if (!form.transactionDate) return "Select a transaction date.";
     return "";
   }
@@ -239,6 +263,7 @@ export default function DayBookPanel({ manager, canDelete = false, canRefund = f
       paymentFor: form.paymentFor.trim(),
       amount: Number(form.amount),
       paymentMethodId: Number(form.paymentMethodId),
+      bankAccountId: Number(form.bankAccountId),
       paymentReferenceNo: form.paymentReferenceNo.trim() || null,
       remarks: form.remarks.trim() || null,
       transactionDate: transactionDateToIso(form.transactionDate)
@@ -296,6 +321,7 @@ export default function DayBookPanel({ manager, canDelete = false, canRefund = f
         paymentFor: item.paymentFor || "",
         amount: String(item.amount ?? ""),
         paymentMethodId: String(item.paymentMethodId ?? ""),
+        bankAccountId: item.bankAccountId ? String(item.bankAccountId) : "",
         paymentReferenceNo: item.paymentReferenceNo || "",
         remarks: item.remarks || "",
         transactionDate: localDateValue(item.transactionDate || item.createdAt)
@@ -427,6 +453,9 @@ export default function DayBookPanel({ manager, canDelete = false, canRefund = f
               <Text style={styles.meta}>
                 {item.paymentMethodName || "-"} · {formatDateTime(item.transactionDate || item.createdAt)}
               </Text>
+              {item.bankAccountName ? (
+                <Text style={styles.meta}>Bank: {item.bankAccountName}</Text>
+              ) : null}
               {item.paymentReferenceNo ? (
                 <Text style={styles.meta}>Ref: {item.paymentReferenceNo}</Text>
               ) : null}
@@ -585,6 +614,15 @@ export default function DayBookPanel({ manager, canDelete = false, canRefund = f
                 }
                 placeholder="Select payment method"
               />
+              <Select
+                label="Bank account"
+                value={form.bankAccountId}
+                options={bankOptions}
+                onChange={bankAccountId =>
+                  setForm(current => ({ ...current, bankAccountId }))
+                }
+                placeholder="Select bank account"
+              />
               <DatePickerField
                 label="Transaction date"
                 value={form.transactionDate}
@@ -655,6 +693,8 @@ export default function DayBookPanel({ manager, canDelete = false, canRefund = f
                   </Text>
                   <Text style={styles.detailLabel}>Payment method</Text>
                   <Text style={styles.detailValue}>{detail.paymentMethodName || "-"}</Text>
+                  <Text style={styles.detailLabel}>Bank account</Text>
+                  <Text style={styles.detailValue}>{detail.bankAccountName || "-"}</Text>
                   <Text style={styles.detailLabel}>Reference</Text>
                   <Text style={styles.detailValue}>{detail.paymentReferenceNo || "-"}</Text>
                   <Text style={styles.detailLabel}>Remarks</Text>

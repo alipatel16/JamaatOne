@@ -17,6 +17,7 @@ import { colors, radius, shadows, spacing } from "../theme";
 import Button from "./Button";
 import Card from "./Card";
 import Input from "./Input";
+import MultiSelect from "./MultiSelect";
 
 const EMPTY_BANK = {
   bankAccountName: "",
@@ -25,7 +26,9 @@ const EMPTY_BANK = {
   accountHolderName: "",
   ifscCode: "",
   branchName: "",
-  remarks: ""
+  remarks: "",
+  openingBalance: "0",
+  categoryIds: []
 };
 
 async function confirmAction(title, message, actionLabel = "Delete") {
@@ -66,6 +69,7 @@ export default function BankAccountsPanel({ canManage = false, canDelete = false
   const phone = width < 600;
   const narrow = width < 380;
   const [accounts, setAccounts] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [modalVisible, setModalVisible] = useState(false);
@@ -82,13 +86,33 @@ export default function BankAccountsPanel({ canManage = false, canDelete = false
     [accounts]
   );
 
+  const categoryOptions = useMemo(
+    () =>
+      categories
+        .filter(item => item?.isActive !== false)
+        .map(item => ({
+          value: String(item.categoryId),
+          label: item.categoryName || `Category ${item.categoryId}`,
+          searchText: item.jamaatName || ""
+        })),
+    [categories]
+  );
+
   async function loadAccounts() {
     try {
       setLoading(true);
       setError("");
-      const result = await accountsApi.getBankAccounts();
+      const [result, categoryResult] = await Promise.all([
+        accountsApi.getBankAccounts(),
+        accountsApi.getPaymentCategories()
+      ]);
       setAccounts(
         (Array.isArray(result) ? result : []).filter(item => item?.isActive !== false)
+      );
+      setCategories(
+        (Array.isArray(categoryResult) ? categoryResult : []).filter(
+          item => item?.isActive !== false
+        )
       );
     } catch (requestError) {
       setAccounts([]);
@@ -114,7 +138,11 @@ export default function BankAccountsPanel({ canManage = false, canDelete = false
       accountHolderName: item.accountHolderName || "",
       ifscCode: item.ifscCode || "",
       branchName: item.branchName || "",
-      remarks: item.remarks || ""
+      remarks: item.remarks || "",
+      openingBalance: String(item.openingBalance ?? 0),
+      categoryIds: (Array.isArray(item.categories) ? item.categories : []).map(
+        category => String(category.categoryId)
+      )
     });
     setError("");
     setModalVisible(true);
@@ -250,6 +278,21 @@ export default function BankAccountsPanel({ canManage = false, canDelete = false
                 </View>
               </View>
 
+              {Array.isArray(item.categories) && item.categories.length ? (
+                <View style={styles.categoryBox}>
+                  <Text style={styles.detailLabel}>Payment categories</Text>
+                  <View style={styles.categoryChips}>
+                    {item.categories.map(category => (
+                      <View key={String(category.categoryId)} style={styles.categoryChip}>
+                        <Text style={styles.categoryChipText}>
+                          {category.categoryName || `Category ${category.categoryId}`}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              ) : null}
+
               {item.remarks ? (
                 <View style={styles.remarksBox}>
                   <Text style={styles.remarksText}>{item.remarks}</Text>
@@ -351,6 +394,16 @@ export default function BankAccountsPanel({ canManage = false, canDelete = false
                 label="Branch name"
                 value={form.branchName}
                 onChangeText={branchName => setForm(value => ({ ...value, branchName }))}
+              />
+              <MultiSelect
+                label="Payment categories"
+                values={form.categoryIds}
+                options={categoryOptions}
+                onChange={categoryIds =>
+                  setForm(value => ({ ...value, categoryIds }))
+                }
+                placeholder="Select payment categories for this account"
+                searchPlaceholder="Search payment categories"
               />
               <Input
                 label="Remarks"
@@ -464,6 +517,10 @@ const styles = StyleSheet.create({
   detailBlock: { minWidth: 130, flex: 1 },
   detailLabel: { color: colors.muted, fontSize: 11 },
   detailValue: { color: colors.text, fontWeight: "700", marginTop: 3, fontSize: 13 },
+  categoryBox: { marginTop: spacing.md, paddingTop: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
+  categoryChips: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: spacing.xs },
+  categoryChip: { backgroundColor: colors.primarySoft, borderRadius: radius.pill, paddingHorizontal: 9, paddingVertical: 5 },
+  categoryChipText: { color: colors.primaryStrong, fontSize: 10, fontWeight: "800" },
   remarksBox: { marginTop: spacing.md, paddingTop: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
   remarksText: { color: colors.textSoft, fontSize: 12, lineHeight: 18 },
   actions: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.md },

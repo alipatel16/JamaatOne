@@ -4,6 +4,7 @@ import {
   Modal,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   useWindowDimensions,
@@ -11,6 +12,7 @@ import {
 } from "react-native";
 import { accountsApi } from "../../src/api/accountsApi";
 import { mumineenApi } from "../../src/api/mumineenApi";
+import Button from "../../src/components/Button";
 import Card from "../../src/components/Card";
 import CashManagementPanel from "../../src/components/CashManagementPanel";
 import CustomerLedgerPanel from "../../src/components/CustomerLedgerPanel";
@@ -176,6 +178,48 @@ const money = (v) =>
 const toApiFromDate = value => value ? `${value}T00:00:00` : undefined;
 const toApiToDate = value => value ? `${value}T23:59:59.999` : undefined;
 
+function CollectionBreakdown({ title, items = [], nameKey }) {
+  const maxAmount = Math.max(
+    1,
+    ...items.map(item => Number(item?.totalAmount || 0))
+  );
+
+  return (
+    <View style={styles.collectionSection}>
+      <Text style={styles.collectionSectionTitle}>{title}</Text>
+      {items.length ? (
+        items.map((item, index) => {
+          const amount = Number(item?.totalAmount || 0);
+          const width = amount > 0 ? `${Math.max(4, (amount / maxAmount) * 100)}%` : "0%";
+          return (
+            <View
+              key={String(item?.categoryId ?? item?.bankAccountId ?? index)}
+              style={styles.collectionRow}
+            >
+              <View style={styles.collectionRowTop}>
+                <View style={styles.flex}>
+                  <Text style={styles.collectionName}>
+                    {item?.[nameKey] || "Unassigned"}
+                  </Text>
+                  <Text style={styles.collectionMeta}>
+                    {Number(item?.paymentCount || 0)} payment{Number(item?.paymentCount || 0) === 1 ? "" : "s"}
+                  </Text>
+                </View>
+                <Text style={styles.collectionAmount}>{money(amount)}</Text>
+              </View>
+              <View style={styles.collectionTrack}>
+                <View style={[styles.collectionBar, { width }]} />
+              </View>
+            </View>
+          );
+        })
+      ) : (
+        <Text style={styles.collectionEmpty}>No payment collection data for this period.</Text>
+      )}
+    </View>
+  );
+}
+
 export default function AccountsScreen() {
   const { width } = useWindowDimensions();
   const phone = width < 600;
@@ -187,6 +231,10 @@ export default function AccountsScreen() {
   const [tab, setTab] = useState(manager ? "STATS" : "PAYMENTS");
   const [summary, setSummary] = useState(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
+  const [collectionVisible, setCollectionVisible] = useState(false);
+  const [collectionSummary, setCollectionSummary] = useState(null);
+  const [collectionLoading, setCollectionLoading] = useState(false);
+  const [collectionError, setCollectionError] = useState("");
   const [statsRange, setStatsRange] = useState("TODAY");
   const [statsFrom, setStatsFrom] = useState(today());
   const [statsTo, setStatsTo] = useState(today());
@@ -303,6 +351,26 @@ export default function AccountsScreen() {
     })();
     return () => { active = false; };
   }, [manager, tab, statsDates.from, statsDates.to]);
+
+  async function openCollectionDetails() {
+    setCollectionVisible(true);
+    setCollectionLoading(true);
+    setCollectionError("");
+    try {
+      const result = await accountsApi.getMyCollectionSummary({
+        fromDate: toApiFromDate(statsDates.from),
+        toDate: toApiToDate(statsDates.to)
+      });
+      setCollectionSummary(result || { byCategory: [], byBankAccount: [] });
+    } catch (requestError) {
+      setCollectionSummary(null);
+      setCollectionError(
+        requestError.message || "Unable to load collection details."
+      );
+    } finally {
+      setCollectionLoading(false);
+    }
+  }
 
   const stats = useMemo(() => {
     const payments = summary?.paymentsOverview || {};
@@ -511,7 +579,15 @@ export default function AccountsScreen() {
               </View>
             </Card>
           ) : null}
-          <Text style={styles.periodLabel}>{statsDates.from} to {statsDates.to}</Text>
+          <View style={[styles.summaryToolbar, phone && styles.summaryToolbarPhone]}>
+            <Text style={styles.periodLabel}>{statsDates.from} to {statsDates.to}</Text>
+            <Pressable
+              style={[styles.collectionButton, phone && styles.collectionButtonPhone]}
+              onPress={openCollectionDetails}
+            >
+              <Text style={styles.collectionButtonText}>View More Payment Details</Text>
+            </Pressable>
+          </View>
           {summaryLoading ? (
             <ActivityIndicator color={colors.primary} style={{ marginVertical: spacing.lg }} />
           ) : (
@@ -591,6 +667,90 @@ export default function AccountsScreen() {
       {manager && tab === "MANAGEMENT" ? (
         <CashManagementPanel canDelete={canDelete} />
       ) : null}
+
+      <Modal
+        visible={collectionVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setCollectionVisible(false)}
+      >
+        <View style={[styles.collectionBackdrop, phone && styles.collectionBackdropPhone]}>
+          <View style={[styles.collectionSheet, phone && styles.collectionSheetPhone]}>
+            <View style={styles.collectionHeader}>
+              <View style={styles.flex}>
+                <Text style={styles.collectionEyebrow}>MY COLLECTION</Text>
+                <Text style={styles.collectionTitle}>Payment collection details</Text>
+                <Text style={styles.collectionSubtitle}>
+                  {statsDates.from} to {statsDates.to}
+                </Text>
+              </View>
+              <Pressable
+                style={styles.collectionClose}
+                onPress={() => setCollectionVisible(false)}
+              >
+                <Text style={styles.collectionCloseText}>×</Text>
+              </Pressable>
+            </View>
+
+            <ScrollView
+              contentContainerStyle={styles.collectionContent}
+              showsVerticalScrollIndicator={false}
+            >
+              {collectionLoading ? (
+                <View style={styles.collectionLoading}>
+                  <ActivityIndicator color={colors.primary} />
+                  <Text style={styles.collectionMeta}>Loading collection analytics...</Text>
+                </View>
+              ) : collectionError ? (
+                <Card>
+                  <Text style={styles.error}>{collectionError}</Text>
+                  <Button
+                    title="Retry"
+                    compact
+                    onPress={openCollectionDetails}
+                  />
+                </Card>
+              ) : (
+                <>
+                  <View style={[styles.collectionTotals, phone && styles.collectionTotalsPhone]}>
+                    <Card style={styles.collectionTotalCard}>
+                      <Text style={styles.collectionTotalLabel}>Collected</Text>
+                      <Text style={styles.collectionTotalValue}>
+                        {money(
+                          (Array.isArray(collectionSummary?.byCategory)
+                            ? collectionSummary.byCategory
+                            : []
+                          ).reduce((sum, item) => sum + Number(item.totalAmount || 0), 0)
+                        )}
+                      </Text>
+                    </Card>
+                    <Card style={styles.collectionTotalCard}>
+                      <Text style={styles.collectionTotalLabel}>Payments</Text>
+                      <Text style={styles.collectionTotalValue}>
+                        {(Array.isArray(collectionSummary?.byCategory)
+                          ? collectionSummary.byCategory
+                          : []
+                        ).reduce((sum, item) => sum + Number(item.paymentCount || 0), 0)}
+                      </Text>
+                    </Card>
+                  </View>
+
+                  <CollectionBreakdown
+                    title="Collection by payment category"
+                    items={Array.isArray(collectionSummary?.byCategory) ? collectionSummary.byCategory : []}
+                    nameKey="categoryName"
+                  />
+                  <CollectionBreakdown
+                    title="Collection by bank account"
+                    items={Array.isArray(collectionSummary?.byBankAccount) ? collectionSummary.byBankAccount : []}
+                    nameKey="bankAccountName"
+                  />
+                </>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </Screen>
   );
 }
@@ -801,6 +961,11 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
   },
   ledgerLabel: { fontSize: 12, color: colors.muted, textAlign: "right" },
+  summaryToolbar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md, marginBottom: spacing.md },
+  summaryToolbarPhone: { flexDirection: "column", alignItems: "stretch", gap: spacing.sm },
+  collectionButton: { minHeight: 44, paddingHorizontal: spacing.md, borderRadius: radius.md, backgroundColor: colors.primaryStrong, alignItems: "center", justifyContent: "center" },
+  collectionButtonPhone: { width: "100%" },
+  collectionButtonText: { color: "#FFFFFF", fontWeight: "900", fontSize: 12 },
   rangeTabs: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: spacing.md },
   rangeTab: { paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
   activeRangeTab: { backgroundColor: colors.primaryStrong, borderColor: colors.primaryStrong },
@@ -814,4 +979,31 @@ const styles = StyleSheet.create({
   pending: { color: colors.danger },
   bankGrid: { flexDirection: "row", flexWrap: "wrap", marginHorizontal: -4 },
   bankCard: { flex: 1, minWidth: 180, marginHorizontal: 4 },
+  collectionBackdrop: { flex: 1, backgroundColor: colors.overlay, justifyContent: "center", padding: spacing.md },
+  collectionBackdropPhone: { justifyContent: "flex-end", padding: 0 },
+  collectionSheet: { width: "100%", maxWidth: 860, maxHeight: "90%", alignSelf: "center", backgroundColor: colors.surface, borderRadius: radius.xl, overflow: "hidden" },
+  collectionSheetPhone: { maxHeight: "94%", borderTopLeftRadius: 24, borderTopRightRadius: 24, borderBottomLeftRadius: 0, borderBottomRightRadius: 0 },
+  collectionHeader: { flexDirection: "row", alignItems: "flex-start", gap: spacing.md, padding: spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.border },
+  collectionEyebrow: { color: colors.accentStrong, fontSize: 9, fontWeight: "900", letterSpacing: 1.3 },
+  collectionTitle: { color: colors.text, fontSize: 23, fontWeight: "900", marginTop: 4 },
+  collectionSubtitle: { color: colors.muted, fontSize: 12, marginTop: 4 },
+  collectionClose: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.backgroundAlt, alignItems: "center", justifyContent: "center" },
+  collectionCloseText: { color: colors.textSoft, fontSize: 25, lineHeight: 27 },
+  collectionContent: { padding: spacing.lg, gap: spacing.lg },
+  collectionLoading: { minHeight: 220, alignItems: "center", justifyContent: "center", gap: spacing.sm },
+  collectionTotals: { flexDirection: "row", gap: spacing.sm },
+  collectionTotalsPhone: { flexDirection: "column" },
+  collectionTotalCard: { flex: 1, marginHorizontal: 0, backgroundColor: colors.surfaceTint, borderColor: colors.primarySoftStrong },
+  collectionTotalLabel: { color: colors.muted, fontSize: 12, fontWeight: "800" },
+  collectionTotalValue: { color: colors.primaryStrong, fontSize: 24, fontWeight: "900", marginTop: 4 },
+  collectionSection: { gap: spacing.sm },
+  collectionSectionTitle: { color: colors.text, fontSize: 18, fontWeight: "900" },
+  collectionRow: { paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border },
+  collectionRowTop: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: spacing.md },
+  collectionName: { color: colors.text, fontWeight: "800", fontSize: 14 },
+  collectionMeta: { color: colors.muted, fontSize: 11, marginTop: 3 },
+  collectionAmount: { color: colors.primaryStrong, fontWeight: "900", fontSize: 14 },
+  collectionTrack: { height: 9, marginTop: spacing.sm, borderRadius: radius.pill, backgroundColor: colors.backgroundAlt, overflow: "hidden" },
+  collectionBar: { height: "100%", borderRadius: radius.pill, backgroundColor: colors.primaryStrong },
+  collectionEmpty: { color: colors.muted, paddingVertical: spacing.lg, textAlign: "center" },
 });

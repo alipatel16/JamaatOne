@@ -182,6 +182,13 @@ export const liveEndpoints = {
       const query = params.toString();
       return `/api/Accounts/summary${query ? `?${query}` : ""}`;
     },
+    myCollectionSummary: ({ fromDate, toDate } = {}) => {
+      const params = new URLSearchParams();
+      if (fromDate) params.set("fromDate", String(fromDate));
+      if (toDate) params.set("toDate", String(toDate));
+      const query = params.toString();
+      return `/api/Accounts/my-collection-summary${query ? `?${query}` : ""}`;
+    },
 
     pagedPayments: ({
       pageNumber = 1,

@@ -59,15 +59,16 @@ function Status({ active }) {
   );
 }
 
-export default function PaymentSetupPanel({ section = "all" }) {
+export default function PaymentSetupPanel({ section = "all", jamaats = [] }) {
   const [categories, setCategories] = useState([]);
   const [subCategories, setSubCategories] = useState([]);
   const [fields, setFields] = useState([]);
   const [methods, setMethods] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [scopeJamaatId, setScopeJamaatId] = useState("");
 
-  const [categoryForm, setCategoryForm] = useState({ id: null, name: "", isActive: true });
+  const [categoryForm, setCategoryForm] = useState({ id: null, jamaatId: "", name: "", isActive: true });
   const [subForm, setSubForm] = useState({ id: null, categoryId: "", name: "", isActive: true });
   const [fieldForm, setFieldForm] = useState({
     id: null,
@@ -82,9 +83,25 @@ export default function PaymentSetupPanel({ section = "all" }) {
   const [methodForm, setMethodForm] = useState({ id: null, name: "", isActive: true });
   const [savingKey, setSavingKey] = useState("");
 
+  const jamaatOptions = useMemo(
+    () =>
+      (Array.isArray(jamaats) ? jamaats : [])
+        .filter(item => item?.isActive !== false)
+        .map(item => ({
+          label: item.name || `Jamaat ${item.jamaatId}`,
+          value: String(item.jamaatId)
+        })),
+    [jamaats]
+  );
+
+  const scopeOptions = useMemo(
+    () => [{ label: "All Jamaats", value: "" }, ...jamaatOptions],
+    [jamaatOptions]
+  );
+
   const categoryOptions = useMemo(
     () => categories.map(item => ({
-      label: `${item.categoryName || "Unnamed"}${item.isActive === false ? " (inactive)" : ""}`,
+      label: `${item.jamaatName ? `${item.jamaatName} · ` : ""}${item.categoryName || "Unnamed"}${item.isActive === false ? " (inactive)" : ""}`,
       value: String(item.categoryId)
     })),
     [categories]
@@ -92,24 +109,24 @@ export default function PaymentSetupPanel({ section = "all" }) {
 
   const subCategoryOptions = useMemo(
     () => subCategories.map(item => ({
-      label: `${item.categoryName || "Category"} · ${item.subCategoryName || "Unnamed"}${item.isActive === false ? " (inactive)" : ""}`,
+      label: `${item.jamaatName ? `${item.jamaatName} · ` : ""}${item.categoryName || "Category"} · ${item.subCategoryName || "Unnamed"}${item.isActive === false ? " (inactive)" : ""}`,
       value: String(item.subCategoryId)
     })),
     [subCategories]
   );
 
   useEffect(() => {
-    loadAll();
-  }, []);
+    loadAll(scopeJamaatId);
+  }, [scopeJamaatId]);
 
-  async function loadAll() {
+  async function loadAll(jamaatId = scopeJamaatId) {
     try {
       setLoading(true);
       setError("");
       const [categoryData, subCategoryData, fieldData, methodData] = await Promise.all([
-        accountsApi.getPaymentCategories(),
-        accountsApi.getPaymentSubCategories(),
-        accountsApi.getPaymentFields(),
+        accountsApi.getPaymentCategories(jamaatId || undefined),
+        accountsApi.getPaymentSubCategories(jamaatId || undefined),
+        accountsApi.getPaymentFields(jamaatId || undefined),
         accountsApi.getPaymentMethods()
       ]);
       setCategories(Array.isArray(categoryData) ? categoryData : []);
@@ -123,8 +140,32 @@ export default function PaymentSetupPanel({ section = "all" }) {
     }
   }
 
+  function changeScope(jamaatId) {
+    setScopeJamaatId(String(jamaatId || ""));
+    setCategoryForm({
+      id: null,
+      jamaatId: jamaatId ? String(jamaatId) : "",
+      name: "",
+      isActive: true
+    });
+    setSubForm({ id: null, categoryId: "", name: "", isActive: true });
+    setFieldForm({
+      id: null,
+      subCategoryId: "",
+      fieldName: "",
+      fieldKey: "",
+      fieldType: "TEXT",
+      isRequired: false,
+      displayOrder: "1",
+      isActive: true
+    });
+  }
+
   async function saveCategory() {
     if (!categoryForm.name.trim()) return setError("Category name is required.");
+    if (!categoryForm.id && !categoryForm.jamaatId) {
+      return setError("Select the Jamaat for this payment category.");
+    }
     try {
       setSavingKey("category"); setError("");
       if (categoryForm.id) {
@@ -132,8 +173,18 @@ export default function PaymentSetupPanel({ section = "all" }) {
           name: categoryForm.name.trim(),
           isActive: categoryForm.isActive
         });
-      } else await accountsApi.createPaymentCategory(categoryForm.name.trim());
-      setCategoryForm({ id: null, name: "", isActive: true });
+      } else {
+        await accountsApi.createPaymentCategory({
+          jamaatId: Number(categoryForm.jamaatId),
+          name: categoryForm.name.trim()
+        });
+      }
+      setCategoryForm({
+        id: null,
+        jamaatId: scopeJamaatId || "",
+        name: "",
+        isActive: true
+      });
       await loadAll();
     } catch (e) { setError(e.message); } finally { setSavingKey(""); }
   }
@@ -219,22 +270,44 @@ export default function PaymentSetupPanel({ section = "all" }) {
           Configure the categories, subcategories, custom fields and payment methods used while recording payments.
         </Text>
       </View>
+      {section !== "methods" ? (
+        <Card style={styles.scopeCard}>
+          <Select
+            label="Jamaat scope"
+            value={scopeJamaatId}
+            options={scopeOptions}
+            onChange={changeScope}
+            placeholder="All Jamaats"
+          />
+          <Text style={styles.scopeHint}>
+            Filter payment configuration by Jamaat. New categories are assigned to the Jamaat selected in the category form.
+          </Text>
+        </Card>
+      ) : null}
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
       <Section sectionKey="categories" activeSection={section} title="Payment categories" description="Top-level heads such as Madrasa, FMB, Sabil, Lagat or Others.">
+        <Select
+          label={categoryForm.id ? "Assigned Jamaat" : "Jamaat"}
+          value={categoryForm.jamaatId}
+          options={jamaatOptions}
+          onChange={jamaatId => setCategoryForm(v => ({ ...v, jamaatId: String(jamaatId) }))}
+          placeholder="Select Jamaat"
+          disabled={Boolean(categoryForm.id)}
+        />
         <Input label="Category name" value={categoryForm.name} onChangeText={name => setCategoryForm(v => ({ ...v, name }))} />
         {categoryForm.id ? (
           <View style={styles.switchRow}><Text style={styles.switchLabel}>Active</Text><Switch value={categoryForm.isActive} onValueChange={isActive => setCategoryForm(v => ({ ...v, isActive }))} /></View>
         ) : null}
         <View style={styles.formActions}>
           <Button title={categoryForm.id ? "Update category" : "Add category"} compact loading={savingKey === "category"} onPress={saveCategory} />
-          {categoryForm.id ? <Button title="Cancel" compact variant="outline" onPress={() => setCategoryForm({ id: null, name: "", isActive: true })} /> : null}
+          {categoryForm.id ? <Button title="Cancel" compact variant="outline" onPress={() => setCategoryForm({ id: null, jamaatId: scopeJamaatId || "", name: "", isActive: true })} /> : null}
         </View>
         <View style={styles.list}>{categories.map(item => (
           <View key={item.categoryId} style={styles.row}>
-            <View style={styles.flex}><Text style={styles.name}>{item.categoryName}</Text><Text style={styles.meta}>ID {item.categoryId}</Text></View>
+            <View style={styles.flex}><Text style={styles.name}>{item.categoryName}</Text><Text style={styles.meta}>{item.jamaatName || `Jamaat ${item.jamaatId}`} · ID {item.categoryId}</Text></View>
             <Status active={item.isActive !== false} />
-            <Button title="Edit" compact variant="outline" onPress={() => setCategoryForm({ id: item.categoryId, name: item.categoryName || "", isActive: item.isActive !== false })} />
+            <Button title="Edit" compact variant="outline" onPress={() => setCategoryForm({ id: item.categoryId, jamaatId: String(item.jamaatId || ""), name: item.categoryName || "", isActive: item.isActive !== false })} />
             <Button title="Delete" compact variant="danger" onPress={() => remove("category", item.categoryId, item.categoryName)} />
           </View>
         ))}</View>
@@ -250,7 +323,7 @@ export default function PaymentSetupPanel({ section = "all" }) {
         </View>
         <View style={styles.list}>{subCategories.map(item => (
           <View key={item.subCategoryId} style={styles.row}>
-            <View style={styles.flex}><Text style={styles.name}>{item.subCategoryName}</Text><Text style={styles.meta}>{item.categoryName} · ID {item.subCategoryId}</Text></View>
+            <View style={styles.flex}><Text style={styles.name}>{item.subCategoryName}</Text><Text style={styles.meta}>{item.jamaatName ? `${item.jamaatName} · ` : ""}{item.categoryName} · ID {item.subCategoryId}</Text></View>
             <Status active={item.isActive !== false} />
             <Button title="Edit" compact variant="outline" onPress={() => setSubForm({ id: item.subCategoryId, categoryId: String(item.categoryId), name: item.subCategoryName || "", isActive: item.isActive !== false })} />
             <Button title="Delete" compact variant="danger" onPress={() => remove("subcategory", item.subCategoryId, item.subCategoryName)} />
@@ -272,7 +345,7 @@ export default function PaymentSetupPanel({ section = "all" }) {
         </View>
         <View style={styles.list}>{[...fields].sort((a,b) => Number(a.displayOrder||0)-Number(b.displayOrder||0)).map(item => (
           <View key={item.fieldId} style={styles.row}>
-            <View style={styles.flex}><Text style={styles.name}>{item.fieldName}</Text><Text style={styles.meta}>{item.categoryName} · {item.subCategoryName} · {item.fieldType} · order {item.displayOrder}</Text></View>
+            <View style={styles.flex}><Text style={styles.name}>{item.fieldName}</Text><Text style={styles.meta}>{item.jamaatName ? `${item.jamaatName} · ` : ""}{item.categoryName} · {item.subCategoryName} · {item.fieldType} · order {item.displayOrder}</Text></View>
             <Status active={item.isActive !== false} />
             <Button title="Edit" compact variant="outline" onPress={() => setFieldForm({ id: item.fieldId, subCategoryId: String(item.subCategoryId), fieldName: item.fieldName || "", fieldKey: item.fieldKey || "", fieldType: item.fieldType || "TEXT", isRequired: Boolean(item.isRequired), displayOrder: String(item.displayOrder ?? 0), isActive: item.isActive !== false })} />
             <Button title="Delete" compact variant="danger" onPress={() => remove("field", item.fieldId, item.fieldName)} />
@@ -305,6 +378,8 @@ const styles = StyleSheet.create({
   intro: { marginBottom: spacing.xs },
   introTitle: { color: colors.text, fontSize: 22, fontWeight: "900" },
   introText: { color: colors.muted, marginTop: spacing.xs, lineHeight: 20 },
+  scopeCard: { padding: spacing.md, backgroundColor: colors.surfaceTint, borderColor: colors.primarySoftStrong },
+  scopeHint: { color: colors.muted, fontSize: 12, lineHeight: 18, marginTop: -spacing.sm },
   error: { color: colors.danger, fontWeight: "700" },
   section: { padding: spacing.md },
   sectionTitle: { color: colors.text, fontSize: 18, fontWeight: "900" },

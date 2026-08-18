@@ -1,6 +1,11 @@
 import { apiRequest, liveApiRequest } from "./client";
 import { endpoints, liveEndpoints } from "./endpoints";
 
+function withOptionalJamaat(path, jamaatId) {
+  if (jamaatId === undefined || jamaatId === null || jamaatId === "") return path;
+  const separator = path.includes("?") ? "&" : "?";
+  return `${path}${separator}jamaatId=${encodeURIComponent(String(jamaatId))}`;
+}
 
 function normalizeDayBookPayload(payload) {
   return {
@@ -10,7 +15,8 @@ function normalizeDayBookPayload(payload) {
     paymentMethodId: Number(payload?.paymentMethodId),
     paymentReferenceNo: payload?.paymentReferenceNo || null,
     remarks: payload?.remarks || null,
-    transactionDate: payload?.transactionDate || null
+    transactionDate: payload?.transactionDate || null,
+    bankAccountId: Number(payload?.bankAccountId)
   };
 }
 
@@ -33,11 +39,12 @@ function normalizePaymentPayload(payload, includeMuminId) {
     paymentReference: payload?.paymentReference || null,
     remarks: payload?.remarks || null,
     transactionDate: payload?.transactionDate || null,
+    bankAccountId: Number(payload?.bankAccountId),
     fieldValues
   };
 }
 
-function normalizeBankAccountPayload(payload) {
+function normalizeBankAccountPayload(payload, includeOpeningBalance = false) {
   return {
     bankAccountName: payload?.bankAccountName || null,
     bankName: payload?.bankName || null,
@@ -45,7 +52,11 @@ function normalizeBankAccountPayload(payload) {
     accountHolderName: payload?.accountHolderName || null,
     ifscCode: payload?.ifscCode || null,
     branchName: payload?.branchName || null,
-    remarks: payload?.remarks || null
+    remarks: payload?.remarks || null,
+    ...(includeOpeningBalance ? { openingBalance: Number(payload?.openingBalance || 0) } : {}),
+    categoryIds: Array.isArray(payload?.categoryIds)
+      ? payload.categoryIds.map(value => Number(value)).filter(Number.isFinite)
+      : []
   };
 }
 
@@ -62,16 +73,25 @@ function normalizeBankDepositPayload(payload) {
 
 export const accountsApi = {
   // Published payment configuration APIs.
-  getPaymentCategories() {
-    return liveApiRequest(liveEndpoints.accounts.paymentCategories);
+  getPaymentCategories(jamaatId) {
+    return liveApiRequest(
+      withOptionalJamaat(liveEndpoints.accounts.paymentCategories, jamaatId)
+    );
   },
   getPaymentCategory(categoryId) {
     return liveApiRequest(liveEndpoints.accounts.paymentCategoryById(categoryId));
   },
-  createPaymentCategory(name) {
+  createPaymentCategory(payload) {
+    const body =
+      payload && typeof payload === "object"
+        ? {
+            jamaatId: Number(payload.jamaatId),
+            name: String(payload.name || "").trim()
+          }
+        : { name: String(payload || "").trim() };
     return liveApiRequest(liveEndpoints.accounts.paymentCategories, {
       method: "POST",
-      body: { name }
+      body
     });
   },
   updatePaymentCategory(categoryId, payload) {
@@ -86,8 +106,10 @@ export const accountsApi = {
     });
   },
 
-  getPaymentSubCategories() {
-    return liveApiRequest(liveEndpoints.accounts.paymentSubCategories);
+  getPaymentSubCategories(jamaatId) {
+    return liveApiRequest(
+      withOptionalJamaat(liveEndpoints.accounts.paymentSubCategories, jamaatId)
+    );
   },
   getPaymentSubCategoriesByCategory(categoryId) {
     return liveApiRequest(
@@ -125,8 +147,10 @@ export const accountsApi = {
     );
   },
 
-  getPaymentFields() {
-    return liveApiRequest(liveEndpoints.accounts.paymentFields);
+  getPaymentFields(jamaatId) {
+    return liveApiRequest(
+      withOptionalJamaat(liveEndpoints.accounts.paymentFields, jamaatId)
+    );
   },
   getPaymentFieldsBySubCategory(subCategoryId) {
     return liveApiRequest(
@@ -274,13 +298,13 @@ export const accountsApi = {
   createBankAccount(payload) {
     return liveApiRequest(liveEndpoints.accounts.bankAccounts, {
       method: "POST",
-      body: normalizeBankAccountPayload(payload)
+      body: normalizeBankAccountPayload(payload, true)
     });
   },
   updateBankAccount(bankAccountId, payload) {
     return liveApiRequest(liveEndpoints.accounts.bankAccountById(bankAccountId), {
       method: "PUT",
-      body: normalizeBankAccountPayload(payload)
+      body: normalizeBankAccountPayload(payload, false)
     });
   },
   deleteBankAccount(bankAccountId) {
@@ -320,6 +344,9 @@ export const accountsApi = {
   },
   getAccountsSummary(filters = {}) {
     return liveApiRequest(liveEndpoints.accounts.summary(filters));
+  },
+  getMyCollectionSummary(filters = {}) {
+    return liveApiRequest(liveEndpoints.accounts.myCollectionSummary(filters));
   },
 
   // Legacy aliases retained for older callers.

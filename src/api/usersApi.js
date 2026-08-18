@@ -10,7 +10,10 @@ const createRoleUser = (path, payload) =>
     body: {
       itsNo: String(payload.itsNo || "").trim(),
       name: String(payload.name || "").trim(),
-      password: payload.password || ""
+      password: payload.password || "",
+      categoryIds: Array.isArray(payload.categoryIds)
+        ? payload.categoryIds.map(value => Number(value)).filter(Number.isFinite)
+        : []
     }
   });
 
@@ -22,7 +25,10 @@ const updateRoleUser = (path, payload) =>
       isActive:
         payload.isActive === undefined || payload.isActive === null
           ? undefined
-          : Boolean(payload.isActive)
+          : Boolean(payload.isActive),
+      categoryIds: Array.isArray(payload.categoryIds)
+        ? payload.categoryIds.map(value => Number(value)).filter(Number.isFinite)
+        : []
     }
   });
 

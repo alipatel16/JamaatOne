@@ -38,6 +38,7 @@ function createEmptyForm() {
     subCategoryId: "",
     amount: "",
     paymentMethodId: "",
+    bankAccountId: "",
     paymentReference: "",
     remarks: "",
     transactionDate: localDateValue(),
@@ -311,6 +312,7 @@ export default function PaymentPanel({
   const [subCategories, setSubCategories] = useState([]);
   const [fields, setFields] = useState([]);
   const [methods, setMethods] = useState([]);
+  const [bankAccounts, setBankAccounts] = useState([]);
   const [payments, setPayments] = useState([]);
   const [pageNumber, setPageNumber] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -367,6 +369,28 @@ export default function PaymentPanel({
     [methods]
   );
 
+  const bankOptions = useMemo(() => {
+    const selectedCategoryId = String(form.categoryId || "");
+    return bankAccounts
+      .filter(item => item?.isActive !== false)
+      .filter(item => {
+        if (!selectedCategoryId) return true;
+        const assigned = Array.isArray(item.categories) ? item.categories : [];
+        // Legacy accounts without category assignments remain available so
+        // existing installations do not lose working payment destinations.
+        if (!assigned.length) return true;
+        return assigned.some(
+          category => String(category.categoryId) === selectedCategoryId
+        );
+      })
+      .map(item => ({
+        label: `${item.bankAccountName || item.bankName || "Bank account"}${
+          item.bankAccountNumber ? ` · ${String(item.bankAccountNumber).slice(-4)}` : ""
+        }`,
+        value: String(item.bankAccountId)
+      }));
+  }, [bankAccounts, form.categoryId]);
+
   useEffect(() => {
     setPageNumber(1);
     loadPayments(1);
@@ -387,15 +411,20 @@ export default function PaymentPanel({
     try {
       setConfigurationLoading(true);
       setError("");
-      const [categoryData, methodData] = await Promise.all([
+      const [categoryData, methodData, bankData] = await Promise.all([
         accountsApi.getPaymentCategories(),
-        accountsApi.getPaymentMethods()
+        accountsApi.getPaymentMethods(),
+        accountsApi.getBankAccounts()
       ]);
       setCategories(Array.isArray(categoryData) ? categoryData : []);
       setMethods(Array.isArray(methodData) ? methodData : []);
+      setBankAccounts(
+        (Array.isArray(bankData) ? bankData : []).filter(item => item?.isActive !== false)
+      );
       return {
         categories: Array.isArray(categoryData) ? categoryData : [],
-        methods: Array.isArray(methodData) ? methodData : []
+        methods: Array.isArray(methodData) ? methodData : [],
+        bankAccounts: Array.isArray(bankData) ? bankData : []
       };
     } catch (requestError) {
       setError(requestError.message || "Unable to load payment configuration.");
@@ -535,6 +564,7 @@ export default function PaymentPanel({
       ...current,
       categoryId,
       subCategoryId: "",
+      bankAccountId: "",
       fieldValues: {}
     }));
     setFields([]);
@@ -596,6 +626,7 @@ export default function PaymentPanel({
     }
     if (!form.amount || Number(form.amount) <= 0) return "Enter a valid payment amount.";
     if (!form.paymentMethodId) return "Please select a payment method.";
+    if (!form.bankAccountId) return "Please select a bank account.";
     if (!form.transactionDate) return "Please select a transaction date.";
 
     const missing = fields.find(
@@ -622,6 +653,7 @@ export default function PaymentPanel({
       subCategoryId: form.subCategoryId ? Number(form.subCategoryId) : null,
       amount: Number(form.amount),
       paymentMethodId: Number(form.paymentMethodId),
+      bankAccountId: Number(form.bankAccountId),
       paymentReference: form.paymentReference.trim() || null,
       remarks: form.remarks.trim() || null,
       transactionDate: transactionDateToIso(form.transactionDate),
@@ -709,6 +741,7 @@ export default function PaymentPanel({
             : "",
         amount: String(item.amount ?? ""),
         paymentMethodId: String(item.paymentMethodId),
+        bankAccountId: item.bankAccountId ? String(item.bankAccountId) : "",
         paymentReference: item.paymentReference || "",
         remarks: item.remarks || "",
         transactionDate: localDateValue(item.transactionDate || item.createdAt),
@@ -810,6 +843,9 @@ export default function PaymentPanel({
                 <Text style={styles.meta}>
                   {item.paymentMethodName || "-"} · {formatDateTime(item.transactionDate || item.createdAt)}
                 </Text>
+                {item.bankAccountName ? (
+                  <Text style={styles.meta}>Bank: {item.bankAccountName}</Text>
+                ) : null}
                 {item.paymentReference ? (
                   <Text style={styles.meta}>Ref: {item.paymentReference}</Text>
                 ) : null}
@@ -933,7 +969,7 @@ export default function PaymentPanel({
                 {configurationLoading ? (
                   <View style={styles.inlineLoading}>
                     <ActivityIndicator color={colors.primary} />
-                    <Text style={styles.helper}>Loading categories and payment methods...</Text>
+                    <Text style={styles.helper}>Loading categories, payment methods and bank accounts...</Text>
                   </View>
                 ) : null}
 
@@ -1004,6 +1040,25 @@ export default function PaymentPanel({
                   }
                   placeholder="Select payment method"
                 />
+                <Select
+                  label="Bank account"
+                  value={form.bankAccountId}
+                  options={bankOptions}
+                  onChange={bankAccountId =>
+                    setForm(current => ({ ...current, bankAccountId }))
+                  }
+                  placeholder={
+                    form.categoryId
+                      ? "Select bank account"
+                      : "Select payment category first"
+                  }
+                  disabled={!form.categoryId}
+                />
+                {form.categoryId && !bankOptions.length ? (
+                  <Text style={styles.infoText}>
+                    No active bank account is available for this payment category.
+                  </Text>
+                ) : null}
                 <DatePickerField
                   label="Transaction date"
                   value={form.transactionDate}
@@ -1083,6 +1138,10 @@ export default function PaymentPanel({
                   <Text style={styles.detailLabel}>Payment method</Text>
                   <Text style={styles.detailValue}>
                     {detail.paymentMethodName || "-"}
+                  </Text>
+                  <Text style={styles.detailLabel}>Bank account</Text>
+                  <Text style={styles.detailValue}>
+                    {detail.bankAccountName || "-"}
                   </Text>
                   <Text style={styles.detailLabel}>Reference</Text>
                   <Text style={styles.detailValue}>

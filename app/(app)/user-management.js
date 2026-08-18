@@ -12,10 +12,13 @@ import {
 } from "react-native";
 import { Redirect } from "expo-router";
 
+import { accountsApi } from "../../src/api/accountsApi";
 import { usersApi } from "../../src/api/usersApi";
 import Button from "../../src/components/Button";
 import Card from "../../src/components/Card";
 import Input from "../../src/components/Input";
+import MultiSelect from "../../src/components/MultiSelect";
+import RemoteMumineenSelect from "../../src/components/RemoteMumineenSelect";
 import Screen from "../../src/components/Screen";
 import Select from "../../src/components/Select";
 import { canManageUsers } from "../../src/constants/roles";
@@ -23,7 +26,7 @@ import { useAuth } from "../../src/context/AuthContext";
 import { colors, radius, spacing } from "../../src/theme";
 
 const PAGE_SIZE = 20;
-const EMPTY_FORM = { userId: null, itsNo: "", name: "", password: "", isActive: "true" };
+const EMPTY_FORM = { userId: null, muminId: "", itsNo: "", name: "", password: "", isActive: "true", categoryIds: [] };
 
 const TYPES = {
   committee: {
@@ -58,6 +61,16 @@ const TYPES = {
   }
 };
 
+function muminName(item) {
+  if (!item) return "";
+  return (
+    item.fullName ||
+    [item.firstName, item.fatherName, item.surname].filter(Boolean).join(" ") ||
+    item.name ||
+    ""
+  ).trim();
+}
+
 async function confirmDelete(type, name) {
   const message = `Delete ${name || `this ${type}`}?`;
   if (Platform.OS === "web") {
@@ -78,6 +91,9 @@ export default function UserManagementScreen() {
   const narrow = width < 390;
   const [type, setType] = useState("committee");
   const [form, setForm] = useState(EMPTY_FORM);
+  const [selectedMumin, setSelectedMumin] = useState(null);
+  const [categories, setCategories] = useState([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(false);
   const [items, setItems] = useState([]);
   const [search, setSearch] = useState("");
   const [pageNumber, setPageNumber] = useState(1);
@@ -94,11 +110,52 @@ export default function UserManagementScreen() {
     { label: "Inactive", value: "false" }
   ], []);
 
+  const categoryOptions = useMemo(
+    () =>
+      categories
+        .filter(item => item?.isActive !== false)
+        .map(item => ({
+          label: item.categoryName || `Category ${item.categoryId}`,
+          value: String(item.categoryId),
+          searchText: item.jamaatName || ""
+        })),
+    [categories]
+  );
+
   useEffect(() => {
     setForm(EMPTY_FORM);
+    setSelectedMumin(null);
     setSearch("");
     setPageNumber(1);
   }, [type]);
+
+  useEffect(() => {
+    if (!canManageUsers(user)) return undefined;
+    let active = true;
+
+    (async () => {
+      try {
+        setCategoriesLoading(true);
+        const result = await accountsApi.getPaymentCategories(user?.jamaatId);
+        if (active) {
+          setCategories(
+            (Array.isArray(result) ? result : []).filter(item => item?.isActive !== false)
+          );
+        }
+      } catch (requestError) {
+        if (active) {
+          setCategories([]);
+          setError(requestError.message || "Unable to load payment categories.");
+        }
+      } finally {
+        if (active) setCategoriesLoading(false);
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [user?.jamaatId, user?.role]);
 
   useEffect(() => {
     if (!canManageUsers(user)) return;
@@ -130,6 +187,7 @@ export default function UserManagementScreen() {
 
   function resetForm() {
     setForm(EMPTY_FORM);
+    setSelectedMumin(null);
     setError("");
   }
 
@@ -138,12 +196,16 @@ export default function UserManagementScreen() {
       setError("");
       const detail = await config.get(item.userId);
       const record = detail || item;
+      setSelectedMumin(null);
       setForm({
         userId: record.userId,
+        muminId: "",
         itsNo: record.itsNo || "",
         name: record.name || "",
         password: "",
-        isActive: String(record.isActive !== false)
+        isActive: String(record.isActive !== false),
+        categoryIds: (Array.isArray(record.categories) ? record.categories : [])
+          .map(category => String(category.categoryId))
       });
     } catch (requestError) {
       setError(requestError.message || `Unable to load ${config.singular} details.`);
@@ -152,8 +214,12 @@ export default function UserManagementScreen() {
 
   async function submit() {
     const editing = Boolean(form.userId);
+    if (!editing && !form.muminId) {
+      setError("Search and select a Mumineen member.");
+      return;
+    }
     if (!editing && !form.itsNo.trim()) {
-      setError("ITS number is required.");
+      setError("The selected Mumineen record does not have an ITS number.");
       return;
     }
     if (!form.name.trim()) {
@@ -171,13 +237,15 @@ export default function UserManagementScreen() {
       if (editing) {
         await config.update(form.userId, {
           name: form.name,
-          isActive: form.isActive === "true"
+          isActive: form.isActive === "true",
+          categoryIds: form.categoryIds.map(value => Number(value))
         });
       } else {
         await config.create({
           itsNo: form.itsNo,
           name: form.name,
-          password: form.password
+          password: form.password,
+          categoryIds: form.categoryIds.map(value => Number(value))
         });
       }
       resetForm();
@@ -251,26 +319,53 @@ export default function UserManagementScreen() {
           <Text style={styles.cardTitle}>{form.userId ? `Edit ${config.singular}` : `Add ${config.singular}`}</Text>
           <Text style={styles.cardSubtitle}>
             {form.userId
-              ? "Update the user name or account status."
-              : "Set the ITS identity and a temporary password for first login."}
+              ? "Update the user name, account status and payment-category access."
+              : "Search Mumineen, assign payment-category access and set a temporary password."}
           </Text>
 
-          <Input
-            label="ITS number"
-            value={form.itsNo}
-            editable={!form.userId}
-            keyboardType="number-pad"
-            autoCapitalize="none"
-            placeholder="Enter ITS number"
-            helperText={form.userId ? "ITS number is fixed after creation." : undefined}
-            onChangeText={itsNo => setForm(current => ({ ...current, itsNo }))}
-          />
-          <Input
-            label="Name"
-            value={form.name}
-            autoCapitalize="words"
-            placeholder="Enter full name"
-            onChangeText={name => setForm(current => ({ ...current, name }))}
+          {!form.userId ? (
+            <RemoteMumineenSelect
+              label="Mumineen member"
+              value={form.muminId}
+              initialItem={selectedMumin}
+              placeholder="Search name, ITS ID, mobile or family ID"
+              onChange={(muminId, item) => {
+                setSelectedMumin(item || null);
+                setForm(current => ({
+                  ...current,
+                  muminId: String(muminId || ""),
+                  itsNo: String(item?.itsId || "").trim(),
+                  name: muminName(item)
+                }));
+              }}
+            />
+          ) : (
+            <>
+              <Input
+                label="ITS number"
+                value={form.itsNo}
+                editable={false}
+                keyboardType="number-pad"
+                autoCapitalize="none"
+                helperText="ITS number is fixed after creation."
+              />
+              <Input
+                label="Name"
+                value={form.name}
+                autoCapitalize="words"
+                placeholder="Enter full name"
+                onChangeText={name => setForm(current => ({ ...current, name }))}
+              />
+            </>
+          )}
+          <MultiSelect
+            label="Payment categories"
+            values={form.categoryIds}
+            options={categoryOptions}
+            onChange={categoryIds => setForm(current => ({ ...current, categoryIds }))}
+            placeholder={categoriesLoading ? "Loading payment categories..." : "Select payment categories"}
+            searchPlaceholder="Search payment categories"
+            disabled={categoriesLoading}
           />
           {!form.userId ? (
             <Input
@@ -348,6 +443,11 @@ export default function UserManagementScreen() {
                   </View>
                 </View>
                 <Text style={styles.meta}>ITS {item.itsNo || "-"} · User ID {item.userId}</Text>
+                {Array.isArray(item.categories) && item.categories.length ? (
+                  <Text style={styles.categoryMeta}>
+                    Categories: {item.categories.map(category => category.categoryName || `#${category.categoryId}`).join(", ")}
+                  </Text>
+                ) : null}
                 {item.lastLoginAt ? <Text style={styles.meta}>Last login {new Date(item.lastLoginAt).toLocaleString("en-IN")}</Text> : null}
               </View>
               <View style={[styles.rowActions, phone && styles.rowActionsPhone]}>
@@ -431,6 +531,7 @@ const styles = StyleSheet.create({
   nameLine: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: spacing.xs },
   userName: { color: colors.text, fontWeight: "900", fontSize: 16, flexShrink: 1 },
   meta: { color: colors.muted, fontSize: 12, marginTop: 3 },
+  categoryMeta: { color: colors.primaryStrong, fontSize: 11, fontWeight: "700", marginTop: 4 },
   badge: { backgroundColor: colors.primarySoft, borderRadius: radius.pill, paddingHorizontal: 9, paddingVertical: 4 },
   badgeInactive: { backgroundColor: colors.dangerSoft },
   badgeText: { color: colors.primaryStrong, fontSize: 10, fontWeight: "900" },

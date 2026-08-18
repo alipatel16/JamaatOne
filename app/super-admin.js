@@ -697,7 +697,7 @@ export default function SuperAdminScreen() {
       ) : activeTab === "aamil" ? (
         <AamilPanel jamaats={jamaats.filter(item => item.isActive !== false)} />
       ) : PAYMENT_SETUP_TABS[activeTab] ? (
-        <PaymentSetupPanel section={PAYMENT_SETUP_TABS[activeTab]} />
+        <PaymentSetupPanel section={PAYMENT_SETUP_TABS[activeTab]} jamaats={jamaats} />
       ) : (
         <ApiLogsPanel />
       )}

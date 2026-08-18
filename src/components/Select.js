@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { colors, radius, shadows, spacing, typography } from "../theme";
 
-export default function Select({ label, value, options = [], onChange, placeholder = "Select" }) {
+export default function Select({ label, value, options = [], onChange, placeholder = "Select", disabled = false }) {
   const { width } = useWindowDimensions();
   const phone = width < 600;
   const [visible, setVisible] = useState(false);
@@ -11,7 +11,7 @@ export default function Select({ label, value, options = [], onChange, placehold
   return (
     <View style={styles.wrapper}>
       {label ? <Text style={styles.label}>{label}</Text> : null}
-      <Pressable style={styles.input} onPress={() => setVisible(true)}>
+      <Pressable disabled={disabled} style={[styles.input, disabled && styles.disabled]} onPress={() => setVisible(true)}>
         <Text style={selected ? styles.value : styles.placeholder} numberOfLines={1}>
           {selected?.label || placeholder}
         </Text>
@@ -70,6 +70,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between"
   },
+  disabled: { opacity: 0.55 },
   value: { color: colors.text, flex: 1, fontFamily: typography.family },
   placeholder: { color: colors.muted, flex: 1, fontFamily: typography.family },
   chevron: { color: colors.muted, fontSize: 18, marginLeft: spacing.sm },
