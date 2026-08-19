@@ -57,7 +57,7 @@ export default function Select({ label, value, options = [], onChange, placehold
 }
 
 const styles = StyleSheet.create({
-  wrapper: { marginBottom: spacing.md },
+  wrapper: { width: "100%", maxWidth: "100%", marginBottom: spacing.md },
   label: { fontFamily: typography.family, marginBottom: spacing.xs, color: colors.textSoft, fontSize: 13, fontWeight: "800" },
   input: {
     minHeight: 52,

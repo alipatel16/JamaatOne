@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Switch,
   Text,
+  useWindowDimensions,
   View
 } from "react-native";
 
@@ -60,6 +61,8 @@ function Status({ active }) {
 }
 
 export default function PaymentSetupPanel({ section = "all", jamaats = [] }) {
+  const { width } = useWindowDimensions();
+  const phone = width < 600;
   const [categories, setCategories] = useState([]);
   const [subCategories, setSubCategories] = useState([]);
   const [fields, setFields] = useState([]);
@@ -304,8 +307,8 @@ export default function PaymentSetupPanel({ section = "all", jamaats = [] }) {
           {categoryForm.id ? <Button title="Cancel" compact variant="outline" onPress={() => setCategoryForm({ id: null, jamaatId: scopeJamaatId || "", name: "", isActive: true })} /> : null}
         </View>
         <View style={styles.list}>{categories.map(item => (
-          <View key={item.categoryId} style={styles.row}>
-            <View style={styles.flex}><Text style={styles.name}>{item.categoryName}</Text><Text style={styles.meta}>{item.jamaatName || `Jamaat ${item.jamaatId}`} · ID {item.categoryId}</Text></View>
+          <View key={item.categoryId} style={[styles.row, phone && styles.rowPhone]}>
+            <View style={[styles.flex, phone && styles.flexPhone]}><Text style={styles.name}>{item.categoryName}</Text><Text style={styles.meta}>{item.jamaatName || `Jamaat ${item.jamaatId}`} · ID {item.categoryId}</Text></View>
             <Status active={item.isActive !== false} />
             <Button title="Edit" compact variant="outline" onPress={() => setCategoryForm({ id: item.categoryId, jamaatId: String(item.jamaatId || ""), name: item.categoryName || "", isActive: item.isActive !== false })} />
             <Button title="Delete" compact variant="danger" onPress={() => remove("category", item.categoryId, item.categoryName)} />
@@ -322,8 +325,8 @@ export default function PaymentSetupPanel({ section = "all", jamaats = [] }) {
           {subForm.id ? <Button title="Cancel" compact variant="outline" onPress={() => setSubForm({ id: null, categoryId: "", name: "", isActive: true })} /> : null}
         </View>
         <View style={styles.list}>{subCategories.map(item => (
-          <View key={item.subCategoryId} style={styles.row}>
-            <View style={styles.flex}><Text style={styles.name}>{item.subCategoryName}</Text><Text style={styles.meta}>{item.jamaatName ? `${item.jamaatName} · ` : ""}{item.categoryName} · ID {item.subCategoryId}</Text></View>
+          <View key={item.subCategoryId} style={[styles.row, phone && styles.rowPhone]}>
+            <View style={[styles.flex, phone && styles.flexPhone]}><Text style={styles.name}>{item.subCategoryName}</Text><Text style={styles.meta}>{item.jamaatName ? `${item.jamaatName} · ` : ""}{item.categoryName} · ID {item.subCategoryId}</Text></View>
             <Status active={item.isActive !== false} />
             <Button title="Edit" compact variant="outline" onPress={() => setSubForm({ id: item.subCategoryId, categoryId: String(item.categoryId), name: item.subCategoryName || "", isActive: item.isActive !== false })} />
             <Button title="Delete" compact variant="danger" onPress={() => remove("subcategory", item.subCategoryId, item.subCategoryName)} />
@@ -344,8 +347,8 @@ export default function PaymentSetupPanel({ section = "all", jamaats = [] }) {
           {fieldForm.id ? <Button title="Cancel" compact variant="outline" onPress={() => setFieldForm({ id: null, subCategoryId: "", fieldName: "", fieldKey: "", fieldType: "TEXT", isRequired: false, displayOrder: "1", isActive: true })} /> : null}
         </View>
         <View style={styles.list}>{[...fields].sort((a,b) => Number(a.displayOrder||0)-Number(b.displayOrder||0)).map(item => (
-          <View key={item.fieldId} style={styles.row}>
-            <View style={styles.flex}><Text style={styles.name}>{item.fieldName}</Text><Text style={styles.meta}>{item.jamaatName ? `${item.jamaatName} · ` : ""}{item.categoryName} · {item.subCategoryName} · {item.fieldType} · order {item.displayOrder}</Text></View>
+          <View key={item.fieldId} style={[styles.row, phone && styles.rowPhone]}>
+            <View style={[styles.flex, phone && styles.flexPhone]}><Text style={styles.name}>{item.fieldName}</Text><Text style={styles.meta}>{item.jamaatName ? `${item.jamaatName} · ` : ""}{item.categoryName} · {item.subCategoryName} · {item.fieldType} · order {item.displayOrder}</Text></View>
             <Status active={item.isActive !== false} />
             <Button title="Edit" compact variant="outline" onPress={() => setFieldForm({ id: item.fieldId, subCategoryId: String(item.subCategoryId), fieldName: item.fieldName || "", fieldKey: item.fieldKey || "", fieldType: item.fieldType || "TEXT", isRequired: Boolean(item.isRequired), displayOrder: String(item.displayOrder ?? 0), isActive: item.isActive !== false })} />
             <Button title="Delete" compact variant="danger" onPress={() => remove("field", item.fieldId, item.fieldName)} />
@@ -361,8 +364,8 @@ export default function PaymentSetupPanel({ section = "all", jamaats = [] }) {
           {methodForm.id ? <Button title="Cancel" compact variant="outline" onPress={() => setMethodForm({ id: null, name: "", isActive: true })} /> : null}
         </View>
         <View style={styles.list}>{methods.map(item => (
-          <View key={item.paymentMethodId} style={styles.row}>
-            <View style={styles.flex}><Text style={styles.name}>{item.paymentMethodName}</Text><Text style={styles.meta}>ID {item.paymentMethodId}</Text></View>
+          <View key={item.paymentMethodId} style={[styles.row, phone && styles.rowPhone]}>
+            <View style={[styles.flex, phone && styles.flexPhone]}><Text style={styles.name}>{item.paymentMethodName}</Text><Text style={styles.meta}>ID {item.paymentMethodId}</Text></View>
             <Status active={item.isActive !== false} />
             <Button title="Edit" compact variant="outline" onPress={() => setMethodForm({ id: item.paymentMethodId, name: item.paymentMethodName || "", isActive: item.isActive !== false })} />
             <Button title="Delete" compact variant="danger" onPress={() => remove("payment method", item.paymentMethodId, item.paymentMethodName)} />
@@ -389,7 +392,9 @@ const styles = StyleSheet.create({
   switchLabel: { color: colors.text, fontWeight: "700" },
   list: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, marginTop: spacing.sm },
   row: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: spacing.sm, paddingVertical: spacing.md, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+  rowPhone: { alignItems: "stretch" },
   flex: { flex: 1, minWidth: 180, flexShrink: 1 },
+  flexPhone: { minWidth: "100%", width: "100%" },
   name: { color: colors.text, fontWeight: "800" },
   meta: { color: colors.muted, marginTop: 3, fontSize: 12 },
   badge: { borderRadius: 999, paddingHorizontal: 9, paddingVertical: 5 },

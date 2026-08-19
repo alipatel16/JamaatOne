@@ -182,12 +182,25 @@ export const liveEndpoints = {
       const query = params.toString();
       return `/api/Accounts/summary${query ? `?${query}` : ""}`;
     },
-    myCollectionSummary: ({ fromDate, toDate } = {}) => {
-      const params = new URLSearchParams();
-      if (fromDate) params.set("fromDate", String(fromDate));
-      if (toDate) params.set("toDate", String(toDate));
-      const query = params.toString();
-      return `/api/Accounts/my-collection-summary${query ? `?${query}` : ""}`;
+    collectionSummary: ({
+      categoryId,
+      subCategoryId,
+      fromDate,
+      toDate,
+      pageNumber = 1,
+      pageSize = 20
+    } = {}) => {
+      const params = new URLSearchParams({
+        pageNumber: String(pageNumber),
+        pageSize: String(pageSize)
+      });
+      const optional = { categoryId, subCategoryId, fromDate, toDate };
+      Object.entries(optional).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== "") {
+          params.set(key, String(value));
+        }
+      });
+      return `/api/Accounts/collection-summary?${params.toString()}`;
     },
 
     pagedPayments: ({

@@ -10,11 +10,13 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { accountsApi } from "../../src/api/accountsApi";
 import { mumineenApi } from "../../src/api/mumineenApi";
 import Button from "../../src/components/Button";
 import Card from "../../src/components/Card";
 import CashManagementPanel from "../../src/components/CashManagementPanel";
+import CollectionSummaryDashboard from "../../src/components/CollectionSummaryDashboard";
 import CustomerLedgerPanel from "../../src/components/CustomerLedgerPanel";
 import DayBookPanel from "../../src/components/DayBookPanel";
 import Input from "../../src/components/Input";
@@ -175,6 +177,50 @@ const money = (v) =>
     maximumFractionDigits: 2,
   }).format(Number(v || 0));
 
+function SummaryKpi({ icon, label, value, caption, tone = "primary", phone }) {
+  const toneStyle =
+    tone === "danger"
+      ? styles.summaryKpiDanger
+      : tone === "success"
+        ? styles.summaryKpiSuccess
+        : tone === "warning"
+          ? styles.summaryKpiWarning
+          : styles.summaryKpiPrimary;
+  const iconColor =
+    tone === "danger"
+      ? colors.danger
+      : tone === "success"
+        ? colors.success
+        : tone === "warning"
+          ? colors.warning
+          : colors.primaryStrong;
+
+  return (
+    <View style={[styles.summaryKpi, phone && styles.summaryKpiPhone, toneStyle]}>
+      <View style={styles.summaryKpiIcon}>
+        <MaterialCommunityIcons name={icon} size={20} color={iconColor} />
+      </View>
+      <Text style={styles.summaryKpiLabel}>{label}</Text>
+      <Text style={styles.summaryKpiValue} numberOfLines={1} adjustsFontSizeToFit>{money(value)}</Text>
+      {caption ? <Text style={styles.summaryKpiCaption}>{caption}</Text> : null}
+    </View>
+  );
+}
+
+function QuickMetric({ icon, label, value }) {
+  return (
+    <View style={styles.quickMetric}>
+      <View style={styles.quickMetricIcon}>
+        <MaterialCommunityIcons name={icon} size={18} color={colors.primaryStrong} />
+      </View>
+      <View style={styles.flex}>
+        <Text style={styles.quickMetricLabel}>{label}</Text>
+        <Text style={styles.quickMetricValue}>{value}</Text>
+      </View>
+    </View>
+  );
+}
+
 const toApiFromDate = value => value ? `${value}T00:00:00` : undefined;
 const toApiToDate = value => value ? `${value}T23:59:59.999` : undefined;
 
@@ -235,6 +281,7 @@ export default function AccountsScreen() {
   const [collectionSummary, setCollectionSummary] = useState(null);
   const [collectionLoading, setCollectionLoading] = useState(false);
   const [collectionError, setCollectionError] = useState("");
+  const [collectionUserPage, setCollectionUserPage] = useState(1);
   const [statsRange, setStatsRange] = useState("TODAY");
   const [statsFrom, setStatsFrom] = useState(today());
   const [statsTo, setStatsTo] = useState(today());
@@ -352,24 +399,37 @@ export default function AccountsScreen() {
     return () => { active = false; };
   }, [manager, tab, statsDates.from, statsDates.to]);
 
-  async function openCollectionDetails() {
-    setCollectionVisible(true);
+  async function loadCollectionDetails(pageNumber = 1, openModal = false) {
+    if (openModal) setCollectionVisible(true);
     setCollectionLoading(true);
     setCollectionError("");
     try {
-      const result = await accountsApi.getMyCollectionSummary({
+      const result = await accountsApi.getCollectionSummary({
         fromDate: toApiFromDate(statsDates.from),
-        toDate: toApiToDate(statsDates.to)
+        toDate: toApiToDate(statsDates.to),
+        pageNumber,
+        pageSize: 10
       });
-      setCollectionSummary(result || { byCategory: [], byBankAccount: [] });
+      setCollectionSummary(result || null);
+      setCollectionUserPage(Number(result?.byUser?.pageNumber || pageNumber || 1));
     } catch (requestError) {
-      setCollectionSummary(null);
+      if (!collectionSummary) setCollectionSummary(null);
       setCollectionError(
         requestError.message || "Unable to load collection details."
       );
     } finally {
       setCollectionLoading(false);
     }
+  }
+
+  function openCollectionDetails() {
+    setCollectionUserPage(1);
+    loadCollectionDetails(1, true);
+  }
+
+  function changeCollectionUserPage(pageNumber) {
+    if (!pageNumber || pageNumber === collectionUserPage || collectionLoading) return;
+    loadCollectionDetails(pageNumber, false);
   }
 
   const stats = useMemo(() => {
@@ -429,6 +489,7 @@ export default function AccountsScreen() {
             ["DAYBOOK", "Day book"],
             ["LEDGERS", "Customer ledgers"],
             ["MANAGEMENT", "Cash management"],
+            ["BANKING", "Banking"],
           ].map(([v, l]) => (
             <Pressable
               key={v}
@@ -564,57 +625,126 @@ export default function AccountsScreen() {
       ) : null}
       {manager && tab === "STATS" ? (
         <>
-          <View style={styles.rangeTabs}>
-            {[["TODAY", "Today"], ["MONTH", "This month"], ["CUSTOM", "Custom range"]].map(([value, label]) => (
-              <Pressable key={value} style={[styles.rangeTab, statsRange === value && styles.activeRangeTab]} onPress={() => setStatsRange(value)}>
-                <Text style={[styles.rangeTabText, statsRange === value && styles.activeRangeTabText]}>{label}</Text>
-              </Pressable>
-            ))}
+          <View style={styles.summaryControls}>
+            <Text style={styles.summaryControlLabel}>REPORTING PERIOD</Text>
+            <View style={styles.rangeTabs}>
+              {[["TODAY", "Today"], ["MONTH", "This month"], ["CUSTOM", "Custom range"]].map(([value, label]) => (
+                <Pressable key={value} style={[styles.rangeTab, statsRange === value && styles.activeRangeTab]} onPress={() => setStatsRange(value)}>
+                  <Text style={[styles.rangeTabText, statsRange === value && styles.activeRangeTabText]}>{label}</Text>
+                </Pressable>
+              ))}
+            </View>
           </View>
+
           {statsRange === "CUSTOM" ? (
-            <Card>
+            <Card style={styles.customRangeCard}>
               <View style={styles.filterRow}>
                 <View style={styles.filter}><DatePickerField label="From date" value={statsFrom} onChange={setStatsFrom} /></View>
                 <View style={styles.filter}><DatePickerField label="To date" value={statsTo} onChange={setStatsTo} /></View>
               </View>
             </Card>
           ) : null}
-          <View style={[styles.summaryToolbar, phone && styles.summaryToolbarPhone]}>
-            <Text style={styles.periodLabel}>{statsDates.from} to {statsDates.to}</Text>
+
+          <View style={[styles.summaryHero, phone && styles.summaryHeroPhone, narrow && styles.summaryHeroNarrow]}>
+            <View style={styles.summaryHeroIcon}>
+              <MaterialCommunityIcons name="chart-donut-variant" size={28} color="#FFFFFF" />
+            </View>
+            <View style={styles.flex}>
+              <Text style={styles.summaryEyebrow}>FINANCIAL OVERVIEW</Text>
+              <Text style={[styles.summaryHeroTitle, phone && styles.summaryHeroTitlePhone]}>Accounts summary</Text>
+              <Text style={styles.summaryHeroSubtitle}>
+                A focused view of collections, refunds, daybook movement and available balance.
+              </Text>
+              <View style={styles.summaryPeriodPill}>
+                <MaterialCommunityIcons name="calendar-month-outline" size={15} color="#E4EFEA" />
+                <Text style={styles.summaryPeriodText}>{statsDates.from} to {statsDates.to}</Text>
+              </View>
+            </View>
             <Pressable
               style={[styles.collectionButton, phone && styles.collectionButtonPhone]}
               onPress={openCollectionDetails}
             >
+              <MaterialCommunityIcons name="chart-box-outline" size={18} color="#FFFFFF" />
               <Text style={styles.collectionButtonText}>View More Payment Details</Text>
             </Pressable>
           </View>
+
           {summaryLoading ? (
             <ActivityIndicator color={colors.primary} style={{ marginVertical: spacing.lg }} />
           ) : (
             <>
-          <View style={styles.summary}>
-            <Card style={[styles.summaryCard, phone && styles.summaryCardPhone]}><Text>Money received</Text><Text style={styles.amount}>{money(stats.received)}</Text></Card>
-            <Card style={[styles.summaryCard, phone && styles.summaryCardPhone]}><Text>Total expenses</Text><Text style={[styles.amount, styles.debit]}>{money(stats.expenses)}</Text></Card>
-            <Card style={[styles.summaryCard, phone && styles.summaryCardPhone]}><Text>Balance</Text><Text style={styles.amount}>{money(stats.balance)}</Text></Card>
-          </View>
-          <Card>
-            <Text style={styles.sectionTitle}>Account breakdown</Text>
-            <View style={[styles.statLine, narrow && styles.statLineNarrow]}><Text style={styles.meta}>Member payments received</Text><Text style={styles.statValue}>{money(stats.paymentGross)}</Text></View>
-            <View style={[styles.statLine, narrow && styles.statLineNarrow]}><Text style={styles.meta}>Payment refunds</Text><Text style={[styles.statValue, styles.debit]}>-{money(stats.paymentRefunds)}</Text></View>
-            <View style={[styles.statLine, narrow && styles.statLineNarrow]}><Text style={styles.meta}>Net member payments</Text><Text style={styles.statValue}>{money(stats.paymentIncome)}</Text></View>
-            <View style={[styles.statLine, narrow && styles.statLineNarrow]}><Text style={styles.meta}>Other credit entries</Text><Text style={styles.statValue}>{money(stats.otherIncome)}</Text></View>
-            <View style={[styles.statLine, narrow && styles.statLineNarrow]}><Text style={styles.meta}>Expenses recorded</Text><Text style={[styles.statValue, styles.debit]}>{money(stats.expenses)}</Text></View>
-            <View style={[styles.statLine, styles.totalLine, narrow && styles.statLineNarrow]}><Text style={styles.paymentTitle}>Available balance</Text><Text style={styles.paymentAmount}>{money(stats.balance)}</Text></View>
-          </Card>
-          <Text style={styles.sectionTitle}>Date-wise summary</Text>
-          {dailyStats.length ? dailyStats.map((item) => (
-            <Card key={item.date}>
-              <Text style={styles.paymentTitle}>{item.date}</Text>
-              <View style={[styles.statLine, narrow && styles.statLineNarrow]}><Text style={styles.meta}>Received</Text><Text style={styles.statValue}>{money(item.received)}</Text></View>
-              <View style={[styles.statLine, narrow && styles.statLineNarrow]}><Text style={styles.meta}>Expenses</Text><Text style={[styles.statValue, styles.debit]}>{money(item.expenses)}</Text></View>
-              <View style={[styles.statLine, styles.totalLine, narrow && styles.statLineNarrow]}><Text style={styles.member}>Balance</Text><Text style={styles.paymentAmount}>{money(item.balance)}</Text></View>
-            </Card>
-          )) : <Card><Text style={styles.meta}>No account entries found for this period.</Text></Card>}
+              <View style={styles.summaryKpiGrid}>
+                <SummaryKpi phone={phone} icon="cash-multiple" label="Money received" value={stats.received} caption="Payments + other credits" />
+                <SummaryKpi phone={phone} icon="cash-clock" label="Member payments" value={stats.paymentIncome} caption="Net after refunds" tone="success" />
+                <SummaryKpi phone={phone} icon="bank-transfer" label="Total expenses" value={stats.expenses} caption="Daybook debits" tone="danger" />
+                <SummaryKpi phone={phone} icon="wallet-outline" label="Available balance" value={stats.balance} caption="Net position for period" tone="warning" />
+              </View>
+
+              <View style={[styles.summaryDetailGrid, phone && styles.summaryDetailGridPhone]}>
+                <Card style={styles.summaryDetailCard}>
+                  <View style={styles.summarySectionHeader}>
+                    <View style={styles.summarySectionIcon}>
+                      <MaterialCommunityIcons name="finance" size={20} color={colors.primaryStrong} />
+                    </View>
+                    <View style={styles.flex}>
+                      <Text style={styles.summarySectionTitle}>Account breakdown</Text>
+                      <Text style={styles.summarySectionSubtitle}>How the current balance is composed.</Text>
+                    </View>
+                  </View>
+                  <View style={[styles.statLine, narrow && styles.statLineNarrow]}><Text style={styles.meta}>Member payments received</Text><Text style={styles.statValue}>{money(stats.paymentGross)}</Text></View>
+                  <View style={[styles.statLine, narrow && styles.statLineNarrow]}><Text style={styles.meta}>Payment refunds</Text><Text style={[styles.statValue, styles.debit]}>-{money(stats.paymentRefunds)}</Text></View>
+                  <View style={[styles.statLine, narrow && styles.statLineNarrow]}><Text style={styles.meta}>Net member payments</Text><Text style={styles.statValue}>{money(stats.paymentIncome)}</Text></View>
+                  <View style={[styles.statLine, narrow && styles.statLineNarrow]}><Text style={styles.meta}>Other credit entries</Text><Text style={styles.statValue}>{money(stats.otherIncome)}</Text></View>
+                  <View style={[styles.statLine, narrow && styles.statLineNarrow]}><Text style={styles.meta}>Expenses recorded</Text><Text style={[styles.statValue, styles.debit]}>{money(stats.expenses)}</Text></View>
+                  <View style={[styles.statLine, styles.totalLine, narrow && styles.statLineNarrow]}><Text style={styles.paymentTitle}>Available balance</Text><Text style={styles.paymentAmount}>{money(stats.balance)}</Text></View>
+                </Card>
+
+                <Card style={styles.summaryDetailCard}>
+                  <View style={styles.summarySectionHeader}>
+                    <View style={styles.summarySectionIcon}>
+                      <MaterialCommunityIcons name="chart-box-outline" size={20} color={colors.primaryStrong} />
+                    </View>
+                    <View style={styles.flex}>
+                      <Text style={styles.summarySectionTitle}>Activity snapshot</Text>
+                      <Text style={styles.summarySectionSubtitle}>Useful counts behind the money movement.</Text>
+                    </View>
+                  </View>
+                  <View style={styles.quickMetricGrid}>
+                    <QuickMetric icon="account-group-outline" label="Mumineen paid" value={Number(summary?.quickCounts?.totalMuminsPaid || 0)} />
+                    <QuickMetric icon="bank-outline" label="Bank accounts" value={Number(summary?.quickCounts?.totalBankAccounts || 0)} />
+                    <QuickMetric icon="cash-multiple" label="Paid transactions" value={Number(summary?.paymentsOverview?.totalPaidCount || 0)} />
+                    <QuickMetric icon="cash-clock" label="Refunded payments" value={Number(summary?.paymentsOverview?.totalRefundedCount || 0)} />
+                    <QuickMetric icon="bank-transfer" label="Credit entries" value={Number(summary?.dayBookOverview?.totalCreditCount || 0)} />
+                    <QuickMetric icon="bank-transfer" label="Debit entries" value={Number(summary?.dayBookOverview?.totalDebitCount || 0)} />
+                  </View>
+                </Card>
+              </View>
+
+              <View style={styles.summaryDateHeader}>
+                <View style={styles.summarySectionIcon}>
+                  <MaterialCommunityIcons name="calendar-month-outline" size={20} color={colors.primaryStrong} />
+                </View>
+                <View style={styles.flex}>
+                  <Text style={styles.summarySectionTitle}>Date-wise summary</Text>
+                  <Text style={styles.summarySectionSubtitle}>Daily money received, expenses and resulting balance.</Text>
+                </View>
+              </View>
+
+              {dailyStats.length ? (
+                <View style={styles.dailyGrid}>
+                  {dailyStats.map(item => (
+                    <Card key={item.date} style={[styles.dailyCard, phone && styles.dailyCardPhone]}>
+                      <View style={styles.dailyDateRow}>
+                        <MaterialCommunityIcons name="calendar-outline" size={17} color={colors.primaryStrong} />
+                        <Text style={styles.dailyDate}>{item.date}</Text>
+                      </View>
+                      <View style={styles.dailyMetricRow}><Text style={styles.dailyMetricLabel}>Received</Text><Text style={styles.dailyReceived}>{money(item.received)}</Text></View>
+                      <View style={styles.dailyMetricRow}><Text style={styles.dailyMetricLabel}>Expenses</Text><Text style={styles.dailyExpense}>{money(item.expenses)}</Text></View>
+                      <View style={styles.dailyBalanceRow}><Text style={styles.dailyBalanceLabel}>Balance</Text><Text style={styles.dailyBalanceValue}>{money(item.balance)}</Text></View>
+                    </Card>
+                  ))}
+                </View>
+              ) : <Card><Text style={styles.meta}>No account entries found for this period.</Text></Card>}
             </>
           )}
         </>
@@ -665,7 +795,10 @@ export default function AccountsScreen() {
         <CustomerLedgerPanel />
       ) : null}
       {manager && tab === "MANAGEMENT" ? (
-        <CashManagementPanel canDelete={canDelete} />
+        <CashManagementPanel canDelete={canDelete} mode="overview" />
+      ) : null}
+      {manager && tab === "BANKING" ? (
+        <CashManagementPanel canDelete={canDelete} mode="banking" />
       ) : null}
 
       <Modal
@@ -676,9 +809,9 @@ export default function AccountsScreen() {
       >
         <View style={[styles.collectionBackdrop, phone && styles.collectionBackdropPhone]}>
           <View style={[styles.collectionSheet, phone && styles.collectionSheetPhone]}>
-            <View style={styles.collectionHeader}>
+            <View style={[styles.collectionHeader, phone && styles.collectionHeaderPhone]}>
               <View style={styles.flex}>
-                <Text style={styles.collectionEyebrow}>MY COLLECTION</Text>
+                <Text style={styles.collectionEyebrow}>COLLECTION INTELLIGENCE</Text>
                 <Text style={styles.collectionTitle}>Payment collection details</Text>
                 <Text style={styles.collectionSubtitle}>
                   {statsDates.from} to {statsDates.to}
@@ -693,60 +826,18 @@ export default function AccountsScreen() {
             </View>
 
             <ScrollView
-              contentContainerStyle={styles.collectionContent}
+              contentContainerStyle={[styles.collectionContent, phone && styles.collectionContentPhone]}
               showsVerticalScrollIndicator={false}
             >
-              {collectionLoading ? (
-                <View style={styles.collectionLoading}>
-                  <ActivityIndicator color={colors.primary} />
-                  <Text style={styles.collectionMeta}>Loading collection analytics...</Text>
-                </View>
-              ) : collectionError ? (
-                <Card>
-                  <Text style={styles.error}>{collectionError}</Text>
-                  <Button
-                    title="Retry"
-                    compact
-                    onPress={openCollectionDetails}
-                  />
-                </Card>
-              ) : (
-                <>
-                  <View style={[styles.collectionTotals, phone && styles.collectionTotalsPhone]}>
-                    <Card style={styles.collectionTotalCard}>
-                      <Text style={styles.collectionTotalLabel}>Collected</Text>
-                      <Text style={styles.collectionTotalValue}>
-                        {money(
-                          (Array.isArray(collectionSummary?.byCategory)
-                            ? collectionSummary.byCategory
-                            : []
-                          ).reduce((sum, item) => sum + Number(item.totalAmount || 0), 0)
-                        )}
-                      </Text>
-                    </Card>
-                    <Card style={styles.collectionTotalCard}>
-                      <Text style={styles.collectionTotalLabel}>Payments</Text>
-                      <Text style={styles.collectionTotalValue}>
-                        {(Array.isArray(collectionSummary?.byCategory)
-                          ? collectionSummary.byCategory
-                          : []
-                        ).reduce((sum, item) => sum + Number(item.paymentCount || 0), 0)}
-                      </Text>
-                    </Card>
-                  </View>
-
-                  <CollectionBreakdown
-                    title="Collection by payment category"
-                    items={Array.isArray(collectionSummary?.byCategory) ? collectionSummary.byCategory : []}
-                    nameKey="categoryName"
-                  />
-                  <CollectionBreakdown
-                    title="Collection by bank account"
-                    items={Array.isArray(collectionSummary?.byBankAccount) ? collectionSummary.byBankAccount : []}
-                    nameKey="bankAccountName"
-                  />
-                </>
-              )}
+              <CollectionSummaryDashboard
+                data={collectionSummary}
+                loading={collectionLoading}
+                error={collectionError}
+                onRetry={() => loadCollectionDetails(collectionUserPage, false)}
+                onUserPageChange={changeCollectionUserPage}
+                userPageLoading={collectionLoading}
+                showHeader={false}
+              />
             </ScrollView>
           </View>
         </View>
@@ -801,6 +892,74 @@ const styles = StyleSheet.create({
   activeTabText: { color: colors.primaryStrong },
   tabsPhone: { width: "100%", alignSelf: "stretch" },
   tabPhone: { flexGrow: 1, flexBasis: "46%", alignItems: "center", paddingHorizontal: spacing.sm },
+  summaryControls: { marginBottom: spacing.sm },
+  summaryControlLabel: { color: colors.muted, fontSize: 9, fontWeight: "900", letterSpacing: 1.2, marginBottom: spacing.xs },
+  customRangeCard: { marginBottom: spacing.md },
+  summaryHero: {
+    minHeight: 150,
+    borderRadius: radius.xl,
+    padding: spacing.lg,
+    backgroundColor: colors.primaryStrong,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    marginBottom: spacing.md
+  },
+  summaryHeroPhone: { padding: spacing.md, alignItems: "flex-start", flexWrap: "wrap" },
+  summaryHeroNarrow: { flexDirection: "column" },
+  summaryHeroIcon: {
+    width: 58,
+    height: 58,
+    borderRadius: 19,
+    backgroundColor: "rgba(255,255,255,.12)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,.16)",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0
+  },
+  summaryEyebrow: { color: "#D8E6E0", fontSize: 9, fontWeight: "900", letterSpacing: 1.4 },
+  summaryHeroTitle: { color: "#FFFFFF", fontSize: 28, fontWeight: "900", marginTop: 4 },
+  summaryHeroTitlePhone: { fontSize: 23 },
+  summaryHeroSubtitle: { color: "#DDE6E2", fontSize: 12, lineHeight: 18, marginTop: 5, maxWidth: 620 },
+  summaryPeriodPill: { alignSelf: "flex-start", flexDirection: "row", alignItems: "center", gap: 6, marginTop: spacing.sm, paddingHorizontal: 10, paddingVertical: 6, borderRadius: radius.pill, backgroundColor: "rgba(255,255,255,.10)" },
+  summaryPeriodText: { color: "#E4EFEA", fontSize: 10, fontWeight: "800" },
+  summaryKpiGrid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginBottom: spacing.md },
+  summaryKpi: { flex: 1, minWidth: 190, minHeight: 136, borderWidth: 1, borderRadius: radius.lg, padding: spacing.md, backgroundColor: colors.surface },
+  summaryKpiPhone: { minWidth: "47%", flexBasis: "47%" },
+  summaryKpiPrimary: { borderColor: colors.primarySoftStrong, backgroundColor: colors.surfaceTint },
+  summaryKpiSuccess: { borderColor: "#D8EADC", backgroundColor: colors.successSoft },
+  summaryKpiDanger: { borderColor: "#F3D6D6", backgroundColor: colors.dangerSoft },
+  summaryKpiWarning: { borderColor: "#F0DFC3", backgroundColor: colors.warningSoft },
+  summaryKpiIcon: { width: 36, height: 36, borderRadius: 12, backgroundColor: "rgba(255,255,255,.7)", alignItems: "center", justifyContent: "center", marginBottom: spacing.sm },
+  summaryKpiLabel: { color: colors.textSoft, fontSize: 11, fontWeight: "800" },
+  summaryKpiValue: { color: colors.text, fontSize: 21, fontWeight: "900", marginTop: 4 },
+  summaryKpiCaption: { color: colors.muted, fontSize: 10, marginTop: 4 },
+  summaryDetailGrid: { flexDirection: "row", alignItems: "stretch", gap: spacing.md, marginBottom: spacing.md },
+  summaryDetailGridPhone: { flexDirection: "column" },
+  summaryDetailCard: { flex: 1, minWidth: 0, marginBottom: 0 },
+  summarySectionHeader: { flexDirection: "row", alignItems: "center", gap: spacing.sm, marginBottom: spacing.sm },
+  summarySectionIcon: { width: 40, height: 40, borderRadius: 13, backgroundColor: colors.primarySoft, alignItems: "center", justifyContent: "center", flexShrink: 0 },
+  summarySectionTitle: { color: colors.text, fontSize: 18, fontWeight: "900" },
+  summarySectionSubtitle: { color: colors.muted, fontSize: 11, lineHeight: 16, marginTop: 3 },
+  quickMetricGrid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.xs },
+  quickMetric: { flexDirection: "row", alignItems: "center", gap: spacing.sm, flexBasis: "47%", minWidth: 150, padding: spacing.sm, borderRadius: radius.md, backgroundColor: colors.backgroundAlt },
+  quickMetricIcon: { width: 32, height: 32, borderRadius: 10, backgroundColor: colors.primarySoft, alignItems: "center", justifyContent: "center" },
+  quickMetricLabel: { color: colors.muted, fontSize: 10, fontWeight: "700" },
+  quickMetricValue: { color: colors.text, fontSize: 17, fontWeight: "900", marginTop: 2 },
+  summaryDateHeader: { flexDirection: "row", alignItems: "center", gap: spacing.sm, marginTop: spacing.xs, marginBottom: spacing.sm },
+  dailyGrid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  dailyCard: { flex: 1, minWidth: 250, marginBottom: 0 },
+  dailyCardPhone: { minWidth: "100%", width: "100%" },
+  dailyDateRow: { flexDirection: "row", alignItems: "center", gap: 6, paddingBottom: spacing.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+  dailyDate: { color: colors.text, fontSize: 14, fontWeight: "900" },
+  dailyMetricRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm, paddingVertical: spacing.xs },
+  dailyMetricLabel: { color: colors.muted, fontSize: 11 },
+  dailyReceived: { color: colors.success, fontSize: 12, fontWeight: "900" },
+  dailyExpense: { color: colors.danger, fontSize: 12, fontWeight: "900" },
+  dailyBalanceRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm, marginTop: spacing.xs, paddingTop: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
+  dailyBalanceLabel: { color: colors.text, fontSize: 12, fontWeight: "800" },
+  dailyBalanceValue: { color: colors.primaryStrong, fontSize: 15, fontWeight: "900" },
   summary: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   summaryCard: { minWidth: 190, flex: 1, marginHorizontal: 0, backgroundColor: colors.surfaceTint, borderColor: colors.primarySoftStrong },
   summaryCardPhone: { minWidth: "100%", width: "100%" },
@@ -963,7 +1122,7 @@ const styles = StyleSheet.create({
   ledgerLabel: { fontSize: 12, color: colors.muted, textAlign: "right" },
   summaryToolbar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md, marginBottom: spacing.md },
   summaryToolbarPhone: { flexDirection: "column", alignItems: "stretch", gap: spacing.sm },
-  collectionButton: { minHeight: 44, paddingHorizontal: spacing.md, borderRadius: radius.md, backgroundColor: colors.primaryStrong, alignItems: "center", justifyContent: "center" },
+  collectionButton: { minHeight: 46, paddingHorizontal: spacing.md, borderRadius: radius.md, backgroundColor: colors.accentStrong, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 7, flexShrink: 0 },
   collectionButtonPhone: { width: "100%" },
   collectionButtonText: { color: "#FFFFFF", fontWeight: "900", fontSize: 12 },
   rangeTabs: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: spacing.md },
@@ -981,15 +1140,17 @@ const styles = StyleSheet.create({
   bankCard: { flex: 1, minWidth: 180, marginHorizontal: 4 },
   collectionBackdrop: { flex: 1, backgroundColor: colors.overlay, justifyContent: "center", padding: spacing.md },
   collectionBackdropPhone: { justifyContent: "flex-end", padding: 0 },
-  collectionSheet: { width: "100%", maxWidth: 860, maxHeight: "90%", alignSelf: "center", backgroundColor: colors.surface, borderRadius: radius.xl, overflow: "hidden" },
+  collectionSheet: { width: "100%", maxWidth: 1120, maxHeight: "92%", alignSelf: "center", backgroundColor: colors.surface, borderRadius: radius.xl, overflow: "hidden" },
   collectionSheetPhone: { maxHeight: "94%", borderTopLeftRadius: 24, borderTopRightRadius: 24, borderBottomLeftRadius: 0, borderBottomRightRadius: 0 },
   collectionHeader: { flexDirection: "row", alignItems: "flex-start", gap: spacing.md, padding: spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.border },
+  collectionHeaderPhone: { padding: spacing.md },
   collectionEyebrow: { color: colors.accentStrong, fontSize: 9, fontWeight: "900", letterSpacing: 1.3 },
   collectionTitle: { color: colors.text, fontSize: 23, fontWeight: "900", marginTop: 4 },
   collectionSubtitle: { color: colors.muted, fontSize: 12, marginTop: 4 },
   collectionClose: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.backgroundAlt, alignItems: "center", justifyContent: "center" },
   collectionCloseText: { color: colors.textSoft, fontSize: 25, lineHeight: 27 },
-  collectionContent: { padding: spacing.lg, gap: spacing.lg },
+  collectionContent: { padding: spacing.lg },
+  collectionContentPhone: { padding: spacing.md },
   collectionLoading: { minHeight: 220, alignItems: "center", justifyContent: "center", gap: spacing.sm },
   collectionTotals: { flexDirection: "row", gap: spacing.sm },
   collectionTotalsPhone: { flexDirection: "column" },

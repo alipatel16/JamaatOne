@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { Modal, Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 import { colors, radius, spacing, typography } from "../theme";
@@ -44,6 +44,9 @@ function daysForMonth(year, month) {
 }
 
 export default function DatePickerField({ label = "Transaction date", value, onChange, required }) {
+  const { width } = useWindowDimensions();
+  const phone = width < 600;
+  const narrow = width < 380;
   const [visible, setVisible] = useState(false);
   const selectedDate = useMemo(() => parseDateValue(value), [value]);
   const [displayYear, setDisplayYear] = useState(selectedDate.getFullYear());
@@ -101,8 +104,8 @@ export default function DatePickerField({ label = "Transaction date", value, onC
         animationType="fade"
         onRequestClose={() => setVisible(false)}
       >
-        <Pressable style={styles.backdrop} onPress={() => setVisible(false)}>
-          <Pressable style={styles.calendar} onPress={() => {}}>
+        <Pressable style={[styles.backdrop, phone && styles.backdropPhone]} onPress={() => setVisible(false)}>
+          <Pressable style={[styles.calendar, phone && styles.calendarPhone]} onPress={() => {}}>
             <View style={styles.header}>
               <Pressable style={styles.navButton} onPress={() => moveMonth(-1)}>
                 <MaterialCommunityIcons name="chevron-left" size={24} color={colors.primaryStrong} />
@@ -130,6 +133,7 @@ export default function DatePickerField({ label = "Transaction date", value, onC
                     <Pressable
                       style={[
                         styles.dayButton,
+                        narrow && styles.dayButtonNarrow,
                         today && !selected && styles.todayButton,
                         selected && styles.selectedButton
                       ]}
@@ -189,6 +193,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: spacing.lg
   },
+  backdropPhone: { justifyContent: "flex-end", padding: 0 },
   calendar: {
     width: "100%",
     maxWidth: 390,
@@ -198,6 +203,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border
   },
+  calendarPhone: { maxWidth: "100%", borderBottomLeftRadius: 0, borderBottomRightRadius: 0, padding: spacing.md },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -236,6 +242,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center"
   },
+  dayButtonNarrow: { width: 32, height: 32 },
   todayButton: { borderWidth: 1, borderColor: colors.primary },
   selectedButton: { backgroundColor: colors.primary },
   dayText: { color: colors.text, fontFamily: typography.family, fontWeight: "700" },

@@ -23,7 +23,7 @@ export default function Input({ label, error, helperText, style, ...props }) {
 }
 
 const styles = StyleSheet.create({
-  wrapper: { marginBottom: spacing.md },
+  wrapper: { width: "100%", maxWidth: "100%", marginBottom: spacing.md },
   label: {
     fontFamily: typography.family,
     marginBottom: spacing.xs,
@@ -32,6 +32,7 @@ const styles = StyleSheet.create({
     fontWeight: "800"
   },
   input: {
+    width: "100%",
     minHeight: 52,
     borderWidth: 1,
     borderColor: colors.borderStrong,

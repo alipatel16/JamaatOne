@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Alert, StyleSheet, Text, View } from "react-native";
+import { Alert, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { Redirect } from "expo-router";
 
 import { apiRequest } from "../../src/api/client";
@@ -27,6 +27,8 @@ const initialForm = {
 };
 
 export default function AnnouncementsScreen() {
+  const { width } = useWindowDimensions();
+  const phone = width < 600;
   const { user } = useAuth();
   const manager = canManageAnnouncements(user);
   const canDelete = canDeleteJamaatData(user);
@@ -89,9 +91,9 @@ export default function AnnouncementsScreen() {
 
   return (
     <Screen>
-      <View style={styles.header}>
+      <View style={[styles.header, phone && styles.headerPhone]}>
         <View style={styles.headerCopy}>
-          <Text style={styles.title}>Announcements</Text>
+          <Text style={[styles.title, phone && styles.titlePhone]}>Announcements</Text>
           <Text style={styles.subtitle}>
             {activeCount}/5 active dashboard announcements
           </Text>
@@ -174,8 +176,8 @@ export default function AnnouncementsScreen() {
             {item.isActive ? " · Active" : " · Inactive"}
           </Text>
 
-          <View style={styles.actions}>
-            <View style={styles.action}>
+          <View style={[styles.actions, phone && styles.actionsPhone]}>
+            <View style={[styles.action, phone && styles.actionPhone]}>
               <Button
                 title="Edit"
                 onPress={() => {
@@ -192,7 +194,7 @@ export default function AnnouncementsScreen() {
               />
             </View>
             {canDelete ? (
-              <View style={styles.action}>
+              <View style={[styles.action, phone && styles.actionPhone]}>
                 <Button
                   title="Delete"
                   variant="danger"
@@ -226,12 +228,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: spacing.lg
   },
-  headerCopy: { flex: 1 },
+  headerCopy: { flex: 1, minWidth: 0 },
+  headerPhone: { alignItems: "flex-start" },
   title: {
     color: colors.text,
     fontSize: 26,
     fontWeight: "800"
   },
+  titlePhone: { fontSize: 23 },
   subtitle: {
     color: colors.muted,
     marginTop: 3
@@ -274,5 +278,7 @@ const styles = StyleSheet.create({
   action: {
     flex: 1,
     minWidth: 120
-  }
+  },
+  actionsPhone: { flexDirection: "column" },
+  actionPhone: { width: "100%", minWidth: "100%" }
 });

@@ -172,7 +172,7 @@ export default function MultiSelect({
 }
 
 const styles = StyleSheet.create({
-  wrapper: { marginBottom: spacing.md },
+  wrapper: { width: "100%", maxWidth: "100%", marginBottom: spacing.md },
   label: {
     fontFamily: typography.family,
     marginBottom: spacing.xs,

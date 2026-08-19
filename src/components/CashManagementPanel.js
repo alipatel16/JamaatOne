@@ -12,12 +12,14 @@ import {
   View
 } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 import { accountsApi } from "../api/accountsApi";
 import { colors, radius, shadows, spacing } from "../theme";
 import ActivityTimeline from "./ActivityTimeline";
 import Button from "./Button";
 import Card from "./Card";
+import CollectionSummaryDashboard from "./CollectionSummaryDashboard";
 import Input from "./Input";
 import Select from "./Select";
 
@@ -86,12 +88,18 @@ async function confirmAction(title, message, actionLabel = "Delete") {
   });
 }
 
-export default function CashManagementPanel({ canDelete = false }) {
+export default function CashManagementPanel({ canDelete = false, mode = "overview" }) {
   const { width } = useWindowDimensions();
   const phone = width < 600;
   const narrow = width < 380;
   const router = useRouter();
+  const showOverview = mode === "overview";
+  const showBanking = mode === "banking";
   const [cashSummary, setCashSummary] = useState([]);
+  const [collectionSummary, setCollectionSummary] = useState(null);
+  const [collectionLoading, setCollectionLoading] = useState(false);
+  const [collectionError, setCollectionError] = useState("");
+  const [collectionUserPage, setCollectionUserPage] = useState(1);
   const [bankAccounts, setBankAccounts] = useState([]);
   const [paymentMethods, setPaymentMethods] = useState([]);
   const [deposits, setDeposits] = useState([]);
@@ -111,13 +119,37 @@ export default function CashManagementPanel({ canDelete = false }) {
 
   useFocusEffect(
     useCallback(() => {
-      loadReferenceData();
-    }, [])
+      if (showOverview) {
+        loadCollectionSummary(1);
+      }
+      if (showBanking) {
+        loadReferenceData();
+      }
+    }, [showOverview, showBanking])
   );
 
   useEffect(() => {
-    loadDeposits(page);
-  }, [page]);
+    if (showBanking) loadDeposits(page);
+  }, [page, showBanking]);
+
+  async function loadCollectionSummary(pageNumber = 1) {
+    try {
+      setCollectionLoading(true);
+      setCollectionError("");
+      const result = await accountsApi.getCollectionSummary({
+        pageNumber,
+        pageSize: 10
+      });
+      setCollectionSummary(result || null);
+      setCollectionUserPage(Number(result?.byUser?.pageNumber || pageNumber || 1));
+    } catch (requestError) {
+      setCollectionError(
+        requestError.message || "Unable to load detailed collection summary."
+      );
+    } finally {
+      setCollectionLoading(false);
+    }
+  }
 
   async function loadReferenceData() {
     try {
@@ -323,52 +355,43 @@ export default function CashManagementPanel({ canDelete = false }) {
     <View>
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
-      <View style={[styles.summaryRow, phone && styles.summaryRowPhone]}>
-        <Card style={[styles.summaryCard, phone && styles.summaryCardPhone]}>
-          <Text style={styles.label}>Total cash received</Text>
-          <Text style={styles.amount}>{money(totals.collected)}</Text>
-        </Card>
-        <Card style={[styles.summaryCard, phone && styles.summaryCardPhone]}>
-          <Text style={styles.label}>Total cash deposited</Text>
-          <Text style={styles.amount}>{money(totals.deposited)}</Text>
-        </Card>
-        <Card style={[styles.summaryCard, phone && styles.summaryCardPhone]}>
-          <Text style={styles.label}>Pending to deposit</Text>
-          <Text style={[styles.amount, totals.pending > 0 && styles.pending]}>
-            {money(totals.pending)}
-          </Text>
-        </Card>
-      </View>
-
-      {cashSummary.length ? (
-        <Card>
-          <Text style={styles.sectionTitle}>Collection method summary</Text>
-          {cashSummary.map(item => (
-            <View key={String(item.paymentMethodId)} style={[styles.summaryLine, phone && styles.summaryLinePhone]}>
-              <View style={styles.flex}>
-                <Text style={styles.title}>{item.paymentMethodName || "Payment method"}</Text>
-                <Text style={styles.meta}>
-                  Collected {money(item.totalCollected)} · Deposited {money(item.totalDeposited)}
-                </Text>
-              </View>
-              <Text
-                style={[
-                  styles.lineAmount,
-                  phone && styles.lineAmountPhone,
-                  Number(item.pendingToDeposit) > 0 && styles.pending
-                ]}
-              >
-                {money(item.pendingToDeposit)} pending
-              </Text>
-            </View>
-          ))}
-        </Card>
+      {showOverview ? (
+        <CollectionSummaryDashboard
+          data={collectionSummary}
+          loading={collectionLoading}
+          error={collectionError}
+          onRetry={() => loadCollectionSummary(collectionUserPage)}
+          onUserPageChange={pageNumber => {
+            if (pageNumber !== collectionUserPage && !collectionLoading) {
+              loadCollectionSummary(pageNumber);
+            }
+          }}
+          userPageLoading={collectionLoading}
+          title="Cash position & pending ownership"
+          subtitle="Track every collection category, bank balance, deposit flow and pending amount from one place."
+          collapsibleSections
+          defaultCollapsed
+        />
       ) : null}
+
+      {showBanking ? (<>
+      <View style={[styles.bankingHero, phone && styles.bankingHeroPhone, shadows.card]}>
+        <View style={styles.bankingHeroIcon}>
+          <MaterialCommunityIcons name="bank-transfer" size={27} color="#FFFFFF" />
+        </View>
+        <View style={styles.flex}>
+          <Text style={styles.bankingHeroEyebrow}>BANKING OPERATIONS</Text>
+          <Text style={[styles.bankingHeroTitle, phone && styles.bankingHeroTitlePhone]}>Accounts & deposits</Text>
+          <Text style={styles.bankingHeroSubtitle}>
+            Configure bank accounts and record deposits without losing the cash-position dashboard above.
+          </Text>
+        </View>
+      </View>
 
       <Pressable onPress={() => router.push("/bank-accounts")}>
         <View style={[styles.manageCard, phone && styles.manageCardPhone, shadows.card]}>
           <View style={styles.manageIcon}>
-            <Text style={styles.manageIconText}>₹</Text>
+            <MaterialCommunityIcons name="bank-outline" size={24} color={colors.primaryStrong} />
           </View>
           <View style={styles.flex}>
             <Text style={styles.manageEyebrow}>BANK SETUP</Text>
@@ -379,7 +402,7 @@ export default function CashManagementPanel({ canDelete = false }) {
                 : "Add a bank account before recording deposits."}
             </Text>
           </View>
-          <Text style={styles.manageArrow}>›</Text>
+          <MaterialCommunityIcons name="chevron-right" size={26} color={colors.primaryStrong} />
         </View>
       </Pressable>
 
@@ -469,6 +492,7 @@ export default function CashManagementPanel({ canDelete = false }) {
           onPress={() => setPage(value => value + 1)}
         />
       </View>
+      </>) : null}
 
       <Modal
         visible={depositModal}
@@ -585,6 +609,32 @@ export default function CashManagementPanel({ canDelete = false }) {
 
 const styles = StyleSheet.create({
   flex: { flex: 1, minWidth: 0 },
+  bankingHero: {
+    minHeight: 126,
+    borderRadius: radius.xl,
+    padding: spacing.lg,
+    backgroundColor: colors.primaryStrong,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    marginBottom: spacing.md
+  },
+  bankingHeroPhone: { padding: spacing.md, alignItems: "flex-start" },
+  bankingHeroIcon: {
+    width: 54,
+    height: 54,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,.12)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,.16)",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0
+  },
+  bankingHeroEyebrow: { color: "#D8E6E0", fontSize: 9, fontWeight: "900", letterSpacing: 1.3 },
+  bankingHeroTitle: { color: "#FFFFFF", fontSize: 25, fontWeight: "900", marginTop: 4 },
+  bankingHeroTitlePhone: { fontSize: 21 },
+  bankingHeroSubtitle: { color: "#DDE6E2", fontSize: 12, lineHeight: 18, marginTop: 5 },
   row: { flexDirection: "row", gap: spacing.md, alignItems: "flex-start" },
   rowPhone: { flexWrap: "wrap", gap: spacing.sm },
   summaryRow: { flexDirection: "row", flexWrap: "wrap", marginHorizontal: -4 },

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Alert, StyleSheet, Text, View } from "react-native";
+import { Alert, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { Redirect, router, useLocalSearchParams } from "expo-router";
 
 import { mumineenApi } from "../../src/api/mumineenApi";
@@ -75,6 +75,8 @@ function ReadOnlyRow({ label, value }) {
 }
 
 export default function UserDetailScreen() {
+  const { width } = useWindowDimensions();
+  const phone = width < 600;
   const { user } = useAuth();
   const canBrowse = canAccessMumineen(user);
   const canManage = canManageMumineen(user);
@@ -186,9 +188,9 @@ export default function UserDetailScreen() {
 
   return (
     <Screen>
-      <View style={styles.header}>
-        <View style={styles.headerContent}>
-          <Text style={styles.title}>
+      <View style={[styles.header, phone && styles.headerPhone]}>
+        <View style={[styles.headerContent, phone && styles.headerContentPhone]}>
+          <Text style={[styles.title, phone && styles.titlePhone]}>
             {mumin.fullName || mumin.firstName || "Mumin details"}
           </Text>
           <Text style={styles.subtitle}>
@@ -457,13 +459,17 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg
   },
   headerContent: {
-    flex: 1
+    flex: 1,
+    minWidth: 220
   },
+  headerPhone: { alignItems: "stretch" },
+  headerContentPhone: { minWidth: "100%", width: "100%" },
   title: {
     color: colors.text,
     fontSize: 24,
     fontWeight: "800"
   },
+  titlePhone: { fontSize: 22 },
   subtitle: {
     color: colors.muted,
     marginTop: 3

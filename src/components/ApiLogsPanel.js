@@ -6,6 +6,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View
 } from "react-native";
 
@@ -119,6 +120,9 @@ function DetailBlock({ label, value, mono = false }) {
 }
 
 export default function ApiLogsPanel() {
+  const { width } = useWindowDimensions();
+  const phone = width < 600;
+  const narrow = width < 380;
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [appliedFilters, setAppliedFilters] = useState(EMPTY_FILTERS);
   const [items, setItems] = useState([]);
@@ -181,7 +185,7 @@ export default function ApiLogsPanel() {
 
   return (
     <View style={styles.root}>
-      <View style={styles.headingRow}>
+      <View style={[styles.headingRow, phone && styles.headingRowPhone]}>
         <View style={styles.flex}>
           <Text style={styles.eyebrow}>AUDIT TRAIL</Text>
           <Text style={styles.title}>API Logs</Text>
@@ -198,9 +202,9 @@ export default function ApiLogsPanel() {
         />
       </View>
 
-      <Card style={styles.filtersCard}>
-        <View style={styles.filterGrid}>
-          <View style={styles.filterWide}>
+      <Card style={[styles.filtersCard, phone && styles.filtersCardPhone]}>
+        <View style={[styles.filterGrid, phone && styles.filterGridPhone]}>
+          <View style={[styles.filterWide, phone && styles.filterItemPhone]}>
             <Input
               label="Search"
               value={filters.search}
@@ -208,7 +212,7 @@ export default function ApiLogsPanel() {
               placeholder="Endpoint, path, ITS, error..."
             />
           </View>
-          <View style={styles.filterItem}>
+          <View style={[styles.filterItem, phone && styles.filterItemPhone]}>
             <Input
               label="User ID"
               value={filters.userId}
@@ -217,7 +221,7 @@ export default function ApiLogsPanel() {
               placeholder="Any user"
             />
           </View>
-          <View style={styles.filterItem}>
+          <View style={[styles.filterItem, phone && styles.filterItemPhone]}>
             <Select
               label="HTTP method"
               value={filters.method}
@@ -225,7 +229,7 @@ export default function ApiLogsPanel() {
               onChange={method => setFilters(current => ({ ...current, method }))}
             />
           </View>
-          <View style={styles.filterItem}>
+          <View style={[styles.filterItem, phone && styles.filterItemPhone]}>
             <Select
               label="Result"
               value={filters.isSuccess}
@@ -233,7 +237,7 @@ export default function ApiLogsPanel() {
               onChange={isSuccess => setFilters(current => ({ ...current, isSuccess }))}
             />
           </View>
-          <View style={styles.filterItem}>
+          <View style={[styles.filterItem, phone && styles.filterItemPhone]}>
             <Input
               label="From date"
               value={filters.fromDate}
@@ -241,7 +245,7 @@ export default function ApiLogsPanel() {
               placeholder="YYYY-MM-DD"
             />
           </View>
-          <View style={styles.filterItem}>
+          <View style={[styles.filterItem, phone && styles.filterItemPhone]}>
             <Input
               label="To date"
               value={filters.toDate}
@@ -277,7 +281,7 @@ export default function ApiLogsPanel() {
       {items.map(item => (
         <Pressable key={String(item.logId)} onPress={() => setSelected(item)}>
           <Card style={styles.logCard}>
-            <View style={styles.logTopRow}>
+            <View style={[styles.logTopRow, narrow && styles.logTopRowNarrow]}>
               <View style={styles.methodPill}>
                 <Text style={styles.methodText}>{item.requestMethod || "-"}</Text>
               </View>
@@ -306,7 +310,7 @@ export default function ApiLogsPanel() {
         </Pressable>
       ))}
 
-      <View style={styles.pagination}>
+      <View style={[styles.pagination, narrow && styles.paginationNarrow]}>
         <Button
           title="Previous"
           compact
@@ -330,9 +334,9 @@ export default function ApiLogsPanel() {
         animationType="fade"
         onRequestClose={() => setSelected(null)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalHeader}>
+        <View style={[styles.modalOverlay, phone && styles.modalOverlayPhone]}>
+          <View style={[styles.modalCard, phone && styles.modalCardPhone]}>
+            <View style={[styles.modalHeader, phone && styles.modalHeaderPhone]}>
               <View style={styles.flex}>
                 <Text style={styles.modalTitle}>API Log #{selected?.logId}</Text>
                 <Text style={styles.modalSubtitle}>
@@ -344,7 +348,7 @@ export default function ApiLogsPanel() {
               </Pressable>
             </View>
 
-            <ScrollView contentContainerStyle={styles.modalBody}>
+            <ScrollView contentContainerStyle={[styles.modalBody, phone && styles.modalBodyPhone]}>
               <View style={styles.detailSummary}>
                 <StatusBadge success={selected?.isSuccess} statusCode={selected?.statusCode} />
                 <Text style={styles.meta}>{formatDateTime(selected?.createdAt)}</Text>
@@ -385,6 +389,7 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     marginBottom: spacing.xs
   },
+  headingRowPhone: { flexDirection: "column", alignItems: "stretch" },
   eyebrow: {
     color: colors.accent,
     fontSize: 10,
@@ -394,9 +399,12 @@ const styles = StyleSheet.create({
   title: { color: colors.text, fontSize: 26, fontWeight: "900", marginTop: 3 },
   description: { color: colors.muted, marginTop: spacing.xs, lineHeight: 20 },
   filtersCard: { padding: spacing.md },
+  filtersCardPhone: { padding: spacing.sm },
   filterGrid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.md },
+  filterGridPhone: { flexDirection: "column", gap: 0 },
   filterWide: { flexGrow: 2, flexBasis: 280, minWidth: 240 },
   filterItem: { flexGrow: 1, flexBasis: 170, minWidth: 150 },
+  filterItemPhone: { flexBasis: "auto", minWidth: 0, width: "100%" },
   filterActions: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   errorCard: { borderColor: colors.danger },
   errorText: { color: colors.danger, fontWeight: "700" },
@@ -409,6 +417,7 @@ const styles = StyleSheet.create({
   summaryText: { color: colors.muted, fontWeight: "700" },
   logCard: { marginBottom: spacing.sm },
   logTopRow: { flexDirection: "row", flexWrap: "wrap", alignItems: "flex-start", gap: spacing.sm },
+  logTopRowNarrow: { alignItems: "stretch" },
   methodPill: {
     minWidth: 58,
     borderRadius: radius.pill,
@@ -439,6 +448,7 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     marginTop: spacing.md
   },
+  paginationNarrow: { gap: spacing.xs },
   pageLabel: { color: colors.text, fontWeight: "800", minWidth: 110, textAlign: "center" },
   modalOverlay: {
     flex: 1,
@@ -447,6 +457,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     padding: spacing.md
   },
+  modalOverlayPhone: { justifyContent: "flex-end", padding: 0 },
   modalCard: {
     width: "100%",
     maxWidth: 850,
@@ -455,6 +466,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     overflow: "hidden"
   },
+  modalCardPhone: { maxHeight: "94%", borderTopLeftRadius: 24, borderTopRightRadius: 24, borderBottomLeftRadius: 0, borderBottomRightRadius: 0 },
   modalHeader: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -462,6 +474,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border
   },
+  modalHeaderPhone: { padding: spacing.md },
   modalTitle: { color: colors.text, fontSize: 21, fontWeight: "900" },
   modalSubtitle: { color: colors.muted, marginTop: 4 },
   closeButton: {
@@ -475,6 +488,7 @@ const styles = StyleSheet.create({
   },
   closeText: { color: colors.text, fontSize: 25, lineHeight: 27 },
   modalBody: { padding: spacing.lg, paddingBottom: spacing.xl },
+  modalBodyPhone: { padding: spacing.md, paddingBottom: spacing.xl },
   detailSummary: { flexDirection: "row", flexWrap: "wrap", gap: spacing.md, alignItems: "center", marginBottom: spacing.md },
   detailBlock: { marginBottom: spacing.lg },
   detailLabel: { color: colors.muted, fontSize: 11, fontWeight: "800", textTransform: "uppercase", letterSpacing: .7 },

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { Redirect } from "expo-router";
 
 import { apiRequest } from "../../src/api/client";
@@ -13,6 +13,8 @@ import { useAuth } from "../../src/context/AuthContext";
 import { colors, spacing } from "../../src/theme";
 
 export default function FmbScreen() {
+  const { width } = useWindowDimensions();
+  const phone = width < 600;
   const { user } = useAuth();
   const manager = canManageFmb(user);
 
@@ -93,7 +95,7 @@ export default function FmbScreen() {
   return (
     <Screen>
       {manager ? (
-        <View style={styles.tabs}>
+        <View style={[styles.tabs, phone && styles.tabsPhone]}>
           <Tab id="my" label="My Thali" selected={tab} onSelect={setTab} />
           <Tab id="members" label="Members" selected={tab} onSelect={setTab} />
           <Tab id="pauses" label="Pauses" selected={tab} onSelect={setTab} />
@@ -104,7 +106,7 @@ export default function FmbScreen() {
 
       {tab === "my" ? (
         <>
-          <Text style={styles.title}>My FMB Thali</Text>
+          <Text style={[styles.title, phone && styles.titlePhone]}>My FMB Thali</Text>
           <Card>
             <Text style={styles.status}>
               {profile?.takesFmb ? "Active FMB member" : "Not enrolled for FMB"}
@@ -150,7 +152,7 @@ export default function FmbScreen() {
 
       {tab === "members" ? (
         <>
-          <Text style={styles.title}>FMB Membership</Text>
+          <Text style={[styles.title, phone && styles.titlePhone]}>FMB Membership</Text>
           <Text style={styles.muted}>
             {members.filter((member) => member.takesFmb).length} of{" "}
             {members.length} members currently take FMB.
@@ -158,8 +160,8 @@ export default function FmbScreen() {
 
           {members.map((member) => (
             <Card key={member.id}>
-              <View style={styles.row}>
-                <View style={styles.memberDetails}>
+              <View style={[styles.row, phone && styles.rowPhone]}>
+                <View style={[styles.memberDetails, phone && styles.memberDetailsPhone]}>
                   <Text style={styles.name}>{member.name}</Text>
                   <Text style={styles.mutedText}>
                     ITS {member.itsId} ·{" "}
@@ -184,7 +186,7 @@ export default function FmbScreen() {
 
       {tab === "pauses" ? (
         <>
-          <Text style={styles.title}>Thali Pause Register</Text>
+          <Text style={[styles.title, phone && styles.titlePhone]}>Thali Pause Register</Text>
           {pauses.map((pause) => (
             <Card key={pause.id}>
               <Text style={styles.name}>{pause.userName}</Text>
@@ -229,6 +231,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.backgroundAlt,
     borderRadius: 16,
   },
+  tabsPhone: { flexWrap: "wrap" },
   tab: {
     flex: 1,
     padding: 11,
@@ -254,6 +257,7 @@ const styles = StyleSheet.create({
     color: colors.text,
     marginBottom: spacing.md,
   },
+  titlePhone: { fontSize: 21 },
   status: {
     fontSize: 18,
     fontWeight: "900",
@@ -278,6 +282,8 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 210,
   },
+  rowPhone: { alignItems: "stretch" },
+  memberDetailsPhone: { minWidth: "100%", width: "100%" },
   name: {
     fontWeight: "900",
     fontSize: 16,

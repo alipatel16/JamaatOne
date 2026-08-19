@@ -73,6 +73,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     borderWidth: 1,
     paddingHorizontal: spacing.lg,
+    maxWidth: "100%",
     justifyContent: "center",
     alignItems: "center"
   },
@@ -84,7 +85,9 @@ const styles = StyleSheet.create({
     fontFamily: typography.family,
     fontSize: 14,
     fontWeight: "800",
-    letterSpacing: 0.1
+    letterSpacing: 0.1,
+    textAlign: "center",
+    flexShrink: 1
   },
   pressed: {
     opacity: 0.84,

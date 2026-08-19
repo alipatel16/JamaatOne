@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 
 import { colors, radius, spacing } from "../theme";
@@ -287,6 +287,9 @@ export default function ActivityTimeline({
   getKey,
   formatDateTime
 }) {
+  const { width } = useWindowDimensions();
+  const phone = width < 600;
+  const narrow = width < 380;
   const normalizedEntries = useMemo(
     () =>
       (Array.isArray(entries) ? entries : []).map((entry, index) => ({
@@ -321,16 +324,16 @@ export default function ActivityTimeline({
         return (
           <View
             key={getKey ? getKey(entry, index) : String(entry?.id || `${entry?.performedAt || "activity"}-${index}`)}
-            style={styles.timelineRow}
+            style={[styles.timelineRow, phone && styles.timelineRowPhone]}
           >
-            <View style={styles.rail}>
-              <View style={[styles.dot, { backgroundColor: tone.background, borderColor: tone.foreground }]}> 
+            <View style={[styles.rail, phone && styles.railPhone]}>
+              <View style={[styles.dot, phone && styles.dotPhone, { backgroundColor: tone.background, borderColor: tone.foreground }]}> 
                 <MaterialCommunityIcons name={presentation.icon} size={16} color={tone.foreground} />
               </View>
               {!isLast ? <View style={styles.line} /> : null}
             </View>
 
-            <View style={styles.content}>
+            <View style={[styles.content, phone && styles.contentPhone]}>
               <View style={styles.eventHeader}>
                 <View style={[styles.actionBadge, { backgroundColor: tone.background }]}> 
                   <Text style={[styles.actionText, { color: tone.foreground }]}>{presentation.label}</Text>
@@ -338,7 +341,7 @@ export default function ActivityTimeline({
                 <Text style={styles.entityText}>{entityLabel}</Text>
               </View>
 
-              <View style={styles.metaRow}>
+              <View style={[styles.metaRow, narrow && styles.metaRowNarrow]}>
                 <MaterialCommunityIcons name="account-outline" size={15} color={colors.muted} />
                 <Text style={styles.metaText}>{actor}</Text>
                 <Text style={styles.metaDot}>•</Text>
@@ -375,7 +378,9 @@ export default function ActivityTimeline({
 const styles = StyleSheet.create({
   timeline: { width: "100%" },
   timelineRow: { flexDirection: "row", alignItems: "stretch" },
+  timelineRowPhone: { alignItems: "flex-start" },
   rail: { width: 38, alignItems: "center" },
+  railPhone: { width: 32 },
   dot: {
     width: 32,
     height: 32,
@@ -385,13 +390,16 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     zIndex: 2
   },
+  dotPhone: { width: 28, height: 28, borderRadius: 14 },
   line: { flex: 1, width: 2, backgroundColor: colors.border, minHeight: 24 },
   content: { flex: 1, minWidth: 0, paddingLeft: spacing.sm, paddingBottom: spacing.lg },
+  contentPhone: { paddingLeft: spacing.xs, paddingBottom: spacing.md },
   eventHeader: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: spacing.xs },
   actionBadge: { borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 5 },
   actionText: { fontSize: 12, fontWeight: "800" },
   entityText: { color: colors.text, fontSize: 15, fontWeight: "800" },
   metaRow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 5, marginTop: 7 },
+  metaRowNarrow: { alignItems: "flex-start" },
   metaText: { color: colors.muted, fontSize: 12 },
   metaDot: { color: colors.borderStrong, fontSize: 12, marginHorizontal: 1 },
   changesCard: {

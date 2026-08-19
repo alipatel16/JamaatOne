@@ -63,6 +63,13 @@ function initials(value) {
   return words.slice(0, 2).map(word => word[0]?.toUpperCase()).join("") || "BK";
 }
 
+const money = value =>
+  new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 2
+  }).format(Number(value || 0));
+
 export default function BankAccountsPanel({ canManage = false, canDelete = false }) {
   const { width } = useWindowDimensions();
   const wide = width >= 820;
@@ -153,6 +160,10 @@ export default function BankAccountsPanel({ canManage = false, canDelete = false
       setError("Bank account name and bank name are required.");
       return;
     }
+    if (!editingId && !Number.isFinite(Number(form.openingBalance))) {
+      setError("Enter a valid opening balance.");
+      return;
+    }
 
     try {
       setSaving(true);
@@ -206,7 +217,7 @@ export default function BankAccountsPanel({ canManage = false, canDelete = false
     <View>
       <View style={[styles.hero, phone && styles.heroPhone, narrow && styles.heroNarrow]}>
         <View style={styles.heroCopy}>
-          <Text style={styles.eyebrow}>CASH MANAGEMENT</Text>
+          <Text style={styles.eyebrow}>BANKING</Text>
           <Text style={styles.heroTitle}>Bank accounts</Text>
           <Text style={styles.heroSubtitle}>
             Manage the Jamaat bank accounts available when recording cash deposits.
@@ -275,6 +286,29 @@ export default function BankAccountsPanel({ canManage = false, canDelete = false
                 <View style={styles.detailBlock}>
                   <Text style={styles.detailLabel}>Branch</Text>
                   <Text style={styles.detailValue}>{item.branchName || "-"}</Text>
+                </View>
+              </View>
+
+              <View style={styles.balanceStrip}>
+                <View style={styles.balanceItem}>
+                  <Text style={styles.balanceLabel}>Opening balance</Text>
+                  <Text style={styles.balanceValue}>{money(item.openingBalance)}</Text>
+                </View>
+                <View style={styles.balanceItem}>
+                  <Text style={styles.balanceLabel}>Current balance</Text>
+                  <Text style={[styles.balanceValue, styles.currentBalance]}>{money(item.currentBalance)}</Text>
+                </View>
+                <View style={styles.balanceItem}>
+                  <Text style={styles.balanceLabel}>Pending cash</Text>
+                  <Text style={[styles.balanceValue, Number(item.pendingCashBalance) > 0 && styles.pendingBalance]}>
+                    {money(item.pendingCashBalance)}
+                  </Text>
+                </View>
+                <View style={styles.balanceItem}>
+                  <Text style={styles.balanceLabel}>Pending cheque</Text>
+                  <Text style={[styles.balanceValue, Number(item.pendingChequeBalance) > 0 && styles.pendingBalance]}>
+                    {money(item.pendingChequeBalance)}
+                  </Text>
                 </View>
               </View>
 
@@ -395,6 +429,18 @@ export default function BankAccountsPanel({ canManage = false, canDelete = false
                 value={form.branchName}
                 onChangeText={branchName => setForm(value => ({ ...value, branchName }))}
               />
+              {!editingId ? (
+                <Input
+                  label="Opening balance"
+                  value={form.openingBalance}
+                  keyboardType="decimal-pad"
+                  placeholder="0.00"
+                  helperText="Enter the account balance before JamaatOne starts tracking transactions for this bank account."
+                  onChangeText={openingBalance =>
+                    setForm(value => ({ ...value, openingBalance }))
+                  }
+                />
+              ) : null}
               <MultiSelect
                 label="Payment categories"
                 values={form.categoryIds}
@@ -517,6 +563,12 @@ const styles = StyleSheet.create({
   detailBlock: { minWidth: 130, flex: 1 },
   detailLabel: { color: colors.muted, fontSize: 11 },
   detailValue: { color: colors.text, fontWeight: "700", marginTop: 3, fontSize: 13 },
+  balanceStrip: { flexDirection: "row", flexWrap: "wrap", gap: spacing.xs, marginTop: spacing.md },
+  balanceItem: { flex: 1, minWidth: 120, padding: spacing.sm, borderRadius: radius.md, backgroundColor: colors.backgroundAlt },
+  balanceLabel: { color: colors.muted, fontSize: 10, fontWeight: "800" },
+  balanceValue: { color: colors.text, fontSize: 12, fontWeight: "900", marginTop: 3 },
+  currentBalance: { color: colors.primaryStrong },
+  pendingBalance: { color: colors.danger },
   categoryBox: { marginTop: spacing.md, paddingTop: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
   categoryChips: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: spacing.xs },
   categoryChip: { backgroundColor: colors.primarySoft, borderRadius: radius.pill, paddingHorizontal: 9, paddingVertical: 5 },

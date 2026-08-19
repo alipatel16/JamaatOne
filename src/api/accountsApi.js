@@ -345,8 +345,12 @@ export const accountsApi = {
   getAccountsSummary(filters = {}) {
     return liveApiRequest(liveEndpoints.accounts.summary(filters));
   },
+  getCollectionSummary(filters = {}) {
+    return liveApiRequest(liveEndpoints.accounts.collectionSummary(filters));
+  },
+  // Compatibility alias for callers from the previous collection-summary implementation.
   getMyCollectionSummary(filters = {}) {
-    return liveApiRequest(liveEndpoints.accounts.myCollectionSummary(filters));
+    return liveApiRequest(liveEndpoints.accounts.collectionSummary(filters));
   },
 
   // Legacy aliases retained for older callers.
