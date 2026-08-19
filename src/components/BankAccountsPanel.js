@@ -160,7 +160,7 @@ export default function BankAccountsPanel({ canManage = false, canDelete = false
       setError("Bank account name and bank name are required.");
       return;
     }
-    if (!editingId && !Number.isFinite(Number(form.openingBalance))) {
+    if (!Number.isFinite(Number(form.openingBalance))) {
       setError("Enter a valid opening balance.");
       return;
     }
@@ -429,18 +429,20 @@ export default function BankAccountsPanel({ canManage = false, canDelete = false
                 value={form.branchName}
                 onChangeText={branchName => setForm(value => ({ ...value, branchName }))}
               />
-              {!editingId ? (
-                <Input
-                  label="Opening balance"
-                  value={form.openingBalance}
-                  keyboardType="decimal-pad"
-                  placeholder="0.00"
-                  helperText="Enter the account balance before JamaatOne starts tracking transactions for this bank account."
-                  onChangeText={openingBalance =>
-                    setForm(value => ({ ...value, openingBalance }))
-                  }
-                />
-              ) : null}
+              <Input
+                label="Opening balance"
+                value={form.openingBalance}
+                keyboardType="decimal-pad"
+                placeholder="0.00"
+                helperText={
+                  editingId
+                    ? "Update the opening balance used as the starting point for this bank account."
+                    : "Enter the account balance before JamaatOne starts tracking transactions for this bank account."
+                }
+                onChangeText={openingBalance =>
+                  setForm(value => ({ ...value, openingBalance }))
+                }
+              />
               <MultiSelect
                 label="Payment categories"
                 values={form.categoryIds}

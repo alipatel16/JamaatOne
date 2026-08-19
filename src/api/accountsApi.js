@@ -44,7 +44,7 @@ function normalizePaymentPayload(payload, includeMuminId) {
   };
 }
 
-function normalizeBankAccountPayload(payload, includeOpeningBalance = false) {
+function normalizeBankAccountPayload(payload) {
   return {
     bankAccountName: payload?.bankAccountName || null,
     bankName: payload?.bankName || null,
@@ -53,7 +53,7 @@ function normalizeBankAccountPayload(payload, includeOpeningBalance = false) {
     ifscCode: payload?.ifscCode || null,
     branchName: payload?.branchName || null,
     remarks: payload?.remarks || null,
-    ...(includeOpeningBalance ? { openingBalance: Number(payload?.openingBalance || 0) } : {}),
+    openingBalance: Number(payload?.openingBalance || 0),
     categoryIds: Array.isArray(payload?.categoryIds)
       ? payload.categoryIds.map(value => Number(value)).filter(Number.isFinite)
       : []
@@ -298,13 +298,13 @@ export const accountsApi = {
   createBankAccount(payload) {
     return liveApiRequest(liveEndpoints.accounts.bankAccounts, {
       method: "POST",
-      body: normalizeBankAccountPayload(payload, true)
+      body: normalizeBankAccountPayload(payload)
     });
   },
   updateBankAccount(bankAccountId, payload) {
     return liveApiRequest(liveEndpoints.accounts.bankAccountById(bankAccountId), {
       method: "PUT",
-      body: normalizeBankAccountPayload(payload, false)
+      body: normalizeBankAccountPayload(payload)
     });
   },
   deleteBankAccount(bankAccountId) {
