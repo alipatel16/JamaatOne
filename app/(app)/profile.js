@@ -80,7 +80,7 @@ export default function ProfileScreen() {
       </Card>
 
       <Card style={[styles.actionCard, phone && styles.actionCardPhone]} elevated={false}>
-        <View style={styles.actionCopy}>
+        <View style={[styles.actionCopy, phone && styles.actionCopyPhone]}>
           <Text style={styles.actionTitle}>Sign out of JamaatOne</Text>
           <Text style={styles.actionText}>End this session on the current device.</Text>
         </View>
@@ -113,6 +113,7 @@ const styles = StyleSheet.create({
   actionCard: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: spacing.md, borderColor: colors.border, backgroundColor: colors.surfaceMuted },
   actionCardPhone: { alignItems: "stretch" },
   actionCopy: { flex: 1, minWidth: 220 },
+  actionCopyPhone: { minWidth: 0, width: "100%" },
   actionTitle: { color: colors.text, fontWeight: "900", fontSize: 16 },
   actionText: { color: colors.muted, fontSize: 12, marginTop: 4 },
   signOutButton: { minWidth: 120 },

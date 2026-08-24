@@ -13,6 +13,7 @@ import {
   View
 } from "react-native";
 import { router } from "expo-router";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 import { accountsApi } from "../api/accountsApi";
 import { mumineenApi } from "../api/mumineenApi";
@@ -322,6 +323,7 @@ export default function PaymentPanel({
   const [subCategoriesLoading, setSubCategoriesLoading] = useState(false);
   const [fieldsLoading, setFieldsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [formError, setFormError] = useState("");
 
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -407,7 +409,7 @@ export default function PaymentPanel({
     }
   }, [createRequestKey, manager]);
 
-  async function loadPaymentConfiguration() {
+  async function loadPaymentConfiguration(forForm = false) {
     try {
       setConfigurationLoading(true);
       setError("");
@@ -427,7 +429,9 @@ export default function PaymentPanel({
         bankAccounts: Array.isArray(bankData) ? bankData : []
       };
     } catch (requestError) {
-      setError(requestError.message || "Unable to load payment configuration.");
+      const message = requestError.message || "Unable to load payment configuration.";
+      if (forForm) setFormError(message);
+      else setError(message);
       throw requestError;
     } finally {
       setConfigurationLoading(false);
@@ -545,6 +549,7 @@ export default function PaymentPanel({
     setFields([]);
     setFamily([]);
     setError("");
+    setFormError("");
   }
 
   async function openCreate() {
@@ -553,7 +558,7 @@ export default function PaymentPanel({
     try {
       // Refresh category + method configuration every time the dialog opens so
       // Super Admin changes are reflected immediately without restarting app.
-      await loadPaymentConfiguration();
+      await loadPaymentConfiguration(true);
     } catch {
       // The dialog remains open and surfaces the API error for retry/visibility.
     }
@@ -571,9 +576,10 @@ export default function PaymentPanel({
     setFamily([]);
 
     try {
+      setFormError("");
       await loadSubCategories(categoryId);
     } catch (requestError) {
-      setError(requestError.message || "Unable to load payment subcategories.");
+      setFormError(requestError.message || "Unable to load payment subcategories.");
     }
   }
 
@@ -585,9 +591,10 @@ export default function PaymentPanel({
     }));
 
     try {
+      setFormError("");
       await loadFields(subCategoryId);
     } catch (requestError) {
-      setError(requestError.message || "Unable to load payment fields.");
+      setFormError(requestError.message || "Unable to load payment fields.");
     }
   }
 
@@ -664,13 +671,13 @@ export default function PaymentPanel({
   async function savePayment() {
     const validation = validateForm();
     if (validation) {
-      setError(validation);
+      setFormError(validation);
       return;
     }
 
     try {
       setSaving(true);
-      setError("");
+      setFormError("");
       const payload = buildPayload();
       if (editingId) {
         await accountsApi.updatePayment(editingId, payload);
@@ -682,7 +689,7 @@ export default function PaymentPanel({
       if (pageNumber === 1) await loadPayments(1);
       else setPageNumber(1);
     } catch (requestError) {
-      setError(requestError.message || "Unable to save payment.");
+      setFormError(requestError.message || "Unable to save payment.");
     } finally {
       setSaving(false);
     }
@@ -954,6 +961,15 @@ export default function PaymentPanel({
               contentContainerStyle={styles.formContent}
               keyboardShouldPersistTaps="handled"
             >
+              {formError ? (
+                <View style={styles.modalErrorBanner}>
+                  <MaterialCommunityIcons name="alert-circle-outline" size={21} color={colors.danger} />
+                  <View style={styles.flex}>
+                    <Text style={styles.modalErrorTitle}>Action required</Text>
+                    <Text style={styles.modalErrorText}>{formError}</Text>
+                  </View>
+                </View>
+              ) : null}
               <View style={[styles.formCard, phone && styles.formCardPhone]}>
                 <Text style={styles.formSectionTitle}>Payment member</Text>
                 <RemoteMumineenSelect
@@ -1268,7 +1284,7 @@ export default function PaymentPanel({
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1 },
+  flex: { flex: 1, minWidth: 0 },
   panelHeader: {
     flexDirection: "row",
     alignItems: "center",
@@ -1353,6 +1369,9 @@ const styles = StyleSheet.create({
   modalTitle: { color: colors.text, fontSize: 22, fontWeight: "900" },
   close: { color: colors.muted, fontSize: 30, lineHeight: 30 },
   formContent: { padding: spacing.md },
+  modalErrorBanner: { width: "100%", flexDirection: "row", alignItems: "flex-start", gap: spacing.sm, padding: spacing.md, marginBottom: spacing.md, borderRadius: radius.md, borderWidth: 1, borderColor: "#F0C9C9", backgroundColor: colors.dangerSoft },
+  modalErrorTitle: { color: colors.danger, fontSize: 13, fontWeight: "900" },
+  modalErrorText: { color: colors.textSoft, fontSize: 12, lineHeight: 18, marginTop: 2 },
   formCard: {
     borderWidth: 1,
     borderColor: colors.border,

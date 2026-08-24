@@ -537,7 +537,7 @@ const styles = StyleSheet.create({
   badgeText: { color: colors.primaryStrong, fontSize: 10, fontWeight: "900" },
   badgeTextInactive: { color: colors.danger },
   rowActions: { flexDirection: "row", gap: spacing.xs, flexShrink: 0 },
-  rowActionsPhone: { width: "100%", paddingLeft: 52 },
-  pagination: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing.md, marginTop: spacing.md },
+  rowActionsPhone: { width: "100%", paddingLeft: 0, flexWrap: "wrap" },
+  pagination: { flexDirection: "row", flexWrap: "wrap", gap: spacing.xs, alignItems: "center", justifyContent: "space-between", borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing.md, marginTop: spacing.md },
   pageText: { color: colors.muted, fontWeight: "800", fontSize: 12 }
 });

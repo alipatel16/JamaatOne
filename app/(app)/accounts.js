@@ -266,6 +266,140 @@ function CollectionBreakdown({ title, items = [], nameKey }) {
   );
 }
 
+function AccountsSummaryDashboard({
+  summary,
+  loading,
+  error,
+  stats,
+  dailyStats,
+  statsDates,
+  phone,
+  narrow,
+  onRetry,
+}) {
+  if (loading && !summary) {
+    return (
+      <View style={styles.collectionLoading}>
+        <ActivityIndicator color={colors.primary} />
+        <Text style={styles.meta}>Loading account summary...</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.accountSummaryModalContent}>
+      {error ? (
+        <View style={styles.inlineErrorBanner}>
+          <MaterialCommunityIcons name="alert-circle-outline" size={20} color={colors.danger} />
+          <View style={styles.flex}>
+            <Text style={styles.inlineErrorTitle}>Unable to load account summary</Text>
+            <Text style={styles.inlineErrorText}>{error}</Text>
+          </View>
+          {onRetry ? (
+            <Pressable style={styles.inlineRetryButton} onPress={onRetry}>
+              <Text style={styles.inlineRetryText}>Retry</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
+
+      <View style={[styles.summaryHero, phone && styles.summaryHeroPhone, narrow && styles.summaryHeroNarrow]}>
+        <View style={styles.summaryHeroIcon}>
+          <MaterialCommunityIcons name="chart-donut-variant" size={28} color="#FFFFFF" />
+        </View>
+        <View style={styles.flex}>
+          <Text style={styles.summaryEyebrow}>FINANCIAL OVERVIEW</Text>
+          <Text style={[styles.summaryHeroTitle, phone && styles.summaryHeroTitlePhone]}>Accounts summary</Text>
+          <Text style={styles.summaryHeroSubtitle}>
+            A focused view of collections, refunds, daybook movement and available balance.
+          </Text>
+          <View style={styles.summaryPeriodPill}>
+            <MaterialCommunityIcons name="calendar-month-outline" size={15} color="#E4EFEA" />
+            <Text style={styles.summaryPeriodText}>{statsDates.from} to {statsDates.to}</Text>
+          </View>
+        </View>
+      </View>
+
+      {loading ? (
+        <ActivityIndicator color={colors.primary} style={{ marginVertical: spacing.md }} />
+      ) : null}
+
+      <View style={styles.summaryKpiGrid}>
+        <SummaryKpi phone={phone} icon="cash-multiple" label="Money received" value={stats.received} caption="Payments + other credits" />
+        <SummaryKpi phone={phone} icon="cash-clock" label="Member payments" value={stats.paymentIncome} caption="Net after refunds" tone="success" />
+        <SummaryKpi phone={phone} icon="bank-transfer" label="Total expenses" value={stats.expenses} caption="Daybook debits" tone="danger" />
+        <SummaryKpi phone={phone} icon="wallet-outline" label="Available balance" value={stats.balance} caption="Net position for period" tone="warning" />
+      </View>
+
+      <View style={[styles.summaryDetailGrid, phone && styles.summaryDetailGridPhone]}>
+        <Card style={styles.summaryDetailCard}>
+          <View style={styles.summarySectionHeader}>
+            <View style={styles.summarySectionIcon}>
+              <MaterialCommunityIcons name="finance" size={20} color={colors.primaryStrong} />
+            </View>
+            <View style={styles.flex}>
+              <Text style={styles.summarySectionTitle}>Account breakdown</Text>
+              <Text style={styles.summarySectionSubtitle}>How the current balance is composed.</Text>
+            </View>
+          </View>
+          <View style={[styles.statLine, narrow && styles.statLineNarrow]}><Text style={styles.meta}>Member payments received</Text><Text style={styles.statValue}>{money(stats.paymentGross)}</Text></View>
+          <View style={[styles.statLine, narrow && styles.statLineNarrow]}><Text style={styles.meta}>Payment refunds</Text><Text style={[styles.statValue, styles.debit]}>-{money(stats.paymentRefunds)}</Text></View>
+          <View style={[styles.statLine, narrow && styles.statLineNarrow]}><Text style={styles.meta}>Net member payments</Text><Text style={styles.statValue}>{money(stats.paymentIncome)}</Text></View>
+          <View style={[styles.statLine, narrow && styles.statLineNarrow]}><Text style={styles.meta}>Other credit entries</Text><Text style={styles.statValue}>{money(stats.otherIncome)}</Text></View>
+          <View style={[styles.statLine, narrow && styles.statLineNarrow]}><Text style={styles.meta}>Expenses recorded</Text><Text style={[styles.statValue, styles.debit]}>{money(stats.expenses)}</Text></View>
+          <View style={[styles.statLine, styles.totalLine, narrow && styles.statLineNarrow]}><Text style={styles.paymentTitle}>Available balance</Text><Text style={styles.paymentAmount}>{money(stats.balance)}</Text></View>
+        </Card>
+
+        <Card style={styles.summaryDetailCard}>
+          <View style={styles.summarySectionHeader}>
+            <View style={styles.summarySectionIcon}>
+              <MaterialCommunityIcons name="chart-box-outline" size={20} color={colors.primaryStrong} />
+            </View>
+            <View style={styles.flex}>
+              <Text style={styles.summarySectionTitle}>Activity snapshot</Text>
+              <Text style={styles.summarySectionSubtitle}>Useful counts behind the money movement.</Text>
+            </View>
+          </View>
+          <View style={styles.quickMetricGrid}>
+            <QuickMetric icon="account-group-outline" label="Mumineen paid" value={Number(summary?.quickCounts?.totalMuminsPaid || 0)} />
+            <QuickMetric icon="bank-outline" label="Bank accounts" value={Number(summary?.quickCounts?.totalBankAccounts || 0)} />
+            <QuickMetric icon="cash-multiple" label="Paid transactions" value={Number(summary?.paymentsOverview?.totalPaidCount || 0)} />
+            <QuickMetric icon="cash-clock" label="Refunded payments" value={Number(summary?.paymentsOverview?.totalRefundedCount || 0)} />
+            <QuickMetric icon="bank-transfer" label="Credit entries" value={Number(summary?.dayBookOverview?.totalCreditCount || 0)} />
+            <QuickMetric icon="bank-transfer" label="Debit entries" value={Number(summary?.dayBookOverview?.totalDebitCount || 0)} />
+          </View>
+        </Card>
+      </View>
+
+      <View style={styles.summaryDateHeader}>
+        <View style={styles.summarySectionIcon}>
+          <MaterialCommunityIcons name="calendar-month-outline" size={20} color={colors.primaryStrong} />
+        </View>
+        <View style={styles.flex}>
+          <Text style={styles.summarySectionTitle}>Date-wise summary</Text>
+          <Text style={styles.summarySectionSubtitle}>Daily money received, expenses and resulting balance.</Text>
+        </View>
+      </View>
+
+      {dailyStats.length ? (
+        <View style={styles.dailyGrid}>
+          {dailyStats.map(item => (
+            <Card key={item.date} style={[styles.dailyCard, phone && styles.dailyCardPhone]}>
+              <View style={styles.dailyDateRow}>
+                <MaterialCommunityIcons name="calendar-outline" size={17} color={colors.primaryStrong} />
+                <Text style={styles.dailyDate}>{item.date}</Text>
+              </View>
+              <View style={styles.dailyMetricRow}><Text style={styles.dailyMetricLabel}>Received</Text><Text style={styles.dailyReceived}>{money(item.received)}</Text></View>
+              <View style={styles.dailyMetricRow}><Text style={styles.dailyMetricLabel}>Expenses</Text><Text style={styles.dailyExpense}>{money(item.expenses)}</Text></View>
+              <View style={styles.dailyBalanceRow}><Text style={styles.dailyBalanceLabel}>Balance</Text><Text style={styles.dailyBalanceValue}>{money(item.balance)}</Text></View>
+            </Card>
+          ))}
+        </View>
+      ) : <Card><Text style={styles.meta}>No account entries found for this period.</Text></Card>}
+    </View>
+  );
+}
+
 export default function AccountsScreen() {
   const { width } = useWindowDimensions();
   const phone = width < 600;
@@ -277,7 +411,8 @@ export default function AccountsScreen() {
   const [tab, setTab] = useState(manager ? "STATS" : "PAYMENTS");
   const [summary, setSummary] = useState(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
-  const [collectionVisible, setCollectionVisible] = useState(false);
+  const [summaryVisible, setSummaryVisible] = useState(false);
+  const [summaryError, setSummaryError] = useState("");
   const [collectionSummary, setCollectionSummary] = useState(null);
   const [collectionLoading, setCollectionLoading] = useState(false);
   const [collectionError, setCollectionError] = useState("");
@@ -384,14 +519,14 @@ export default function AccountsScreen() {
     (async () => {
       try {
         setSummaryLoading(true);
-        setError("");
+        setSummaryError("");
         const result = await accountsApi.getAccountsSummary({
           fromDate: toApiFromDate(statsDates.from),
           toDate: toApiToDate(statsDates.to)
         });
         if (active) setSummary(result || null);
       } catch (requestError) {
-        if (active) setError(requestError.message || "Unable to load account summary.");
+        if (active) setSummaryError(requestError.message || "Unable to load account summary.");
       } finally {
         if (active) setSummaryLoading(false);
       }
@@ -399,8 +534,7 @@ export default function AccountsScreen() {
     return () => { active = false; };
   }, [manager, tab, statsDates.from, statsDates.to]);
 
-  async function loadCollectionDetails(pageNumber = 1, openModal = false) {
-    if (openModal) setCollectionVisible(true);
+  async function loadCollectionDetails(pageNumber = 1) {
     setCollectionLoading(true);
     setCollectionError("");
     try {
@@ -422,15 +556,16 @@ export default function AccountsScreen() {
     }
   }
 
-  function openCollectionDetails() {
-    setCollectionUserPage(1);
-    loadCollectionDetails(1, true);
-  }
-
   function changeCollectionUserPage(pageNumber) {
     if (!pageNumber || pageNumber === collectionUserPage || collectionLoading) return;
-    loadCollectionDetails(pageNumber, false);
+    loadCollectionDetails(pageNumber);
   }
+
+  useEffect(() => {
+    if (!manager || tab !== "STATS") return;
+    setCollectionUserPage(1);
+    loadCollectionDetails(1);
+  }, [manager, tab, statsDates.from, statsDates.to]);
 
   const stats = useMemo(() => {
     const payments = summary?.paymentsOverview || {};
@@ -488,7 +623,6 @@ export default function AccountsScreen() {
             ["PAYMENTS", "Add Payments"],
             ["DAYBOOK", "Day book"],
             ["LEDGERS", "Customer ledgers"],
-            ["MANAGEMENT", "Cash management"],
             ["BANKING", "Banking"],
           ].map(([v, l]) => (
             <Pressable
@@ -638,115 +772,37 @@ export default function AccountsScreen() {
 
           {statsRange === "CUSTOM" ? (
             <Card style={styles.customRangeCard}>
-              <View style={styles.filterRow}>
-                <View style={styles.filter}><DatePickerField label="From date" value={statsFrom} onChange={setStatsFrom} /></View>
-                <View style={styles.filter}><DatePickerField label="To date" value={statsTo} onChange={setStatsTo} /></View>
+              <View style={[styles.filterRow, phone && styles.filterRowPhone]}>
+                <View style={[styles.filter, phone && styles.filterPhone]}><DatePickerField label="From date" value={statsFrom} onChange={setStatsFrom} /></View>
+                <View style={[styles.filter, phone && styles.filterPhone]}><DatePickerField label="To date" value={statsTo} onChange={setStatsTo} /></View>
               </View>
             </Card>
           ) : null}
 
-          <View style={[styles.summaryHero, phone && styles.summaryHeroPhone, narrow && styles.summaryHeroNarrow]}>
-            <View style={styles.summaryHeroIcon}>
-              <MaterialCommunityIcons name="chart-donut-variant" size={28} color="#FFFFFF" />
-            </View>
+          <View style={[styles.collectionPageHeader, phone && styles.collectionPageHeaderPhone]}>
             <View style={styles.flex}>
-              <Text style={styles.summaryEyebrow}>FINANCIAL OVERVIEW</Text>
-              <Text style={[styles.summaryHeroTitle, phone && styles.summaryHeroTitlePhone]}>Accounts summary</Text>
-              <Text style={styles.summaryHeroSubtitle}>
-                A focused view of collections, refunds, daybook movement and available balance.
-              </Text>
-              <View style={styles.summaryPeriodPill}>
-                <MaterialCommunityIcons name="calendar-month-outline" size={15} color="#E4EFEA" />
-                <Text style={styles.summaryPeriodText}>{statsDates.from} to {statsDates.to}</Text>
-              </View>
+              <Text style={styles.collectionEyebrow}>COLLECTION INTELLIGENCE</Text>
+              <Text style={[styles.collectionTitle, phone && styles.collectionTitlePhone]}>Payment collection details</Text>
+              <Text style={styles.collectionSubtitle}>{statsDates.from} to {statsDates.to}</Text>
             </View>
             <Pressable
               style={[styles.collectionButton, phone && styles.collectionButtonPhone]}
-              onPress={openCollectionDetails}
+              onPress={() => setSummaryVisible(true)}
             >
-              <MaterialCommunityIcons name="chart-box-outline" size={18} color="#FFFFFF" />
-              <Text style={styles.collectionButtonText}>View More Payment Details</Text>
+              <MaterialCommunityIcons name="chart-donut-variant" size={18} color="#FFFFFF" />
+              <Text style={styles.collectionButtonText}>View account summary</Text>
             </Pressable>
           </View>
 
-          {summaryLoading ? (
-            <ActivityIndicator color={colors.primary} style={{ marginVertical: spacing.lg }} />
-          ) : (
-            <>
-              <View style={styles.summaryKpiGrid}>
-                <SummaryKpi phone={phone} icon="cash-multiple" label="Money received" value={stats.received} caption="Payments + other credits" />
-                <SummaryKpi phone={phone} icon="cash-clock" label="Member payments" value={stats.paymentIncome} caption="Net after refunds" tone="success" />
-                <SummaryKpi phone={phone} icon="bank-transfer" label="Total expenses" value={stats.expenses} caption="Daybook debits" tone="danger" />
-                <SummaryKpi phone={phone} icon="wallet-outline" label="Available balance" value={stats.balance} caption="Net position for period" tone="warning" />
-              </View>
-
-              <View style={[styles.summaryDetailGrid, phone && styles.summaryDetailGridPhone]}>
-                <Card style={styles.summaryDetailCard}>
-                  <View style={styles.summarySectionHeader}>
-                    <View style={styles.summarySectionIcon}>
-                      <MaterialCommunityIcons name="finance" size={20} color={colors.primaryStrong} />
-                    </View>
-                    <View style={styles.flex}>
-                      <Text style={styles.summarySectionTitle}>Account breakdown</Text>
-                      <Text style={styles.summarySectionSubtitle}>How the current balance is composed.</Text>
-                    </View>
-                  </View>
-                  <View style={[styles.statLine, narrow && styles.statLineNarrow]}><Text style={styles.meta}>Member payments received</Text><Text style={styles.statValue}>{money(stats.paymentGross)}</Text></View>
-                  <View style={[styles.statLine, narrow && styles.statLineNarrow]}><Text style={styles.meta}>Payment refunds</Text><Text style={[styles.statValue, styles.debit]}>-{money(stats.paymentRefunds)}</Text></View>
-                  <View style={[styles.statLine, narrow && styles.statLineNarrow]}><Text style={styles.meta}>Net member payments</Text><Text style={styles.statValue}>{money(stats.paymentIncome)}</Text></View>
-                  <View style={[styles.statLine, narrow && styles.statLineNarrow]}><Text style={styles.meta}>Other credit entries</Text><Text style={styles.statValue}>{money(stats.otherIncome)}</Text></View>
-                  <View style={[styles.statLine, narrow && styles.statLineNarrow]}><Text style={styles.meta}>Expenses recorded</Text><Text style={[styles.statValue, styles.debit]}>{money(stats.expenses)}</Text></View>
-                  <View style={[styles.statLine, styles.totalLine, narrow && styles.statLineNarrow]}><Text style={styles.paymentTitle}>Available balance</Text><Text style={styles.paymentAmount}>{money(stats.balance)}</Text></View>
-                </Card>
-
-                <Card style={styles.summaryDetailCard}>
-                  <View style={styles.summarySectionHeader}>
-                    <View style={styles.summarySectionIcon}>
-                      <MaterialCommunityIcons name="chart-box-outline" size={20} color={colors.primaryStrong} />
-                    </View>
-                    <View style={styles.flex}>
-                      <Text style={styles.summarySectionTitle}>Activity snapshot</Text>
-                      <Text style={styles.summarySectionSubtitle}>Useful counts behind the money movement.</Text>
-                    </View>
-                  </View>
-                  <View style={styles.quickMetricGrid}>
-                    <QuickMetric icon="account-group-outline" label="Mumineen paid" value={Number(summary?.quickCounts?.totalMuminsPaid || 0)} />
-                    <QuickMetric icon="bank-outline" label="Bank accounts" value={Number(summary?.quickCounts?.totalBankAccounts || 0)} />
-                    <QuickMetric icon="cash-multiple" label="Paid transactions" value={Number(summary?.paymentsOverview?.totalPaidCount || 0)} />
-                    <QuickMetric icon="cash-clock" label="Refunded payments" value={Number(summary?.paymentsOverview?.totalRefundedCount || 0)} />
-                    <QuickMetric icon="bank-transfer" label="Credit entries" value={Number(summary?.dayBookOverview?.totalCreditCount || 0)} />
-                    <QuickMetric icon="bank-transfer" label="Debit entries" value={Number(summary?.dayBookOverview?.totalDebitCount || 0)} />
-                  </View>
-                </Card>
-              </View>
-
-              <View style={styles.summaryDateHeader}>
-                <View style={styles.summarySectionIcon}>
-                  <MaterialCommunityIcons name="calendar-month-outline" size={20} color={colors.primaryStrong} />
-                </View>
-                <View style={styles.flex}>
-                  <Text style={styles.summarySectionTitle}>Date-wise summary</Text>
-                  <Text style={styles.summarySectionSubtitle}>Daily money received, expenses and resulting balance.</Text>
-                </View>
-              </View>
-
-              {dailyStats.length ? (
-                <View style={styles.dailyGrid}>
-                  {dailyStats.map(item => (
-                    <Card key={item.date} style={[styles.dailyCard, phone && styles.dailyCardPhone]}>
-                      <View style={styles.dailyDateRow}>
-                        <MaterialCommunityIcons name="calendar-outline" size={17} color={colors.primaryStrong} />
-                        <Text style={styles.dailyDate}>{item.date}</Text>
-                      </View>
-                      <View style={styles.dailyMetricRow}><Text style={styles.dailyMetricLabel}>Received</Text><Text style={styles.dailyReceived}>{money(item.received)}</Text></View>
-                      <View style={styles.dailyMetricRow}><Text style={styles.dailyMetricLabel}>Expenses</Text><Text style={styles.dailyExpense}>{money(item.expenses)}</Text></View>
-                      <View style={styles.dailyBalanceRow}><Text style={styles.dailyBalanceLabel}>Balance</Text><Text style={styles.dailyBalanceValue}>{money(item.balance)}</Text></View>
-                    </Card>
-                  ))}
-                </View>
-              ) : <Card><Text style={styles.meta}>No account entries found for this period.</Text></Card>}
-            </>
-          )}
+          <CollectionSummaryDashboard
+            data={collectionSummary}
+            loading={collectionLoading}
+            error={collectionError}
+            onRetry={() => loadCollectionDetails(collectionUserPage)}
+            onUserPageChange={changeCollectionUserPage}
+            userPageLoading={collectionLoading}
+            showHeader={false}
+          />
         </>
       ) : null}
       {tab === "PAYMENTS" ? (
@@ -794,33 +850,25 @@ export default function AccountsScreen() {
       {manager && tab === "LEDGERS" ? (
         <CustomerLedgerPanel />
       ) : null}
-      {manager && tab === "MANAGEMENT" ? (
-        <CashManagementPanel canDelete={canDelete} mode="overview" />
-      ) : null}
       {manager && tab === "BANKING" ? (
         <CashManagementPanel canDelete={canDelete} mode="banking" />
       ) : null}
 
       <Modal
-        visible={collectionVisible}
+        visible={summaryVisible}
         transparent
         animationType="fade"
-        onRequestClose={() => setCollectionVisible(false)}
+        onRequestClose={() => setSummaryVisible(false)}
       >
         <View style={[styles.collectionBackdrop, phone && styles.collectionBackdropPhone]}>
           <View style={[styles.collectionSheet, phone && styles.collectionSheetPhone]}>
             <View style={[styles.collectionHeader, phone && styles.collectionHeaderPhone]}>
               <View style={styles.flex}>
-                <Text style={styles.collectionEyebrow}>COLLECTION INTELLIGENCE</Text>
-                <Text style={styles.collectionTitle}>Payment collection details</Text>
-                <Text style={styles.collectionSubtitle}>
-                  {statsDates.from} to {statsDates.to}
-                </Text>
+                <Text style={styles.collectionEyebrow}>FINANCIAL OVERVIEW</Text>
+                <Text style={[styles.collectionTitle, phone && styles.collectionTitlePhone]}>Accounts summary</Text>
+                <Text style={styles.collectionSubtitle}>{statsDates.from} to {statsDates.to}</Text>
               </View>
-              <Pressable
-                style={styles.collectionClose}
-                onPress={() => setCollectionVisible(false)}
-              >
+              <Pressable style={styles.collectionClose} onPress={() => setSummaryVisible(false)}>
                 <Text style={styles.collectionCloseText}>×</Text>
               </Pressable>
             </View>
@@ -829,14 +877,30 @@ export default function AccountsScreen() {
               contentContainerStyle={[styles.collectionContent, phone && styles.collectionContentPhone]}
               showsVerticalScrollIndicator={false}
             >
-              <CollectionSummaryDashboard
-                data={collectionSummary}
-                loading={collectionLoading}
-                error={collectionError}
-                onRetry={() => loadCollectionDetails(collectionUserPage, false)}
-                onUserPageChange={changeCollectionUserPage}
-                userPageLoading={collectionLoading}
-                showHeader={false}
+              <AccountsSummaryDashboard
+                summary={summary}
+                loading={summaryLoading}
+                error={summaryError}
+                stats={stats}
+                dailyStats={dailyStats}
+                statsDates={statsDates}
+                phone={phone}
+                narrow={narrow}
+                onRetry={async () => {
+                  try {
+                    setSummaryLoading(true);
+                    setSummaryError("");
+                    const result = await accountsApi.getAccountsSummary({
+                      fromDate: toApiFromDate(statsDates.from),
+                      toDate: toApiToDate(statsDates.to)
+                    });
+                    setSummary(result || null);
+                  } catch (requestError) {
+                    setSummaryError(requestError.message || "Unable to load account summary.");
+                  } finally {
+                    setSummaryLoading(false);
+                  }
+                }}
               />
             </ScrollView>
           </View>
@@ -866,7 +930,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: spacing.lg,
   },
-  flex: { flex: 1 },
+  flex: { flex: 1, minWidth: 0 },
   title: { fontSize: 30, fontWeight: "900", color: colors.text },
   subtitle: { color: colors.muted, marginTop: spacing.xs, lineHeight: 20 },
   error: { color: colors.danger, marginBottom: spacing.md },
@@ -926,7 +990,7 @@ const styles = StyleSheet.create({
   summaryPeriodText: { color: "#E4EFEA", fontSize: 10, fontWeight: "800" },
   summaryKpiGrid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginBottom: spacing.md },
   summaryKpi: { flex: 1, minWidth: 190, minHeight: 136, borderWidth: 1, borderRadius: radius.lg, padding: spacing.md, backgroundColor: colors.surface },
-  summaryKpiPhone: { minWidth: "47%", flexBasis: "47%" },
+  summaryKpiPhone: { minWidth: "100%", width: "100%", flexBasis: "100%" },
   summaryKpiPrimary: { borderColor: colors.primarySoftStrong, backgroundColor: colors.surfaceTint },
   summaryKpiSuccess: { borderColor: "#D8EADC", backgroundColor: colors.successSoft },
   summaryKpiDanger: { borderColor: "#F3D6D6", backgroundColor: colors.dangerSoft },
@@ -943,7 +1007,7 @@ const styles = StyleSheet.create({
   summarySectionTitle: { color: colors.text, fontSize: 18, fontWeight: "900" },
   summarySectionSubtitle: { color: colors.muted, fontSize: 11, lineHeight: 16, marginTop: 3 },
   quickMetricGrid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.xs },
-  quickMetric: { flexDirection: "row", alignItems: "center", gap: spacing.sm, flexBasis: "47%", minWidth: 150, padding: spacing.sm, borderRadius: radius.md, backgroundColor: colors.backgroundAlt },
+  quickMetric: { flexDirection: "row", alignItems: "center", gap: spacing.sm, flexGrow: 1, flexBasis: 150, minWidth: 0, padding: spacing.sm, borderRadius: radius.md, backgroundColor: colors.backgroundAlt },
   quickMetricIcon: { width: 32, height: 32, borderRadius: 10, backgroundColor: colors.primarySoft, alignItems: "center", justifyContent: "center" },
   quickMetricLabel: { color: colors.muted, fontSize: 10, fontWeight: "700" },
   quickMetricValue: { color: colors.text, fontSize: 17, fontWeight: "900", marginTop: 2 },
@@ -979,6 +1043,33 @@ const styles = StyleSheet.create({
   filter: { flex: 1, minWidth: 180, marginHorizontal: 4 },
   clearFiltersButton: { alignSelf: "flex-start", paddingVertical: spacing.sm },
   clearFiltersText: { color: colors.danger, fontWeight: "700" },
+  filterRowPhone: { flexDirection: "column", marginHorizontal: 0 },
+  filterPhone: { width: "100%", minWidth: 0, marginHorizontal: 0 },
+  collectionPageHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: spacing.md,
+    marginBottom: spacing.md,
+  },
+  collectionPageHeaderPhone: { flexDirection: "column", alignItems: "stretch", gap: spacing.sm },
+  collectionTitlePhone: { fontSize: 20 },
+  accountSummaryModalContent: { width: "100%", minWidth: 0 },
+  inlineErrorBanner: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: spacing.sm,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: "#F3D6D6",
+    borderRadius: radius.md,
+    backgroundColor: colors.dangerSoft,
+  },
+  inlineErrorTitle: { color: colors.danger, fontWeight: "900", fontSize: 12 },
+  inlineErrorText: { color: colors.textSoft, fontSize: 11, lineHeight: 16, marginTop: 2 },
+  inlineRetryButton: { paddingHorizontal: 10, paddingVertical: 7, borderRadius: radius.md, backgroundColor: colors.surface, flexShrink: 0 },
+  inlineRetryText: { color: colors.danger, fontSize: 10, fontWeight: "900" },
   dateFieldContainer: { marginBottom: spacing.md },
   fieldLabel: { color: colors.text, fontWeight: "700", marginBottom: spacing.xs },
   dateField: {

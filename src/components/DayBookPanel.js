@@ -12,6 +12,7 @@ import {
   useWindowDimensions,
   View
 } from "react-native";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 import { accountsApi } from "../api/accountsApi";
 import { ENTRY_TYPES } from "../constants/accounts";
@@ -93,6 +94,7 @@ export default function DayBookPanel({ manager, canDelete = false, canRefund = f
   const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [formError, setFormError] = useState("");
 
   const [entryTypeFilter, setEntryTypeFilter] = useState("");
   const [paymentMethodFilter, setPaymentMethodFilter] = useState("");
@@ -182,7 +184,7 @@ export default function DayBookPanel({ manager, canDelete = false, canRefund = f
     if (pageNumber !== 1) loadEntries(pageNumber);
   }, [pageNumber]);
 
-  async function loadMethods() {
+  async function loadMethods(forForm = false) {
     try {
       const [methodResult, bankResult] = await Promise.all([
         accountsApi.getPaymentMethods(),
@@ -195,7 +197,9 @@ export default function DayBookPanel({ manager, canDelete = false, canRefund = f
         )
       );
     } catch (requestError) {
-      setError(requestError.message || "Unable to load payment methods and bank accounts.");
+      const message = requestError.message || "Unable to load payment methods and bank accounts.";
+      if (forForm) setFormError(message);
+      else setError(message);
     }
   }
 
@@ -239,12 +243,13 @@ export default function DayBookPanel({ manager, canDelete = false, canRefund = f
     setEditingId(null);
     setForm(createEmptyForm());
     setError("");
+    setFormError("");
   }
 
   async function openCreate() {
     resetForm();
-    await loadMethods();
     setShowForm(true);
+    await loadMethods(true);
   }
 
   function validateForm() {
@@ -273,13 +278,13 @@ export default function DayBookPanel({ manager, canDelete = false, canRefund = f
   async function saveEntry() {
     const validation = validateForm();
     if (validation) {
-      setError(validation);
+      setFormError(validation);
       return;
     }
 
     try {
       setSaving(true);
-      setError("");
+      setFormError("");
       const payload = buildPayload();
       if (editingId) {
         await accountsApi.updateDaybookEntry(editingId, payload);
@@ -291,7 +296,7 @@ export default function DayBookPanel({ manager, canDelete = false, canRefund = f
       if (pageNumber === 1) await loadEntries(1);
       else setPageNumber(1);
     } catch (requestError) {
-      setError(requestError.message || "Unable to save Day Book entry.");
+      setFormError(requestError.message || "Unable to save Day Book entry.");
     } finally {
       setSaving(false);
     }
@@ -583,6 +588,15 @@ export default function DayBookPanel({ manager, canDelete = false, canRefund = f
               contentContainerStyle={styles.formContent}
               keyboardShouldPersistTaps="handled"
             >
+              {formError ? (
+                <View style={styles.modalErrorBanner}>
+                  <MaterialCommunityIcons name="alert-circle-outline" size={21} color={colors.danger} />
+                  <View style={styles.flex}>
+                    <Text style={styles.modalErrorTitle}>Action required</Text>
+                    <Text style={styles.modalErrorText}>{formError}</Text>
+                  </View>
+                </View>
+              ) : null}
               <Select
                 label="Entry type"
                 value={form.entryType}
@@ -806,7 +820,7 @@ export default function DayBookPanel({ manager, canDelete = false, canRefund = f
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1 },
+  flex: { flex: 1, minWidth: 0 },
   panelHeader: {
     flexDirection: "row",
     alignItems: "center",
@@ -909,6 +923,9 @@ const styles = StyleSheet.create({
   close: { color: colors.muted, fontSize: 30, lineHeight: 30 },
   formScroll: { flexGrow: 0 },
   formContent: { padding: spacing.lg, paddingBottom: spacing.xl },
+  modalErrorBanner: { width: "100%", flexDirection: "row", alignItems: "flex-start", gap: spacing.sm, padding: spacing.md, marginBottom: spacing.md, borderRadius: radius.md, borderWidth: 1, borderColor: "#F0C9C9", backgroundColor: colors.dangerSoft },
+  modalErrorTitle: { color: colors.danger, fontSize: 13, fontWeight: "900" },
+  modalErrorText: { color: colors.textSoft, fontSize: 12, lineHeight: 18, marginTop: 2 },
   detailContent: { padding: spacing.lg },
   detailLabel: {
     color: colors.muted,

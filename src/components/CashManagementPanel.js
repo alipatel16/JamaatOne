@@ -15,6 +15,7 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 import { accountsApi } from "../api/accountsApi";
+import { useAuth } from "../context/AuthContext";
 import { colors, radius, shadows, spacing } from "../theme";
 import ActivityTimeline from "./ActivityTimeline";
 import Button from "./Button";
@@ -71,6 +72,13 @@ function formatDateTime(value) {
   });
 }
 
+function getBalanceType(paymentMethodName) {
+  const normalized = String(paymentMethodName || "").trim().toLowerCase();
+  if (normalized.includes("cash")) return "Cash";
+  if (normalized.includes("cheque") || normalized.includes("check")) return "Cheque";
+  return "";
+}
+
 async function confirmAction(title, message, actionLabel = "Delete") {
   if (Platform.OS === "web") {
     return globalThis.confirm?.(`${title}\n\n${message}`) ?? false;
@@ -93,9 +101,9 @@ export default function CashManagementPanel({ canDelete = false, mode = "overvie
   const phone = width < 600;
   const narrow = width < 380;
   const router = useRouter();
+  const { user } = useAuth();
   const showOverview = mode === "overview";
   const showBanking = mode === "banking";
-  const [cashSummary, setCashSummary] = useState([]);
   const [collectionSummary, setCollectionSummary] = useState(null);
   const [collectionLoading, setCollectionLoading] = useState(false);
   const [collectionError, setCollectionError] = useState("");
@@ -112,6 +120,7 @@ export default function CashManagementPanel({ canDelete = false, mode = "overvie
   const [editingDepositId, setEditingDepositId] = useState(null);
   const [depositForm, setDepositForm] = useState(EMPTY_DEPOSIT);
   const [depositSaving, setDepositSaving] = useState(false);
+  const [depositError, setDepositError] = useState("");
 
   const [logsVisible, setLogsVisible] = useState(false);
   const [logs, setLogs] = useState([]);
@@ -154,12 +163,12 @@ export default function CashManagementPanel({ canDelete = false, mode = "overvie
   async function loadReferenceData() {
     try {
       setError("");
-      const [summaryResult, bankResult, methodResult] = await Promise.all([
-        accountsApi.getCashSummary(),
+      const [collectionResult, bankResult, methodResult] = await Promise.all([
+        accountsApi.getCollectionSummary({ pageNumber: 1, pageSize: 20 }),
         accountsApi.getBankAccounts(),
         accountsApi.getPaymentMethods()
       ]);
-      setCashSummary(Array.isArray(summaryResult) ? summaryResult : []);
+      setCollectionSummary(collectionResult || null);
       setBankAccounts(
         (Array.isArray(bankResult) ? bankResult : []).filter(
           item => item?.isActive !== false
@@ -204,19 +213,6 @@ export default function CashManagementPanel({ canDelete = false, mode = "overvie
     await Promise.all([loadReferenceData(), loadDeposits(page)]);
   }
 
-  const totals = useMemo(
-    () =>
-      cashSummary.reduce(
-        (result, item) => ({
-          collected: result.collected + Number(item.totalCollected || 0),
-          deposited: result.deposited + Number(item.totalDeposited || 0),
-          pending: result.pending + Number(item.pendingToDeposit || 0)
-        }),
-        { collected: 0, deposited: 0, pending: 0 }
-      ),
-    [cashSummary]
-  );
-
   const bankOptions = useMemo(
     () =>
       bankAccounts.map(item => ({
@@ -237,8 +233,71 @@ export default function CashManagementPanel({ canDelete = false, mode = "overvie
     [paymentMethods]
   );
 
+  const myPendingBalances = useMemo(() => {
+    const currentUserId = String(user?.userId ?? "");
+    const rows = Array.isArray(collectionSummary?.pendingByUser)
+      ? collectionSummary.pendingByUser
+      : [];
+    return rows
+      .filter(item => !currentUserId || String(item?.userId ?? "") === currentUserId)
+      .reduce(
+        (result, item) => {
+          const balanceType = String(item?.balanceType || "").trim().toLowerCase();
+          const amount = Number(item?.estimatedPendingAmount || 0);
+          if (balanceType === "cash") result.cash += amount;
+          if (balanceType === "cheque" || balanceType === "check") result.cheque += amount;
+          return result;
+        },
+        { cash: 0, cheque: 0 }
+      );
+  }, [collectionSummary, user?.userId]);
+
+  const selectedPending = useMemo(() => {
+    const selectedMethod = paymentMethods.find(
+      item => String(item.paymentMethodId) === String(depositForm.paymentMethodId)
+    );
+    const selectedBank = bankAccounts.find(
+      item => String(item.bankAccountId) === String(depositForm.bankAccountId)
+    );
+    const balanceType = getBalanceType(selectedMethod?.paymentMethodName);
+    if (!balanceType || !selectedBank) {
+      return {
+        balanceType,
+        ownPending: null,
+        bankPending: null,
+        available: null,
+        source: ""
+      };
+    }
+
+    const currentUserId = String(user?.userId ?? "");
+    const hasPendingOwnershipData = Array.isArray(collectionSummary?.pendingByUser);
+    const rows = hasPendingOwnershipData ? collectionSummary.pendingByUser : [];
+    const matchingRows = rows.filter(item => {
+      const sameUser = currentUserId && String(item?.userId ?? "") === currentUserId;
+      const sameBank = String(item?.bankAccountId ?? "") === String(selectedBank.bankAccountId);
+      const sameType = String(item?.balanceType || "").trim().toLowerCase() === balanceType.toLowerCase();
+      return sameUser && sameBank && sameType;
+    });
+    const ownPending = currentUserId && hasPendingOwnershipData
+      ? matchingRows.reduce((total, item) => total + Number(item?.estimatedPendingAmount || 0), 0)
+      : null;
+    const bankPending = balanceType === "Cash"
+      ? Number(selectedBank.pendingCashBalance || 0)
+      : Number(selectedBank.pendingChequeBalance || 0);
+
+    return {
+      balanceType,
+      ownPending,
+      bankPending,
+      available: ownPending != null ? ownPending : bankPending,
+      source: ownPending != null ? "your pending collection" : "bank pending balance"
+    };
+  }, [bankAccounts, collectionSummary, depositForm.bankAccountId, depositForm.paymentMethodId, paymentMethods, user?.userId]);
+
   function openCreateDeposit() {
     setEditingDepositId(null);
+    setDepositError("");
     setDepositForm({
       ...EMPTY_DEPOSIT,
       paymentMethodId: paymentMethodOptions[0]?.value || "",
@@ -249,6 +308,7 @@ export default function CashManagementPanel({ canDelete = false, mode = "overvie
 
   function openEditDeposit(item) {
     setEditingDepositId(item.bankDepositId);
+    setDepositError("");
     setDepositForm({
       paymentMethodId: String(item.paymentMethodId || ""),
       bankAccountId: String(item.bankAccountId || ""),
@@ -263,24 +323,27 @@ export default function CashManagementPanel({ canDelete = false, mode = "overvie
   async function saveDeposit() {
     const amount = Number(depositForm.amount);
     if (!depositForm.paymentMethodId || !depositForm.bankAccountId) {
-      setError("Select a payment method and bank account.");
+      setDepositError("Select a payment method and bank account.");
       return;
     }
     if (!Number.isFinite(amount) || amount <= 0) {
-      setError("Enter a valid deposit amount.");
+      setDepositError("Enter a valid deposit amount.");
       return;
     }
 
-    const methodSummary = cashSummary.find(
-      item => String(item.paymentMethodId) === String(depositForm.paymentMethodId)
-    );
     const existing = editingDepositId
       ? deposits.find(item => item.bankDepositId === editingDepositId)
       : null;
-    const available =
-      Number(methodSummary?.pendingToDeposit || 0) + Number(existing?.amount || 0);
-    if (methodSummary && amount > available) {
-      setError(`Deposit cannot exceed pending amount ${money(available)} for this method.`);
+    const existingMatchesSelection = existing &&
+      String(existing.bankAccountId) === String(depositForm.bankAccountId) &&
+      String(existing.paymentMethodId) === String(depositForm.paymentMethodId);
+    const available = selectedPending.available == null
+      ? null
+      : Number(selectedPending.available || 0) + (existingMatchesSelection ? Number(existing?.amount || 0) : 0);
+    if (available != null && amount > available) {
+      setDepositError(
+        `Deposit cannot exceed ${money(available)} available from ${selectedPending.source || "the current pending balance"}.`
+      );
       return;
     }
 
@@ -292,7 +355,7 @@ export default function CashManagementPanel({ canDelete = false, mode = "overvie
 
     try {
       setDepositSaving(true);
-      setError("");
+      setDepositError("");
       if (editingDepositId) {
         const updated = await accountsApi.updateBankDeposit(editingDepositId, payload);
         setDeposits(current =>
@@ -311,7 +374,7 @@ export default function CashManagementPanel({ canDelete = false, mode = "overvie
       setDepositModal(false);
       await refreshAll();
     } catch (requestError) {
-      setError(requestError.message || "Unable to save the bank deposit.");
+      setDepositError(requestError.message || "Unable to save the bank deposit.");
     } finally {
       setDepositSaving(false);
     }
@@ -505,31 +568,78 @@ export default function CashManagementPanel({ canDelete = false, mode = "overvie
           onPress={() => !depositSaving && setDepositModal(false)}
         >
           <Pressable style={[styles.modalCard, phone && styles.modalCardPhone]} onPress={() => {}}>
-            <ScrollView keyboardShouldPersistTaps="handled">
+            <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.modalScrollContent}>
               <Text style={styles.modalTitle}>
                 {editingDepositId ? "Edit bank deposit" : "Record bank deposit"}
               </Text>
+              {depositError ? (
+                <View style={styles.modalErrorBanner}>
+                  <MaterialCommunityIcons name="alert-circle-outline" size={21} color={colors.danger} />
+                  <View style={styles.flex}>
+                    <Text style={styles.modalErrorTitle}>Action required</Text>
+                    <Text style={styles.modalErrorText}>{depositError}</Text>
+                  </View>
+                </View>
+              ) : null}
+
+              <View style={[styles.pendingAvailability, phone && styles.pendingAvailabilityPhone]}>
+                <View style={styles.pendingAvailabilityHeader}>
+                  <View style={styles.pendingAvailabilityIcon}>
+                    <MaterialCommunityIcons name="account-cash-outline" size={20} color={colors.primaryStrong} />
+                  </View>
+                  <View style={styles.flex}>
+                    <Text style={styles.pendingAvailabilityTitle}>Pending with you</Text>
+                    <Text style={styles.pendingAvailabilitySubtitle}>Amounts still expected to be deposited under your name.</Text>
+                  </View>
+                </View>
+                <View style={[styles.pendingAvailabilityGrid, narrow && styles.pendingAvailabilityGridNarrow]}>
+                  <View style={styles.pendingAvailabilityItem}>
+                    <Text style={styles.pendingAvailabilityLabel}>Cash</Text>
+                    <Text style={styles.pendingAvailabilityValue}>{money(myPendingBalances.cash)}</Text>
+                  </View>
+                  <View style={styles.pendingAvailabilityItem}>
+                    <Text style={styles.pendingAvailabilityLabel}>Cheque</Text>
+                    <Text style={styles.pendingAvailabilityValue}>{money(myPendingBalances.cheque)}</Text>
+                  </View>
+                </View>
+                {selectedPending.balanceType ? (
+                  <View style={styles.selectedPendingLine}>
+                    <Text style={styles.selectedPendingLabel}>
+                      {selectedPending.balanceType} available for selected bank
+                    </Text>
+                    <Text style={styles.selectedPendingValue}>
+                      {money(selectedPending.available || 0)}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
               <Select
                 label="Payment method"
                 value={depositForm.paymentMethodId}
                 options={paymentMethodOptions}
-                onChange={paymentMethodId =>
-                  setDepositForm(value => ({ ...value, paymentMethodId }))
-                }
+                onChange={paymentMethodId => {
+                  setDepositError("");
+                  setDepositForm(value => ({ ...value, paymentMethodId }));
+                }}
               />
               <Select
                 label="Bank account"
                 value={depositForm.bankAccountId}
                 options={bankOptions}
-                onChange={bankAccountId =>
-                  setDepositForm(value => ({ ...value, bankAccountId }))
-                }
+                onChange={bankAccountId => {
+                  setDepositError("");
+                  setDepositForm(value => ({ ...value, bankAccountId }));
+                }}
               />
               <Input
                 label="Amount"
                 value={depositForm.amount}
                 keyboardType="decimal-pad"
-                onChangeText={amount => setDepositForm(value => ({ ...value, amount }))}
+                helperText={selectedPending.available != null ? `Available now: ${money(selectedPending.available)}` : undefined}
+                onChangeText={amount => {
+                  setDepositError("");
+                  setDepositForm(value => ({ ...value, amount }));
+                }}
               />
               <Input
                 label="Deposit date"
@@ -711,6 +821,43 @@ const styles = StyleSheet.create({
   modalCard: { width: "100%", maxWidth: 680, maxHeight: "90%", alignSelf: "center", backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.md },
   modalCardPhone: { maxHeight: "94%", borderTopLeftRadius: 24, borderTopRightRadius: 24, borderBottomLeftRadius: 0, borderBottomRightRadius: 0, padding: spacing.md },
   modalTitle: { color: colors.text, fontSize: 21, fontWeight: "800", marginBottom: spacing.md },
+  modalScrollContent: { paddingBottom: spacing.xs },
+  modalErrorBanner: {
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: spacing.sm,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: "#F0C9C9",
+    backgroundColor: colors.dangerSoft
+  },
+  modalErrorTitle: { color: colors.danger, fontSize: 13, fontWeight: "900" },
+  modalErrorText: { color: colors.textSoft, fontSize: 12, lineHeight: 18, marginTop: 2 },
+  pendingAvailability: {
+    width: "100%",
+    padding: spacing.md,
+    marginBottom: spacing.md,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.primarySoftStrong,
+    backgroundColor: colors.surfaceTint
+  },
+  pendingAvailabilityPhone: { padding: spacing.sm },
+  pendingAvailabilityHeader: { flexDirection: "row", alignItems: "flex-start", gap: spacing.sm },
+  pendingAvailabilityIcon: { width: 38, height: 38, borderRadius: 12, backgroundColor: colors.primarySoft, alignItems: "center", justifyContent: "center", flexShrink: 0 },
+  pendingAvailabilityTitle: { color: colors.text, fontSize: 14, fontWeight: "900" },
+  pendingAvailabilitySubtitle: { color: colors.muted, fontSize: 11, lineHeight: 16, marginTop: 2 },
+  pendingAvailabilityGrid: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.md },
+  pendingAvailabilityGridNarrow: { flexDirection: "column" },
+  pendingAvailabilityItem: { flex: 1, minWidth: 0, padding: spacing.sm, borderRadius: radius.md, backgroundColor: colors.surface },
+  pendingAvailabilityLabel: { color: colors.muted, fontSize: 10, fontWeight: "800" },
+  pendingAvailabilityValue: { color: colors.primaryStrong, fontSize: 17, fontWeight: "900", marginTop: 3 },
+  selectedPendingLine: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: spacing.sm, paddingTop: spacing.sm, marginTop: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.primarySoftStrong },
+  selectedPendingLabel: { color: colors.textSoft, fontSize: 11, fontWeight: "800", flex: 1, minWidth: 150 },
+  selectedPendingValue: { color: colors.primaryStrong, fontSize: 13, fontWeight: "900" },
   modalActions: { flexDirection: "row", justifyContent: "flex-end", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.sm },
   timelineHeader: { flexDirection: "row", alignItems: "center", marginBottom: spacing.sm },
   timelineTitle: { marginBottom: 2 },

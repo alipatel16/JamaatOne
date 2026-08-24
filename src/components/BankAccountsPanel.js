@@ -11,6 +11,7 @@ import {
   useWindowDimensions,
   View
 } from "react-native";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 import { accountsApi } from "../api/accountsApi";
 import { colors, radius, shadows, spacing } from "../theme";
@@ -79,6 +80,7 @@ export default function BankAccountsPanel({ canManage = false, canDelete = false
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [formError, setFormError] = useState("");
   const [modalVisible, setModalVisible] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(EMPTY_BANK);
@@ -133,6 +135,7 @@ export default function BankAccountsPanel({ canManage = false, canDelete = false
     setEditingId(null);
     setForm(EMPTY_BANK);
     setError("");
+    setFormError("");
     setModalVisible(true);
   }
 
@@ -152,22 +155,23 @@ export default function BankAccountsPanel({ canManage = false, canDelete = false
       )
     });
     setError("");
+    setFormError("");
     setModalVisible(true);
   }
 
   async function save() {
     if (!form.bankAccountName.trim() || !form.bankName.trim()) {
-      setError("Bank account name and bank name are required.");
+      setFormError("Bank account name and bank name are required.");
       return;
     }
     if (!Number.isFinite(Number(form.openingBalance))) {
-      setError("Enter a valid opening balance.");
+      setFormError("Enter a valid opening balance.");
       return;
     }
 
     try {
       setSaving(true);
-      setError("");
+      setFormError("");
       if (editingId) {
         const updated = await accountsApi.updateBankAccount(editingId, form);
         setAccounts(current =>
@@ -186,7 +190,7 @@ export default function BankAccountsPanel({ canManage = false, canDelete = false
       setModalVisible(false);
       await loadAccounts();
     } catch (requestError) {
-      setError(requestError.message || "Unable to save the bank account.");
+      setFormError(requestError.message || "Unable to save the bank account.");
     } finally {
       setSaving(false);
     }
@@ -390,6 +394,16 @@ export default function BankAccountsPanel({ canManage = false, canDelete = false
                 </Pressable>
               </View>
 
+              {formError ? (
+                <View style={styles.modalErrorBanner}>
+                  <MaterialCommunityIcons name="alert-circle-outline" size={21} color={colors.danger} />
+                  <View style={styles.flex}>
+                    <Text style={styles.modalErrorTitle}>Action required</Text>
+                    <Text style={styles.modalErrorText}>{formError}</Text>
+                  </View>
+                </View>
+              ) : null}
+
               <Input
                 label="Account label"
                 value={form.bankAccountName}
@@ -481,7 +495,7 @@ export default function BankAccountsPanel({ canManage = false, canDelete = false
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1 },
+  flex: { flex: 1, minWidth: 0 },
   hero: {
     flexDirection: "row",
     alignItems: "center",
@@ -591,5 +605,8 @@ const styles = StyleSheet.create({
   modalEyebrow: { color: colors.accent, fontSize: 10, fontWeight: "800", letterSpacing: 1.3 },
   modalTitle: { color: colors.text, fontSize: 23, fontWeight: "800", marginTop: 3 },
   close: { color: colors.muted, fontSize: 30, paddingHorizontal: spacing.sm },
+  modalErrorBanner: { width: "100%", flexDirection: "row", alignItems: "flex-start", gap: spacing.sm, padding: spacing.md, marginBottom: spacing.md, borderRadius: radius.md, borderWidth: 1, borderColor: "#F0C9C9", backgroundColor: colors.dangerSoft },
+  modalErrorTitle: { color: colors.danger, fontSize: 13, fontWeight: "900" },
+  modalErrorText: { color: colors.textSoft, fontSize: 12, lineHeight: 18, marginTop: 2 },
   modalActions: { flexDirection: "row", justifyContent: "flex-end", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.sm }
 });
