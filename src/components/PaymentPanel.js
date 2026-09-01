@@ -324,6 +324,11 @@ export default function PaymentPanel({
   const [fieldsLoading, setFieldsLoading] = useState(false);
   const [error, setError] = useState("");
   const [formError, setFormError] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
+  const [subCategoryFilter, setSubCategoryFilter] = useState("");
+  const [paymentMethodFilter, setPaymentMethodFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [filterSubCategories, setFilterSubCategories] = useState([]);
 
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -371,6 +376,27 @@ export default function PaymentPanel({
     [methods]
   );
 
+  const filterCategoryOptions = useMemo(
+    () => [{ label: "All categories", value: "" }, ...categoryOptions],
+    [categoryOptions]
+  );
+
+  const filterSubCategoryOptions = useMemo(
+    () => [{ label: "All subcategories", value: "" }, ...filterSubCategories.filter(item => item?.isActive !== false).map(item => ({ label: item.subCategoryName || `Subcategory ${item.subCategoryId}`, value: String(item.subCategoryId) }))],
+    [filterSubCategories]
+  );
+
+  const filterMethodOptions = useMemo(
+    () => [{ label: "All payment methods", value: "" }, ...methodOptions],
+    [methodOptions]
+  );
+
+  const statusOptions = [
+    { label: "All statuses", value: "" },
+    { label: "Paid", value: "PAID" },
+    { label: "Refunded", value: "REFUNDED" }
+  ];
+
   const bankOptions = useMemo(() => {
     const selectedCategoryId = String(form.categoryId || "");
     return bankAccounts
@@ -394,9 +420,13 @@ export default function PaymentPanel({
   }, [bankAccounts, form.categoryId]);
 
   useEffect(() => {
+    loadPaymentConfiguration().catch(() => {});
+  }, []);
+
+  useEffect(() => {
     setPageNumber(1);
     loadPayments(1);
-  }, [filters.muminId, filters.fromDate, filters.toDate]);
+  }, [filters.muminId, filters.fromDate, filters.toDate, categoryFilter, subCategoryFilter, paymentMethodFilter, statusFilter]);
 
   useEffect(() => {
     if (pageNumber !== 1) loadPayments(pageNumber);
@@ -446,6 +476,10 @@ export default function PaymentPanel({
         pageNumber: page,
         pageSize: PAGE_SIZE,
         muminId: filters.muminId ? Number(filters.muminId) : undefined,
+        categoryId: categoryFilter ? Number(categoryFilter) : undefined,
+        subCategoryId: subCategoryFilter ? Number(subCategoryFilter) : undefined,
+        paymentMethodId: paymentMethodFilter ? Number(paymentMethodFilter) : undefined,
+        status: statusFilter || undefined,
         fromDate: paymentFilterDate(filters.fromDate),
         toDate: paymentFilterDate(filters.toDate, true)
       });
@@ -826,6 +860,42 @@ export default function PaymentPanel({
           <Button title="Add payment" compact onPress={openCreate} style={phone && styles.headerButtonPhone} />
         ) : null}
       </View>
+
+      <Card style={styles.serverFilters}>
+        <Text style={styles.filterTitle}>Payment history filters</Text>
+        <View style={styles.filterGrid}>
+          <View style={[styles.filterCell, phone && styles.filterCellPhone]}>
+            <Select
+              label="Category"
+              value={categoryFilter}
+              options={filterCategoryOptions}
+              onChange={async value => {
+                setCategoryFilter(value);
+                setSubCategoryFilter("");
+                if (!value) { setFilterSubCategories([]); return; }
+                try {
+                  const result = await accountsApi.getPaymentSubCategoriesByCategory(Number(value));
+                  setFilterSubCategories((Array.isArray(result) ? result : []).filter(item => item?.isActive !== false));
+                } catch {
+                  setFilterSubCategories([]);
+                }
+              }}
+            />
+          </View>
+          <View style={[styles.filterCell, phone && styles.filterCellPhone]}>
+            <Select label="Subcategory" value={subCategoryFilter} options={filterSubCategoryOptions} onChange={setSubCategoryFilter} disabled={!categoryFilter} />
+          </View>
+          <View style={[styles.filterCell, phone && styles.filterCellPhone]}>
+            <Select label="Payment method" value={paymentMethodFilter} options={filterMethodOptions} onChange={setPaymentMethodFilter} />
+          </View>
+          <View style={[styles.filterCell, phone && styles.filterCellPhone]}>
+            <Select label="Status" value={statusFilter} options={statusOptions} onChange={setStatusFilter} />
+          </View>
+        </View>
+        {categoryFilter || subCategoryFilter || paymentMethodFilter || statusFilter ? (
+          <Button title="Clear payment filters" compact variant="outline" onPress={() => { setCategoryFilter(""); setSubCategoryFilter(""); setPaymentMethodFilter(""); setStatusFilter(""); setFilterSubCategories([]); }} />
+        ) : null}
+      </Card>
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
       {loading ? (
@@ -1295,6 +1365,11 @@ const styles = StyleSheet.create({
   headerButtonPhone: { width: "100%" },
   title: { color: colors.text, fontSize: 22, fontWeight: "900" },
   subtitle: { color: colors.muted, marginTop: 3, fontSize: 12 },
+  serverFilters: { marginBottom: spacing.md },
+  filterTitle: { color: colors.text, fontWeight: "800", marginBottom: spacing.sm },
+  filterGrid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.md },
+  filterCell: { flex: 1, minWidth: 210 },
+  filterCellPhone: { minWidth: "100%" },
   error: { color: colors.danger, marginBottom: spacing.md },
   loader: { marginVertical: spacing.lg },
   paymentCard: { marginBottom: spacing.sm, padding: spacing.lg },

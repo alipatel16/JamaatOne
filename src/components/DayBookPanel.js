@@ -28,7 +28,10 @@ const PAGE_SIZE = 20;
 
 function createEmptyForm() {
   return {
-    entryType: "DEBIT",
+    entryType: "",
+    categoryId: "",
+    subCategoryId: "",
+    fieldValues: {},
     paymentFor: "",
     amount: "",
     paymentMethodId: "",
@@ -88,6 +91,9 @@ export default function DayBookPanel({ manager, canDelete = false, canRefund = f
   const narrow = width < 380;
   const [methods, setMethods] = useState([]);
   const [bankAccounts, setBankAccounts] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [subCategories, setSubCategories] = useState([]);
+  const [fields, setFields] = useState([]);
   const [entries, setEntries] = useState([]);
   const [pageNumber, setPageNumber] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -97,6 +103,8 @@ export default function DayBookPanel({ manager, canDelete = false, canRefund = f
   const [formError, setFormError] = useState("");
 
   const [entryTypeFilter, setEntryTypeFilter] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
+  const [subCategoryFilter, setSubCategoryFilter] = useState("");
   const [paymentMethodFilter, setPaymentMethodFilter] = useState("");
 
   const [showForm, setShowForm] = useState(false);
@@ -108,6 +116,25 @@ export default function DayBookPanel({ manager, canDelete = false, canRefund = f
   const [detailLoading, setDetailLoading] = useState(false);
   const [logs, setLogs] = useState(null);
   const [logsLoading, setLogsLoading] = useState(false);
+
+  const categoryOptions = useMemo(
+    () => categories.filter(item => item?.isActive !== false).map(item => ({
+      label: item.categoryName || `Category ${item.categoryId}`,
+      value: String(item.categoryId)
+    })),
+    [categories]
+  );
+
+  const subCategoryOptions = useMemo(
+    () => subCategories.filter(item => item?.isActive !== false).filter(item => {
+      if (!form.entryType) return true;
+      return !item.entryType || String(item.entryType).toUpperCase() === String(form.entryType).toUpperCase();
+    }).map(item => ({
+      label: item.subCategoryName || `Subcategory ${item.subCategoryId}`,
+      value: String(item.subCategoryId)
+    })),
+    [subCategories, form.entryType]
+  );
 
   const methodOptions = useMemo(
     () =>
@@ -131,6 +158,16 @@ export default function DayBookPanel({ manager, canDelete = false, canRefund = f
           value: String(item.bankAccountId)
         })),
     [bankAccounts]
+  );
+
+  const filterCategoryOptions = useMemo(
+    () => [{ label: "All categories", value: "" }, ...categoryOptions],
+    [categoryOptions]
+  );
+
+  const filterSubCategoryOptions = useMemo(
+    () => [{ label: "All subcategories", value: "" }, ...subCategories.filter(item => item?.isActive !== false).map(item => ({ label: item.subCategoryName || `Subcategory ${item.subCategoryId}`, value: String(item.subCategoryId) }))],
+    [subCategories]
   );
 
   const filterMethodOptions = useMemo(
@@ -177,6 +214,8 @@ export default function DayBookPanel({ manager, canDelete = false, canRefund = f
     filters.fromDate,
     filters.toDate,
     entryTypeFilter,
+    categoryFilter,
+    subCategoryFilter,
     paymentMethodFilter
   ]);
 
@@ -186,11 +225,13 @@ export default function DayBookPanel({ manager, canDelete = false, canRefund = f
 
   async function loadMethods(forForm = false) {
     try {
-      const [methodResult, bankResult] = await Promise.all([
+      const [methodResult, bankResult, categoryResult] = await Promise.all([
         accountsApi.getPaymentMethods(),
-        accountsApi.getBankAccounts()
+        accountsApi.getBankAccounts(),
+        accountsApi.getPaymentCategories()
       ]);
       setMethods(Array.isArray(methodResult) ? methodResult : []);
+      setCategories((Array.isArray(categoryResult) ? categoryResult : []).filter(item => item?.isActive !== false));
       setBankAccounts(
         (Array.isArray(bankResult) ? bankResult : []).filter(
           item => item?.isActive !== false
@@ -211,6 +252,8 @@ export default function DayBookPanel({ manager, canDelete = false, canRefund = f
         pageNumber: page,
         pageSize: PAGE_SIZE,
         entryType: entryTypeFilter || undefined,
+        categoryId: categoryFilter ? Number(categoryFilter) : undefined,
+        subCategoryId: subCategoryFilter ? Number(subCategoryFilter) : undefined,
         paymentMethodId: paymentMethodFilter
           ? Number(paymentMethodFilter)
           : undefined,
@@ -242,6 +285,8 @@ export default function DayBookPanel({ manager, canDelete = false, canRefund = f
   function resetForm() {
     setEditingId(null);
     setForm(createEmptyForm());
+    setSubCategories([]);
+    setFields([]);
     setError("");
     setFormError("");
   }
@@ -252,9 +297,41 @@ export default function DayBookPanel({ manager, canDelete = false, canRefund = f
     await loadMethods(true);
   }
 
+
+  async function changeCategory(categoryId) {
+    setForm(current => ({ ...current, categoryId, subCategoryId: "", fieldValues: {} }));
+    setFields([]);
+    if (!categoryId) { setSubCategories([]); return; }
+    try {
+      const result = await accountsApi.getPaymentSubCategoriesByCategory(Number(categoryId));
+      setSubCategories((Array.isArray(result) ? result : []).filter(item => item?.isActive !== false));
+    } catch (requestError) {
+      setFormError(requestError.message || "Unable to load Day Book subcategories.");
+    }
+  }
+
+  async function changeSubCategory(subCategoryId) {
+    setForm(current => ({ ...current, subCategoryId, fieldValues: {} }));
+    if (!subCategoryId) { setFields([]); return; }
+    try {
+      const result = await accountsApi.getPaymentFieldsBySubCategory(Number(subCategoryId));
+      setFields((Array.isArray(result) ? result : []).filter(item => item?.isActive !== false).sort((a,b) => Number(a.displayOrder || 0) - Number(b.displayOrder || 0)));
+    } catch (requestError) {
+      setFormError(requestError.message || "Unable to load Day Book fields.");
+    }
+  }
+
+  function changeFieldValue(fieldId, value) {
+    setForm(current => ({ ...current, fieldValues: { ...current.fieldValues, [String(fieldId)]: value } }));
+  }
+
   function validateForm() {
     if (!form.entryType) return "Select an entry type.";
-    if (!form.paymentFor.trim()) return "Enter payment for / account head.";
+    if (!form.categoryId) return "Select a category.";
+    const compatibleSubCategories = subCategories.filter(item => !item.entryType || String(item.entryType).toUpperCase() === String(form.entryType).toUpperCase());
+    if (compatibleSubCategories.length > 0 && !form.subCategoryId) return "Select a subcategory.";
+    const missingField = fields.find(field => field.isRequired && !String(form.fieldValues[String(field.fieldId)] || "").trim());
+    if (missingField) return `${missingField.fieldName || "Required field"} is required.`;
     if (!form.amount || Number(form.amount) <= 0) return "Enter a valid amount.";
     if (!form.paymentMethodId) return "Select a payment method.";
     if (!form.bankAccountId) return "Select a bank account.";
@@ -263,15 +340,22 @@ export default function DayBookPanel({ manager, canDelete = false, canRefund = f
   }
 
   function buildPayload() {
+    const fieldValues = fields.map(field => ({
+      fieldId: Number(field.fieldId),
+      value: String(form.fieldValues[String(field.fieldId)] || "").trim()
+    })).filter(item => item.value !== "");
     return {
       entryType: form.entryType,
-      paymentFor: form.paymentFor.trim(),
+      categoryId: Number(form.categoryId),
+      subCategoryId: form.subCategoryId ? Number(form.subCategoryId) : null,
+      paymentFor: form.paymentFor.trim() || null,
       amount: Number(form.amount),
       paymentMethodId: Number(form.paymentMethodId),
       bankAccountId: Number(form.bankAccountId),
       paymentReferenceNo: form.paymentReferenceNo.trim() || null,
       remarks: form.remarks.trim() || null,
-      transactionDate: transactionDateToIso(form.transactionDate)
+      transactionDate: transactionDateToIso(form.transactionDate),
+      fieldValues
     };
   }
 
@@ -320,9 +404,18 @@ export default function DayBookPanel({ manager, canDelete = false, canRefund = f
       setError("");
       await loadMethods();
       const item = await accountsApi.getDaybookEntry(dayBookId);
+      const loadedSubCategories = item.categoryId ? await accountsApi.getPaymentSubCategoriesByCategory(Number(item.categoryId)) : [];
+      setSubCategories((Array.isArray(loadedSubCategories) ? loadedSubCategories : []).filter(entry => entry?.isActive !== false));
+      const loadedFields = item.subCategoryId ? await accountsApi.getPaymentFieldsBySubCategory(Number(item.subCategoryId)) : [];
+      setFields((Array.isArray(loadedFields) ? loadedFields : []).filter(field => field?.isActive !== false));
+      const savedValues = {};
+      (item.fieldValues || []).forEach(field => { savedValues[String(field.fieldId)] = field.value || ""; });
       setEditingId(item.dayBookId);
       setForm({
-        entryType: String(item.entryType || "DEBIT").toUpperCase(),
+        entryType: String(item.entryType || "").toUpperCase(),
+        categoryId: item.categoryId ? String(item.categoryId) : "",
+        subCategoryId: item.subCategoryId ? String(item.subCategoryId) : "",
+        fieldValues: savedValues,
         paymentFor: item.paymentFor || "",
         amount: String(item.amount ?? ""),
         paymentMethodId: String(item.paymentMethodId ?? ""),
@@ -424,6 +517,12 @@ export default function DayBookPanel({ manager, canDelete = false, canRefund = f
             />
           </View>
           <View style={[styles.filterCell, phone && styles.filterCellPhone]}>
+            <Select label="Category" value={categoryFilter} options={filterCategoryOptions} onChange={value => { setCategoryFilter(value); setSubCategoryFilter(""); if (value) { accountsApi.getPaymentSubCategoriesByCategory(Number(value)).then(result => setSubCategories((Array.isArray(result) ? result : []).filter(item => item?.isActive !== false))).catch(() => {}); } else setSubCategories([]); }} />
+          </View>
+          <View style={[styles.filterCell, phone && styles.filterCellPhone]}>
+            <Select label="Subcategory" value={subCategoryFilter} options={filterSubCategoryOptions} onChange={setSubCategoryFilter} disabled={!categoryFilter} />
+          </View>
+          <View style={[styles.filterCell, phone && styles.filterCellPhone]}>
             <Select
               label="Payment method"
               value={paymentMethodFilter}
@@ -432,13 +531,15 @@ export default function DayBookPanel({ manager, canDelete = false, canRefund = f
             />
           </View>
         </View>
-        {entryTypeFilter || paymentMethodFilter ? (
+        {entryTypeFilter || categoryFilter || subCategoryFilter || paymentMethodFilter ? (
           <Button
             title="Clear Day Book filters"
             compact
             variant="outline"
             onPress={() => {
               setEntryTypeFilter("");
+              setCategoryFilter("");
+              setSubCategoryFilter("");
               setPaymentMethodFilter("");
             }}
           />
@@ -454,7 +555,7 @@ export default function DayBookPanel({ manager, canDelete = false, canRefund = f
         <Card key={String(item.dayBookId)} style={styles.entryCard}>
           <View style={[styles.row, phone && styles.rowPhone]}>
             <View style={styles.flex}>
-              <Text style={styles.entryTitle}>{item.paymentFor || "Day Book entry"}</Text>
+              <Text style={styles.entryTitle}>{item.categoryName || item.paymentFor || "Day Book entry"}{item.subCategoryName ? ` · ${item.subCategoryName}` : ""}</Text>
               <Text style={styles.meta}>
                 {item.paymentMethodName || "-"} · {formatDateTime(item.transactionDate || item.createdAt)}
               </Text>
@@ -463,6 +564,12 @@ export default function DayBookPanel({ manager, canDelete = false, canRefund = f
               ) : null}
               {item.paymentReferenceNo ? (
                 <Text style={styles.meta}>Ref: {item.paymentReferenceNo}</Text>
+              ) : null}
+              {item.receiptNo ? (
+                <Text style={styles.meta}>Receipt: {item.receiptNo}</Text>
+              ) : null}
+              {item.voucherNo ? (
+                <Text style={styles.meta}>Voucher: {item.voucherNo}</Text>
               ) : null}
               {item.remarks ? <Text style={styles.meta}>{item.remarks}</Text> : null}
               <View style={styles.statusRow}>
@@ -601,10 +708,41 @@ export default function DayBookPanel({ manager, canDelete = false, canRefund = f
                 label="Entry type"
                 value={form.entryType}
                 options={ENTRY_TYPES}
-                onChange={entryType =>
-                  setForm(current => ({ ...current, entryType }))
-                }
+                placeholder="Select credit or debit"
+                onChange={entryType => {
+                  setForm(current => ({ ...current, entryType, subCategoryId: "", fieldValues: {} }));
+                  setFields([]);
+                }}
               />
+              <Select
+                label="Category"
+                value={form.categoryId}
+                options={categoryOptions}
+                onChange={changeCategory}
+                placeholder="Select category"
+              />
+              {form.categoryId && subCategoryOptions.length ? (
+                <Select
+                  label="Subcategory"
+                  value={form.subCategoryId}
+                  options={subCategoryOptions}
+                  onChange={changeSubCategory}
+                  placeholder="Select subcategory"
+                />
+              ) : null}
+              {fields.length ? (
+                <View style={styles.dynamicSection}>
+                  <Text style={styles.dynamicTitle}>Additional details</Text>
+                  {fields.map(field => {
+                    const id = String(field.fieldId);
+                    const type = String(field.fieldType || "TEXT").toUpperCase();
+                    if (["BOOLEAN", "CHECKBOX", "YES_NO", "YESNO"].includes(type)) {
+                      return <Select key={id} label={`${field.fieldName || field.fieldKey || `Field ${field.fieldId}`}${field.isRequired ? " *" : ""}`} value={form.fieldValues[id] || ""} options={[{ label: "Yes", value: "true" }, { label: "No", value: "false" }]} onChange={value => changeFieldValue(id, value)} />;
+                    }
+                    return <Input key={id} label={`${field.fieldName || field.fieldKey || `Field ${field.fieldId}`}${field.isRequired ? " *" : ""}`} value={form.fieldValues[id] || ""} multiline={type === "TEXTAREA" || type === "MULTILINE"} keyboardType={type === "NUMBER" || type === "DECIMAL" ? "decimal-pad" : "default"} onChangeText={value => changeFieldValue(id, value)} />;
+                  })}
+                </View>
+              ) : null}
               <Input
                 label="Payment for / account head"
                 value={form.paymentFor}
@@ -693,6 +831,11 @@ export default function DayBookPanel({ manager, canDelete = false, canRefund = f
                 </View>
 
                 <View style={styles.detailContent}>
+                  <Text style={styles.detailLabel}>Category</Text>
+                  <Text style={styles.detailValue}>{detail.categoryName || "-"}{detail.subCategoryName ? ` · ${detail.subCategoryName}` : ""}</Text>
+                  {Array.isArray(detail.fieldValues) && detail.fieldValues.length ? (
+                    <View>{detail.fieldValues.map(field => <View key={String(field.fieldId)}><Text style={styles.detailLabel}>{field.fieldName || `Field ${field.fieldId}`}</Text><Text style={styles.detailValue}>{field.value || "-"}</Text></View>)}</View>
+                  ) : null}
                   <Text style={styles.detailLabel}>Payment for</Text>
                   <Text style={styles.detailValue}>{detail.paymentFor || "-"}</Text>
                   <Text style={styles.detailLabel}>Amount</Text>
@@ -711,6 +854,18 @@ export default function DayBookPanel({ manager, canDelete = false, canRefund = f
                   <Text style={styles.detailValue}>{detail.bankAccountName || "-"}</Text>
                   <Text style={styles.detailLabel}>Reference</Text>
                   <Text style={styles.detailValue}>{detail.paymentReferenceNo || "-"}</Text>
+                  {detail.receiptNo ? (
+                    <>
+                      <Text style={styles.detailLabel}>Receipt number</Text>
+                      <Text style={styles.detailValue}>{detail.receiptNo}</Text>
+                    </>
+                  ) : null}
+                  {detail.voucherNo ? (
+                    <>
+                      <Text style={styles.detailLabel}>Voucher number</Text>
+                      <Text style={styles.detailValue}>{detail.voucherNo}</Text>
+                    </>
+                  ) : null}
                   <Text style={styles.detailLabel}>Remarks</Text>
                   <Text style={styles.detailValue}>{detail.remarks || "-"}</Text>
                   <Text style={styles.detailLabel}>Transaction date</Text>
@@ -836,6 +991,8 @@ const styles = StyleSheet.create({
   filterGrid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.md },
   filterCell: { flex: 1, minWidth: 220 },
   filterCellPhone: { minWidth: "100%" },
+  dynamicSection: { marginTop: spacing.sm, marginBottom: spacing.sm, padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.surfaceTint },
+  dynamicTitle: { color: colors.text, fontWeight: "800", marginBottom: spacing.sm },
   error: { color: colors.danger, marginBottom: spacing.md },
   loader: { marginVertical: spacing.lg },
   entryCard: { marginBottom: spacing.sm },

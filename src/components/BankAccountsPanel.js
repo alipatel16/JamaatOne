@@ -29,6 +29,9 @@ const EMPTY_BANK = {
   branchName: "",
   remarks: "",
   openingBalance: "0",
+  accountCode: "",
+  startingReceiptNo: "",
+  startingVoucherNo: "",
   categoryIds: []
 };
 
@@ -150,6 +153,9 @@ export default function BankAccountsPanel({ canManage = false, canDelete = false
       branchName: item.branchName || "",
       remarks: item.remarks || "",
       openingBalance: String(item.openingBalance ?? 0),
+      accountCode: item.accountCode || "",
+      startingReceiptNo: item.receiptNo != null ? String(item.receiptNo) : "",
+      startingVoucherNo: item.voucherNo != null ? String(item.voucherNo) : "",
       categoryIds: (Array.isArray(item.categories) ? item.categories : []).map(
         category => String(category.categoryId)
       )
@@ -164,8 +170,20 @@ export default function BankAccountsPanel({ canManage = false, canDelete = false
       setFormError("Bank account name and bank name are required.");
       return;
     }
-    if (!Number.isFinite(Number(form.openingBalance))) {
+    if (!editingId && !Number.isFinite(Number(form.openingBalance))) {
       setFormError("Enter a valid opening balance.");
+      return;
+    }
+    if (!editingId && !form.accountCode.trim()) {
+      setFormError("Prefix is required for receipt and voucher numbering.");
+      return;
+    }
+    if (!editingId && (!Number.isInteger(Number(form.startingReceiptNo)) || Number(form.startingReceiptNo) < 0)) {
+      setFormError("Enter a valid starting receipt number.");
+      return;
+    }
+    if (!editingId && (!Number.isInteger(Number(form.startingVoucherNo)) || Number(form.startingVoucherNo) < 0)) {
+      setFormError("Enter a valid starting voucher number.");
       return;
     }
 
@@ -173,7 +191,8 @@ export default function BankAccountsPanel({ canManage = false, canDelete = false
       setSaving(true);
       setFormError("");
       if (editingId) {
-        const updated = await accountsApi.updateBankAccount(editingId, form);
+        const { openingBalance, accountCode, startingReceiptNo, startingVoucherNo, ...editableForm } = form;
+        const updated = await accountsApi.updateBankAccount(editingId, editableForm);
         setAccounts(current =>
           updated?.isActive === false
             ? current.filter(item => item.bankAccountId !== editingId)
@@ -182,7 +201,13 @@ export default function BankAccountsPanel({ canManage = false, canDelete = false
               )
         );
       } else {
-        const created = await accountsApi.createBankAccount(form);
+        const created = await accountsApi.createBankAccount({
+          ...form,
+          openingBalance: Number(form.openingBalance || 0),
+          accountCode: form.accountCode.trim(),
+          startingReceiptNo: Number(form.startingReceiptNo),
+          startingVoucherNo: Number(form.startingVoucherNo)
+        });
         if (created?.isActive !== false) {
           setAccounts(current => [created, ...current]);
         }
@@ -443,20 +468,57 @@ export default function BankAccountsPanel({ canManage = false, canDelete = false
                 value={form.branchName}
                 onChangeText={branchName => setForm(value => ({ ...value, branchName }))}
               />
-              <Input
-                label="Opening balance"
-                value={form.openingBalance}
-                keyboardType="decimal-pad"
-                placeholder="0.00"
-                helperText={
-                  editingId
-                    ? "Update the opening balance used as the starting point for this bank account."
-                    : "Enter the account balance before JamaatOne starts tracking transactions for this bank account."
-                }
-                onChangeText={openingBalance =>
-                  setForm(value => ({ ...value, openingBalance }))
-                }
-              />
+              {!editingId ? (
+                <>
+                  <Input
+                    label="Prefix"
+                    value={form.accountCode}
+                    autoCapitalize="characters"
+                    placeholder="e.g. JMT"
+                    helperText="Used as the account code prefix for generated receipt and voucher numbers."
+                    onChangeText={accountCode =>
+                      setForm(value => ({ ...value, accountCode }))
+                    }
+                  />
+                  <Input
+                    label="Starting receipt number"
+                    value={form.startingReceiptNo}
+                    keyboardType="number-pad"
+                    placeholder="1"
+                    onChangeText={startingReceiptNo =>
+                      setForm(value => ({ ...value, startingReceiptNo }))
+                    }
+                  />
+                  <Input
+                    label="Starting voucher number"
+                    value={form.startingVoucherNo}
+                    keyboardType="number-pad"
+                    placeholder="1"
+                    onChangeText={startingVoucherNo =>
+                      setForm(value => ({ ...value, startingVoucherNo }))
+                    }
+                  />
+                  <Input
+                    label="Opening balance"
+                    value={form.openingBalance}
+                    keyboardType="decimal-pad"
+                    placeholder="0.00"
+                    helperText="Opening balance is captured once when the account is created and cannot be edited later."
+                    onChangeText={openingBalance =>
+                      setForm(value => ({ ...value, openingBalance }))
+                    }
+                  />
+                </>
+              ) : (
+                <View style={styles.lockedSetupBox}>
+                  <Text style={styles.lockedSetupTitle}>Numbering setup</Text>
+                  <Text style={styles.lockedSetupText}>Prefix: {form.accountCode || "-"}</Text>
+                  <Text style={styles.lockedSetupText}>Opening balance: {money(form.openingBalance)}</Text>
+                  <Text style={styles.lockedSetupText}>Current receipt no: {form.startingReceiptNo || "-"}</Text>
+                  <Text style={styles.lockedSetupText}>Current voucher no: {form.startingVoucherNo || "-"}</Text>
+                  <Text style={styles.lockedSetupHint}>These values are fixed after account creation.</Text>
+                </View>
+              )}
               <MultiSelect
                 label="Payment categories"
                 values={form.categoryIds}
@@ -495,6 +557,10 @@ export default function BankAccountsPanel({ canManage = false, canDelete = false
 }
 
 const styles = StyleSheet.create({
+  lockedSetupBox: { padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.surfaceTint, marginBottom: spacing.md },
+  lockedSetupTitle: { color: colors.text, fontSize: 13, fontWeight: "900", marginBottom: 6 },
+  lockedSetupText: { color: colors.text, fontSize: 12, marginBottom: 3 },
+  lockedSetupHint: { color: colors.muted, fontSize: 11, marginTop: 5 },
   flex: { flex: 1, minWidth: 0 },
   hero: {
     flexDirection: "row",
