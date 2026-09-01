@@ -66,7 +66,7 @@ function normalizePaymentPayload(payload, includeMuminId) {
   };
 }
 
-function normalizeBankAccountPayload(payload) {
+function normalizeBankAccountBasePayload(payload) {
   return {
     bankAccountName: payload?.bankAccountName || null,
     bankName: payload?.bankName || null,
@@ -75,11 +75,24 @@ function normalizeBankAccountPayload(payload) {
     ifscCode: payload?.ifscCode || null,
     branchName: payload?.branchName || null,
     remarks: payload?.remarks || null,
-    openingBalance: Number(payload?.openingBalance || 0),
     categoryIds: Array.isArray(payload?.categoryIds)
       ? payload.categoryIds.map(value => Number(value)).filter(Number.isFinite)
       : []
   };
+}
+
+function normalizeCreateBankAccountPayload(payload) {
+  return {
+    ...normalizeBankAccountBasePayload(payload),
+    openingBalance: Number(payload?.openingBalance || 0),
+    accountCode: payload?.accountCode ? String(payload.accountCode).trim() : null,
+    startingReceiptNo: Number(payload?.startingReceiptNo),
+    startingVoucherNo: Number(payload?.startingVoucherNo)
+  };
+}
+
+function normalizeUpdateBankAccountPayload(payload) {
+  return normalizeBankAccountBasePayload(payload);
 }
 
 function normalizeBankDepositPayload(payload) {
@@ -331,13 +344,13 @@ export const accountsApi = {
   createBankAccount(payload) {
     return liveApiRequest(liveEndpoints.accounts.bankAccounts, {
       method: "POST",
-      body: normalizeBankAccountPayload(payload)
+      body: normalizeCreateBankAccountPayload(payload)
     });
   },
   updateBankAccount(bankAccountId, payload) {
     return liveApiRequest(liveEndpoints.accounts.bankAccountById(bankAccountId), {
       method: "PUT",
-      body: normalizeBankAccountPayload(payload)
+      body: normalizeUpdateBankAccountPayload(payload)
     });
   },
   deleteBankAccount(bankAccountId) {
