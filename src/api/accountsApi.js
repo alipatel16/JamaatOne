@@ -1,22 +1,44 @@
 import { apiRequest, liveApiRequest } from "./client";
 import { endpoints, liveEndpoints } from "./endpoints";
 
-function withOptionalJamaat(path, jamaatId) {
-  if (jamaatId === undefined || jamaatId === null || jamaatId === "") return path;
+function withOptionalQuery(path, values = {}) {
+  const params = new URLSearchParams();
+  Object.entries(values).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== "") {
+      params.set(key, String(value));
+    }
+  });
+  const query = params.toString();
+  if (!query) return path;
   const separator = path.includes("?") ? "&" : "?";
-  return `${path}${separator}jamaatId=${encodeURIComponent(String(jamaatId))}`;
+  return `${path}${separator}${query}`;
+}
+
+function withOptionalJamaat(path, jamaatId) {
+  return withOptionalQuery(path, { jamaatId });
 }
 
 function normalizeDayBookPayload(payload) {
+  const fieldValues = Array.isArray(payload?.fieldValues)
+    ? payload.fieldValues
+        .filter(item => item && item.fieldId != null)
+        .map(item => ({
+          fieldId: Number(item.fieldId),
+          value: item.value == null ? null : String(item.value)
+        }))
+    : [];
+
   return {
     entryType: payload?.entryType || null,
-    paymentFor: payload?.paymentFor || null,
+    categoryId: Number(payload?.categoryId),
+    subCategoryId: payload?.subCategoryId ? Number(payload.subCategoryId) : null,
     amount: Number(payload?.amount),
     paymentMethodId: Number(payload?.paymentMethodId),
     paymentReferenceNo: payload?.paymentReferenceNo || null,
     remarks: payload?.remarks || null,
     transactionDate: payload?.transactionDate || null,
-    bankAccountId: Number(payload?.bankAccountId)
+    bankAccountId: Number(payload?.bankAccountId),
+    fieldValues
   };
 }
 
@@ -106,14 +128,20 @@ export const accountsApi = {
     });
   },
 
-  getPaymentSubCategories(jamaatId) {
+  getPaymentSubCategories(jamaatId, entryType) {
     return liveApiRequest(
-      withOptionalJamaat(liveEndpoints.accounts.paymentSubCategories, jamaatId)
+      withOptionalQuery(liveEndpoints.accounts.paymentSubCategories, {
+        jamaatId,
+        entryType
+      })
     );
   },
-  getPaymentSubCategoriesByCategory(categoryId) {
+  getPaymentSubCategoriesByCategory(categoryId, entryType) {
     return liveApiRequest(
-      liveEndpoints.accounts.paymentSubCategoriesByCategory(categoryId)
+      withOptionalQuery(
+        liveEndpoints.accounts.paymentSubCategoriesByCategory(categoryId),
+        { entryType }
+      )
     );
   },
   getPaymentSubCategory(subCategoryId) {
@@ -121,10 +149,14 @@ export const accountsApi = {
       liveEndpoints.accounts.paymentSubCategoryById(subCategoryId)
     );
   },
-  createPaymentSubCategory(categoryId, name) {
+  createPaymentSubCategory(categoryId, name, entryType) {
     return liveApiRequest(liveEndpoints.accounts.paymentSubCategories, {
       method: "POST",
-      body: { categoryId: Number(categoryId), name }
+      body: {
+        categoryId: Number(categoryId),
+        name,
+        entryType: entryType || null
+      }
     });
   },
   updatePaymentSubCategory(subCategoryId, payload) {
@@ -135,7 +167,8 @@ export const accountsApi = {
         body: {
           categoryId: Number(payload.categoryId),
           name: payload.name,
-          isActive: Boolean(payload.isActive)
+          isActive: Boolean(payload.isActive),
+          entryType: payload.entryType || null
         }
       }
     );

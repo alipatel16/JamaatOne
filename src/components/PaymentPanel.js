@@ -508,7 +508,8 @@ export default function PaymentPanel({
     try {
       setSubCategoriesLoading(true);
       const result = await accountsApi.getPaymentSubCategoriesByCategory(
-        Number(categoryId)
+        Number(categoryId),
+        "CREDIT"
       );
       const active = (Array.isArray(result) ? result : []).filter(
         item => item.isActive !== false
@@ -874,7 +875,7 @@ export default function PaymentPanel({
                 setSubCategoryFilter("");
                 if (!value) { setFilterSubCategories([]); return; }
                 try {
-                  const result = await accountsApi.getPaymentSubCategoriesByCategory(Number(value));
+                  const result = await accountsApi.getPaymentSubCategoriesByCategory(Number(value), "CREDIT");
                   setFilterSubCategories((Array.isArray(result) ? result : []).filter(item => item?.isActive !== false));
                 } catch {
                   setFilterSubCategories([]);

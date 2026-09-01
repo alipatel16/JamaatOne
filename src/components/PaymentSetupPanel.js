@@ -12,6 +12,7 @@ import {
 } from "react-native";
 
 import { accountsApi } from "../api/accountsApi";
+import { ENTRY_TYPES } from "../constants/accounts";
 import { colors, radius, spacing } from "../theme";
 import Button from "./Button";
 import Card from "./Card";
@@ -72,7 +73,7 @@ export default function PaymentSetupPanel({ section = "all", jamaats = [] }) {
   const [scopeJamaatId, setScopeJamaatId] = useState("");
 
   const [categoryForm, setCategoryForm] = useState({ id: null, jamaatId: "", name: "", isActive: true });
-  const [subForm, setSubForm] = useState({ id: null, categoryId: "", name: "", isActive: true });
+  const [subForm, setSubForm] = useState({ id: null, categoryId: "", name: "", entryType: "", isActive: true });
   const [fieldForm, setFieldForm] = useState({
     id: null,
     subCategoryId: "",
@@ -151,7 +152,7 @@ export default function PaymentSetupPanel({ section = "all", jamaats = [] }) {
       name: "",
       isActive: true
     });
-    setSubForm({ id: null, categoryId: "", name: "", isActive: true });
+    setSubForm({ id: null, categoryId: "", name: "", entryType: "", isActive: true });
     setFieldForm({
       id: null,
       subCategoryId: "",
@@ -195,18 +196,20 @@ export default function PaymentSetupPanel({ section = "all", jamaats = [] }) {
   async function saveSubCategory() {
     if (!subForm.categoryId) return setError("Select a payment category.");
     if (!subForm.name.trim()) return setError("Subcategory name is required.");
+    if (!subForm.entryType) return setError("Select an entry type.");
     try {
       setSavingKey("subcategory"); setError("");
       if (subForm.id) {
         await accountsApi.updatePaymentSubCategory(subForm.id, {
           categoryId: Number(subForm.categoryId),
           name: subForm.name.trim(),
+          entryType: subForm.entryType,
           isActive: subForm.isActive
         });
       } else {
-        await accountsApi.createPaymentSubCategory(Number(subForm.categoryId), subForm.name.trim());
+        await accountsApi.createPaymentSubCategory(Number(subForm.categoryId), subForm.name.trim(), subForm.entryType);
       }
-      setSubForm({ id: null, categoryId: "", name: "", isActive: true });
+      setSubForm({ id: null, categoryId: "", name: "", entryType: "", isActive: true });
       await loadAll();
     } catch (e) { setError(e.message); } finally { setSavingKey(""); }
   }
@@ -319,16 +322,17 @@ export default function PaymentSetupPanel({ section = "all", jamaats = [] }) {
       <Section sectionKey="subcategories" activeSection={section} title="Payment subcategories" description="Each subcategory belongs to a payment category, for example Monthly Fee or Annual Fee under Madrasa.">
         <Select label="Category" value={subForm.categoryId} options={categoryOptions} onChange={categoryId => setSubForm(v => ({ ...v, categoryId }))} />
         <Input label="Subcategory name" value={subForm.name} onChangeText={name => setSubForm(v => ({ ...v, name }))} />
+        <Select label="Entry type" value={subForm.entryType} options={ENTRY_TYPES} onChange={entryType => setSubForm(v => ({ ...v, entryType }))} />
         {subForm.id ? <View style={styles.switchRow}><Text style={styles.switchLabel}>Active</Text><Switch value={subForm.isActive} onValueChange={isActive => setSubForm(v => ({ ...v, isActive }))} /></View> : null}
         <View style={styles.formActions}>
           <Button title={subForm.id ? "Update subcategory" : "Add subcategory"} compact loading={savingKey === "subcategory"} onPress={saveSubCategory} />
-          {subForm.id ? <Button title="Cancel" compact variant="outline" onPress={() => setSubForm({ id: null, categoryId: "", name: "", isActive: true })} /> : null}
+          {subForm.id ? <Button title="Cancel" compact variant="outline" onPress={() => setSubForm({ id: null, categoryId: "", name: "", entryType: "", isActive: true })} /> : null}
         </View>
         <View style={styles.list}>{subCategories.map(item => (
           <View key={item.subCategoryId} style={[styles.row, phone && styles.rowPhone]}>
-            <View style={[styles.flex, phone && styles.flexPhone]}><Text style={styles.name}>{item.subCategoryName}</Text><Text style={styles.meta}>{item.jamaatName ? `${item.jamaatName} · ` : ""}{item.categoryName} · ID {item.subCategoryId}</Text></View>
+            <View style={[styles.flex, phone && styles.flexPhone]}><Text style={styles.name}>{item.subCategoryName}</Text><Text style={styles.meta}>{item.jamaatName ? `${item.jamaatName} · ` : ""}{item.categoryName} · {String(item.entryType || "-").toUpperCase()} · ID {item.subCategoryId}</Text></View>
             <Status active={item.isActive !== false} />
-            <Button title="Edit" compact variant="outline" onPress={() => setSubForm({ id: item.subCategoryId, categoryId: String(item.categoryId), name: item.subCategoryName || "", isActive: item.isActive !== false })} />
+            <Button title="Edit" compact variant="outline" onPress={() => setSubForm({ id: item.subCategoryId, categoryId: String(item.categoryId), name: item.subCategoryName || "", entryType: String(item.entryType || "").toUpperCase(), isActive: item.isActive !== false })} />
             <Button title="Delete" compact variant="danger" onPress={() => remove("subcategory", item.subCategoryId, item.subCategoryName)} />
           </View>
         ))}</View>

@@ -32,7 +32,6 @@ function createEmptyForm() {
     categoryId: "",
     subCategoryId: "",
     fieldValues: {},
-    paymentFor: "",
     amount: "",
     paymentMethodId: "",
     bankAccountId: "",
@@ -188,7 +187,6 @@ export default function DayBookPanel({ manager, canDelete = false, canRefund = f
     // search can only be applied to the currently loaded server page.
     return entries.filter(item =>
       [
-        item.paymentFor,
         item.paymentMethodName,
         item.paymentReferenceNo,
         item.remarks,
@@ -298,15 +296,56 @@ export default function DayBookPanel({ manager, canDelete = false, canRefund = f
   }
 
 
+  async function loadSubCategories(categoryId, entryType = form.entryType) {
+    if (!categoryId) {
+      setSubCategories([]);
+      return [];
+    }
+    try {
+      const result = await accountsApi.getPaymentSubCategoriesByCategory(
+        Number(categoryId),
+        entryType || undefined
+      );
+      const active = (Array.isArray(result) ? result : []).filter(
+        item => item?.isActive !== false
+      );
+      setSubCategories(active);
+      return active;
+    } catch (requestError) {
+      setFormError(requestError.message || "Unable to load Day Book subcategories.");
+      return [];
+    }
+  }
+
   async function changeCategory(categoryId) {
     setForm(current => ({ ...current, categoryId, subCategoryId: "", fieldValues: {} }));
     setFields([]);
-    if (!categoryId) { setSubCategories([]); return; }
+    setFormError("");
+    await loadSubCategories(categoryId, form.entryType);
+  }
+
+  async function changeEntryType(entryType) {
+    const categoryId = form.categoryId;
+    setForm(current => ({ ...current, entryType, subCategoryId: "", fieldValues: {} }));
+    setFields([]);
+    setFormError("");
+    if (categoryId) await loadSubCategories(categoryId, entryType);
+  }
+
+  async function changeEntryTypeFilterValue(entryType) {
+    setEntryTypeFilter(entryType);
+    setSubCategoryFilter("");
+    if (!categoryFilter) return;
     try {
-      const result = await accountsApi.getPaymentSubCategoriesByCategory(Number(categoryId));
-      setSubCategories((Array.isArray(result) ? result : []).filter(item => item?.isActive !== false));
-    } catch (requestError) {
-      setFormError(requestError.message || "Unable to load Day Book subcategories.");
+      const result = await accountsApi.getPaymentSubCategoriesByCategory(
+        Number(categoryFilter),
+        entryType || undefined
+      );
+      setSubCategories(
+        (Array.isArray(result) ? result : []).filter(item => item?.isActive !== false)
+      );
+    } catch {
+      setSubCategories([]);
     }
   }
 
@@ -348,7 +387,6 @@ export default function DayBookPanel({ manager, canDelete = false, canRefund = f
       entryType: form.entryType,
       categoryId: Number(form.categoryId),
       subCategoryId: form.subCategoryId ? Number(form.subCategoryId) : null,
-      paymentFor: form.paymentFor.trim() || null,
       amount: Number(form.amount),
       paymentMethodId: Number(form.paymentMethodId),
       bankAccountId: Number(form.bankAccountId),
@@ -404,7 +442,7 @@ export default function DayBookPanel({ manager, canDelete = false, canRefund = f
       setError("");
       await loadMethods();
       const item = await accountsApi.getDaybookEntry(dayBookId);
-      const loadedSubCategories = item.categoryId ? await accountsApi.getPaymentSubCategoriesByCategory(Number(item.categoryId)) : [];
+      const loadedSubCategories = item.categoryId ? await accountsApi.getPaymentSubCategoriesByCategory(Number(item.categoryId), item.entryType || undefined) : [];
       setSubCategories((Array.isArray(loadedSubCategories) ? loadedSubCategories : []).filter(entry => entry?.isActive !== false));
       const loadedFields = item.subCategoryId ? await accountsApi.getPaymentFieldsBySubCategory(Number(item.subCategoryId)) : [];
       setFields((Array.isArray(loadedFields) ? loadedFields : []).filter(field => field?.isActive !== false));
@@ -416,7 +454,6 @@ export default function DayBookPanel({ manager, canDelete = false, canRefund = f
         categoryId: item.categoryId ? String(item.categoryId) : "",
         subCategoryId: item.subCategoryId ? String(item.subCategoryId) : "",
         fieldValues: savedValues,
-        paymentFor: item.paymentFor || "",
         amount: String(item.amount ?? ""),
         paymentMethodId: String(item.paymentMethodId ?? ""),
         bankAccountId: item.bankAccountId ? String(item.bankAccountId) : "",
@@ -513,11 +550,11 @@ export default function DayBookPanel({ manager, canDelete = false, canRefund = f
               label="Entry type"
               value={entryTypeFilter}
               options={typeFilterOptions}
-              onChange={setEntryTypeFilter}
+              onChange={changeEntryTypeFilterValue}
             />
           </View>
           <View style={[styles.filterCell, phone && styles.filterCellPhone]}>
-            <Select label="Category" value={categoryFilter} options={filterCategoryOptions} onChange={value => { setCategoryFilter(value); setSubCategoryFilter(""); if (value) { accountsApi.getPaymentSubCategoriesByCategory(Number(value)).then(result => setSubCategories((Array.isArray(result) ? result : []).filter(item => item?.isActive !== false))).catch(() => {}); } else setSubCategories([]); }} />
+            <Select label="Category" value={categoryFilter} options={filterCategoryOptions} onChange={value => { setCategoryFilter(value); setSubCategoryFilter(""); if (value) { accountsApi.getPaymentSubCategoriesByCategory(Number(value), entryTypeFilter || undefined).then(result => setSubCategories((Array.isArray(result) ? result : []).filter(item => item?.isActive !== false))).catch(() => {}); } else setSubCategories([]); }} />
           </View>
           <View style={[styles.filterCell, phone && styles.filterCellPhone]}>
             <Select label="Subcategory" value={subCategoryFilter} options={filterSubCategoryOptions} onChange={setSubCategoryFilter} disabled={!categoryFilter} />
@@ -555,7 +592,7 @@ export default function DayBookPanel({ manager, canDelete = false, canRefund = f
         <Card key={String(item.dayBookId)} style={styles.entryCard}>
           <View style={[styles.row, phone && styles.rowPhone]}>
             <View style={styles.flex}>
-              <Text style={styles.entryTitle}>{item.categoryName || item.paymentFor || "Day Book entry"}{item.subCategoryName ? ` · ${item.subCategoryName}` : ""}</Text>
+              <Text style={styles.entryTitle}>{item.categoryName || "Day Book entry"}{item.subCategoryName ? ` · ${item.subCategoryName}` : ""}</Text>
               <Text style={styles.meta}>
                 {item.paymentMethodName || "-"} · {formatDateTime(item.transactionDate || item.createdAt)}
               </Text>
@@ -709,10 +746,7 @@ export default function DayBookPanel({ manager, canDelete = false, canRefund = f
                 value={form.entryType}
                 options={ENTRY_TYPES}
                 placeholder="Select credit or debit"
-                onChange={entryType => {
-                  setForm(current => ({ ...current, entryType, subCategoryId: "", fieldValues: {} }));
-                  setFields([]);
-                }}
+                onChange={changeEntryType}
               />
               <Select
                 label="Category"
@@ -743,14 +777,6 @@ export default function DayBookPanel({ manager, canDelete = false, canRefund = f
                   })}
                 </View>
               ) : null}
-              <Input
-                label="Payment for / account head"
-                value={form.paymentFor}
-                placeholder="Electricity, salary, donation income..."
-                onChangeText={paymentFor =>
-                  setForm(current => ({ ...current, paymentFor }))
-                }
-              />
               <Input
                 label="Amount"
                 value={form.amount}
@@ -836,8 +862,6 @@ export default function DayBookPanel({ manager, canDelete = false, canRefund = f
                   {Array.isArray(detail.fieldValues) && detail.fieldValues.length ? (
                     <View>{detail.fieldValues.map(field => <View key={String(field.fieldId)}><Text style={styles.detailLabel}>{field.fieldName || `Field ${field.fieldId}`}</Text><Text style={styles.detailValue}>{field.value || "-"}</Text></View>)}</View>
                   ) : null}
-                  <Text style={styles.detailLabel}>Payment for</Text>
-                  <Text style={styles.detailValue}>{detail.paymentFor || "-"}</Text>
                   <Text style={styles.detailLabel}>Amount</Text>
                   <Text
                     style={[
