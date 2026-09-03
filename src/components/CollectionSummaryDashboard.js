@@ -403,6 +403,7 @@ function PendingByUser({ items, phone, showHeading = true }) {
 
 export default function CollectionSummaryDashboard({
   data,
+  cashSummary = [],
   loading = false,
   error = "",
   onRetry,
@@ -442,6 +443,7 @@ export default function CollectionSummaryDashboard({
   const byBankAccount = Array.isArray(data?.byBankAccount) ? data.byBankAccount : [];
   const byBankAccountAndMethod = Array.isArray(data?.byBankAccountAndMethod) ? data.byBankAccountAndMethod : [];
   const pendingByUser = Array.isArray(data?.pendingByUser) ? data.pendingByUser : [];
+  const cashPosition = Array.isArray(cashSummary) ? cashSummary : [];
 
   return (
     <View style={styles.root}>
@@ -477,6 +479,31 @@ export default function CollectionSummaryDashboard({
               <OverviewTile phone={phone} icon="cash" label="Pending cash" value={overview.currentPendingCashBalance} tone="warning" />
               <OverviewTile phone={phone} icon="checkbook" label="Pending cheque" value={overview.currentPendingChequeBalance} tone="warning" />
             </View>
+          </CollapsibleSection>
+
+          <CollapsibleSection
+            title="Cash & cheque on hand"
+            subtitle="Collected, debited, deposited and currently in-hand amount by payment method."
+            icon="cash-register"
+            defaultExpanded={!defaultCollapsed}
+            phone={phone}
+          >
+            <Card style={styles.sectionCard} elevated={false}>
+              {cashPosition.length ? cashPosition.map(item => (
+                <View key={String(item.paymentMethodId)} style={styles.cashPositionRow}>
+                  <View style={styles.flex}>
+                    <Text style={styles.cashPositionName}>{item.paymentMethodName || `Method ${item.paymentMethodId}`}</Text>
+                    <Text style={styles.cashPositionMeta}>
+                      Collected {money(item.totalCollected)} · Debited {money(item.totalDebited)} · Deposited {money(item.totalDeposited)}
+                    </Text>
+                  </View>
+                  <View style={styles.cashPositionAmountWrap}>
+                    <Text style={styles.cashPositionLabel}>On hand</Text>
+                    <Text style={styles.cashPositionAmount}>{money(item.inHand)}</Text>
+                  </View>
+                </View>
+              )) : <Text style={styles.empty}>No cash-position data is available for this period.</Text>}
+            </Card>
           </CollapsibleSection>
 
           <CollapsibleSection
@@ -571,6 +598,29 @@ export default function CollectionSummaryDashboard({
             <OverviewTile phone={phone} icon="checkbook" label="Pending cheque" value={overview.currentPendingChequeBalance} tone="warning" />
           </View>
 
+          <Card style={styles.sectionCard} elevated={false}>
+            <View style={styles.sectionHeading}>
+              <View style={styles.flex}>
+                <Text style={styles.sectionTitle}>Cash & cheque on hand</Text>
+                <Text style={styles.sectionSubtitle}>Live in-hand position by payment method for the selected period.</Text>
+              </View>
+            </View>
+            {cashPosition.length ? cashPosition.map(item => (
+              <View key={String(item.paymentMethodId)} style={styles.cashPositionRow}>
+                <View style={styles.flex}>
+                  <Text style={styles.cashPositionName}>{item.paymentMethodName || `Method ${item.paymentMethodId}`}</Text>
+                  <Text style={styles.cashPositionMeta}>
+                    Collected {money(item.totalCollected)} · Debited {money(item.totalDebited)} · Deposited {money(item.totalDeposited)}
+                  </Text>
+                </View>
+                <View style={styles.cashPositionAmountWrap}>
+                  <Text style={styles.cashPositionLabel}>On hand</Text>
+                  <Text style={styles.cashPositionAmount}>{money(item.inHand)}</Text>
+                </View>
+              </View>
+            )) : <Text style={styles.empty}>No cash-position data is available for this period.</Text>}
+          </Card>
+
           <PendingByUser items={pendingByUser} phone={phone} />
           <BankAccountSection items={byBankAccount} phone={phone} />
 
@@ -615,6 +665,12 @@ export default function CollectionSummaryDashboard({
 const styles = StyleSheet.create({
   root: { width: "100%", gap: spacing.md },
   flex: { flex: 1, minWidth: 0 },
+  cashPositionRow: { flexDirection: "row", alignItems: "center", gap: spacing.md, paddingVertical: spacing.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+  cashPositionName: { color: colors.text, fontSize: 13, fontWeight: "900" },
+  cashPositionMeta: { color: colors.muted, fontSize: 10, lineHeight: 15, marginTop: 3 },
+  cashPositionAmountWrap: { alignItems: "flex-end", minWidth: 110 },
+  cashPositionLabel: { color: colors.muted, fontSize: 9, fontWeight: "800", textTransform: "uppercase", letterSpacing: 0.6 },
+  cashPositionAmount: { color: colors.primaryStrong, fontSize: 15, fontWeight: "900", marginTop: 2 },
   accordion: {
     width: "100%",
     borderWidth: 1,

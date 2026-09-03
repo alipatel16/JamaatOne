@@ -15,7 +15,6 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 import { accountsApi } from "../api/accountsApi";
-import { useAuth } from "../context/AuthContext";
 import { colors, radius, shadows, spacing } from "../theme";
 import ActivityTimeline from "./ActivityTimeline";
 import Button from "./Button";
@@ -101,10 +100,10 @@ export default function CashManagementPanel({ canDelete = false, mode = "overvie
   const phone = width < 600;
   const narrow = width < 380;
   const router = useRouter();
-  const { user } = useAuth();
   const showOverview = mode === "overview";
   const showBanking = mode === "banking";
   const [collectionSummary, setCollectionSummary] = useState(null);
+  const [cashSummary, setCashSummary] = useState([]);
   const [collectionLoading, setCollectionLoading] = useState(false);
   const [collectionError, setCollectionError] = useState("");
   const [collectionUserPage, setCollectionUserPage] = useState(1);
@@ -163,12 +162,14 @@ export default function CashManagementPanel({ canDelete = false, mode = "overvie
   async function loadReferenceData() {
     try {
       setError("");
-      const [collectionResult, bankResult, methodResult] = await Promise.all([
+      const [collectionResult, cashResult, bankResult, methodResult] = await Promise.all([
         accountsApi.getCollectionSummary({ pageNumber: 1, pageSize: 20 }),
+        accountsApi.getCashSummary(),
         accountsApi.getBankAccounts(),
         accountsApi.getPaymentMethods()
       ]);
       setCollectionSummary(collectionResult || null);
+      setCashSummary(Array.isArray(cashResult) ? cashResult : []);
       setBankAccounts(
         (Array.isArray(bankResult) ? bankResult : []).filter(
           item => item?.isActive !== false
@@ -234,23 +235,22 @@ export default function CashManagementPanel({ canDelete = false, mode = "overvie
   );
 
   const myPendingBalances = useMemo(() => {
-    const currentUserId = String(user?.userId ?? "");
-    const rows = Array.isArray(collectionSummary?.pendingByUser)
-      ? collectionSummary.pendingByUser
-      : [];
-    return rows
-      .filter(item => !currentUserId || String(item?.userId ?? "") === currentUserId)
-      .reduce(
-        (result, item) => {
-          const balanceType = String(item?.balanceType || "").trim().toLowerCase();
-          const amount = Number(item?.estimatedPendingAmount || 0);
-          if (balanceType === "cash") result.cash += amount;
-          if (balanceType === "cheque" || balanceType === "check") result.cheque += amount;
-          return result;
-        },
-        { cash: 0, cheque: 0 }
-      );
-  }, [collectionSummary, user?.userId]);
+    const overview = collectionSummary?.overview || {};
+    const rows = Array.isArray(cashSummary) ? cashSummary : [];
+    let cash = null;
+    let cheque = null;
+
+    rows.forEach(item => {
+      const type = getBalanceType(item?.paymentMethodName);
+      if (type === "Cash") cash = Number(cash || 0) + Number(item?.inHand || 0);
+      if (type === "Cheque") cheque = Number(cheque || 0) + Number(item?.inHand || 0);
+    });
+
+    return {
+      cash: cash != null ? cash : Number(overview?.currentPendingCashBalance || 0),
+      cheque: cheque != null ? cheque : Number(overview?.currentPendingChequeBalance || 0)
+    };
+  }, [cashSummary, collectionSummary]);
 
   const selectedPending = useMemo(() => {
     const selectedMethod = paymentMethods.find(
@@ -260,7 +260,7 @@ export default function CashManagementPanel({ canDelete = false, mode = "overvie
       item => String(item.bankAccountId) === String(depositForm.bankAccountId)
     );
     const balanceType = getBalanceType(selectedMethod?.paymentMethodName);
-    if (!balanceType || !selectedBank) {
+    if (!balanceType) {
       return {
         balanceType,
         ownPending: null,
@@ -270,30 +270,30 @@ export default function CashManagementPanel({ canDelete = false, mode = "overvie
       };
     }
 
-    const currentUserId = String(user?.userId ?? "");
-    const hasPendingOwnershipData = Array.isArray(collectionSummary?.pendingByUser);
-    const rows = hasPendingOwnershipData ? collectionSummary.pendingByUser : [];
-    const matchingRows = rows.filter(item => {
-      const sameUser = currentUserId && String(item?.userId ?? "") === currentUserId;
-      const sameBank = String(item?.bankAccountId ?? "") === String(selectedBank.bankAccountId);
-      const sameType = String(item?.balanceType || "").trim().toLowerCase() === balanceType.toLowerCase();
-      return sameUser && sameBank && sameType;
-    });
-    const ownPending = currentUserId && hasPendingOwnershipData
-      ? matchingRows.reduce((total, item) => total + Number(item?.estimatedPendingAmount || 0), 0)
+    const methodCashPosition = (Array.isArray(cashSummary) ? cashSummary : []).find(
+      item => String(item?.paymentMethodId) === String(selectedMethod?.paymentMethodId)
+    );
+    const overview = collectionSummary?.overview || {};
+    const overviewPending = balanceType === "Cash"
+      ? Number(overview?.currentPendingCashBalance || 0)
+      : Number(overview?.currentPendingChequeBalance || 0);
+    const bankPending = selectedBank
+      ? (balanceType === "Cash"
+          ? Number(selectedBank.pendingCashBalance || 0)
+          : Number(selectedBank.pendingChequeBalance || 0))
       : null;
-    const bankPending = balanceType === "Cash"
-      ? Number(selectedBank.pendingCashBalance || 0)
-      : Number(selectedBank.pendingChequeBalance || 0);
+    const available = methodCashPosition
+      ? Number(methodCashPosition.inHand || 0)
+      : overviewPending;
 
     return {
       balanceType,
-      ownPending,
+      ownPending: available,
       bankPending,
-      available: ownPending != null ? ownPending : bankPending,
-      source: ownPending != null ? "your pending collection" : "bank pending balance"
+      available,
+      source: methodCashPosition ? `${selectedMethod?.paymentMethodName || balanceType} on hand` : `current pending ${balanceType.toLowerCase()} balance`
     };
-  }, [bankAccounts, collectionSummary, depositForm.bankAccountId, depositForm.paymentMethodId, paymentMethods, user?.userId]);
+  }, [bankAccounts, cashSummary, collectionSummary, depositForm.bankAccountId, depositForm.paymentMethodId, paymentMethods]);
 
   function openCreateDeposit() {
     setEditingDepositId(null);
@@ -588,17 +588,17 @@ export default function CashManagementPanel({ canDelete = false, mode = "overvie
                     <MaterialCommunityIcons name="account-cash-outline" size={20} color={colors.primaryStrong} />
                   </View>
                   <View style={styles.flex}>
-                    <Text style={styles.pendingAvailabilityTitle}>Pending with you</Text>
-                    <Text style={styles.pendingAvailabilitySubtitle}>Amounts still expected to be deposited under your name.</Text>
+                    <Text style={styles.pendingAvailabilityTitle}>Available to deposit</Text>
+                    <Text style={styles.pendingAvailabilitySubtitle}>Current cash and cheque on hand before recording this bank deposit.</Text>
                   </View>
                 </View>
                 <View style={[styles.pendingAvailabilityGrid, narrow && styles.pendingAvailabilityGridNarrow]}>
                   <View style={styles.pendingAvailabilityItem}>
-                    <Text style={styles.pendingAvailabilityLabel}>Cash</Text>
+                    <Text style={styles.pendingAvailabilityLabel}>Cash on Hand</Text>
                     <Text style={styles.pendingAvailabilityValue}>{money(myPendingBalances.cash)}</Text>
                   </View>
                   <View style={styles.pendingAvailabilityItem}>
-                    <Text style={styles.pendingAvailabilityLabel}>Cheque</Text>
+                    <Text style={styles.pendingAvailabilityLabel}>Cheque on Hand</Text>
                     <Text style={styles.pendingAvailabilityValue}>{money(myPendingBalances.cheque)}</Text>
                   </View>
                 </View>

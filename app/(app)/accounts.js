@@ -414,6 +414,7 @@ export default function AccountsScreen() {
   const [summaryVisible, setSummaryVisible] = useState(false);
   const [summaryError, setSummaryError] = useState("");
   const [collectionSummary, setCollectionSummary] = useState(null);
+  const [cashSummary, setCashSummary] = useState([]);
   const [collectionLoading, setCollectionLoading] = useState(false);
   const [collectionError, setCollectionError] = useState("");
   const [collectionUserPage, setCollectionUserPage] = useState(1);
@@ -538,16 +539,24 @@ export default function AccountsScreen() {
     setCollectionLoading(true);
     setCollectionError("");
     try {
-      const result = await accountsApi.getCollectionSummary({
+      const filters = {
         fromDate: toApiFromDate(statsDates.from),
-        toDate: toApiToDate(statsDates.to),
-        pageNumber,
-        pageSize: 10
-      });
-      setCollectionSummary(result || null);
-      setCollectionUserPage(Number(result?.byUser?.pageNumber || pageNumber || 1));
+        toDate: toApiToDate(statsDates.to)
+      };
+      const [collectionResult, cashResult] = await Promise.all([
+        accountsApi.getCollectionSummary({
+          ...filters,
+          pageNumber,
+          pageSize: 10
+        }),
+        accountsApi.getCashSummary(filters)
+      ]);
+      setCollectionSummary(collectionResult || null);
+      setCashSummary(Array.isArray(cashResult) ? cashResult : []);
+      setCollectionUserPage(Number(collectionResult?.byUser?.pageNumber || pageNumber || 1));
     } catch (requestError) {
       if (!collectionSummary) setCollectionSummary(null);
+      setCashSummary([]);
       setCollectionError(
         requestError.message || "Unable to load collection details."
       );
@@ -796,6 +805,7 @@ export default function AccountsScreen() {
 
           <CollectionSummaryDashboard
             data={collectionSummary}
+            cashSummary={cashSummary}
             loading={collectionLoading}
             error={collectionError}
             onRetry={() => loadCollectionDetails(collectionUserPage)}
