@@ -15,14 +15,56 @@ const formatAmount = value =>
     maximumFractionDigits: 2
   });
 
+const row = (key, value) => `
+  <div class="row">
+    <div class="cell key">${escapeHtml(key)}</div>
+    <div class="cell value">${escapeHtml(value || "-")}</div>
+  </div>`;
+
 export const receiptHtml = r => {
+  const documentType = String(r.documentType || "RECEIPT").toUpperCase();
+  const isVoucher = documentType === "VOUCHER";
+  const isDayBook = Boolean(r.isDayBook);
   const subtype = r.subType || r.lagatType;
   const paymentDescription =
     r.paymentFor === "OTHERS"
       ? r.otherDescription
       : subtype
-        ? `${label(r.paymentFor)} · ${label(subtype)}`
-        : label(r.paymentFor);
+        ? `${String(r.paymentFor || "-").replaceAll("_", " ")} · ${String(subtype).replaceAll("_", " ")}`
+        : String(r.paymentFor || "-").replaceAll("_", " ");
+
+  const detailSections = isDayBook
+    ? `
+      <div class="section-title">DAY BOOK DETAILS</div>
+      <div class="grid">
+        ${row("Entry type", r.entryType)}
+        ${row("Category", r.paymentFor)}
+        ${row("Payment method", r.paymentMethod)}
+        ${row("Bank account", r.bankAccountName)}
+        ${row("Reference", r.referenceNumber)}
+        ${row("Notes", r.notes)}
+      </div>`
+    : `
+      <div class="section-title">MEMBER DETAILS</div>
+      <div class="grid">
+        ${row("Paid by", r.userName)}
+        ${row("ITS ID / Grade", `${r.itsId || "-"} / ${r.userGrade || "-"}`)}
+        ${r.paidForUserName ? row(
+          "Madrasa fee paid for",
+          `${r.paidForUserName}${r.paidForItsId ? ` · ITS ${r.paidForItsId}` : ""}`
+        ) : ""}
+      </div>
+
+      <div class="section-title">PAYMENT DETAILS</div>
+      <div class="grid">
+        ${row("Payment for", paymentDescription)}
+        ${row(
+          "Payment method",
+          `${String(r.paymentMethod || "-").replaceAll("_", " ")}${r.referenceNumber ? ` · ${r.referenceNumber}` : ""}`
+        )}
+        ${row("Bank account", r.bankAccountName)}
+        ${row("Notes", r.notes)}
+      </div>`;
 
   return `<!doctype html>
 <html>
@@ -93,15 +135,13 @@ export const receiptHtml = r => {
       color: #E7D3AB;
       font-size: 12px;
     }
-    .content {
-      padding: 28px 34px 34px;
-    }
+    .content { padding: 28px 34px 34px; }
     .status {
       display: inline-block;
       padding: 7px 12px;
       border-radius: 999px;
-      background: #EAF4ED;
-      color: #52715E;
+      background: ${isVoucher ? "#F7F0E5" : "#EAF4ED"};
+      color: ${isVoucher ? "#7A6A52" : "#52715E"};
       font-size: 11px;
       font-weight: 700;
       letter-spacing: .5px;
@@ -150,10 +190,7 @@ export const receiptHtml = r => {
       border-bottom: 1px solid #E9EDEA;
     }
     .row:last-child { border-bottom: 0; }
-    .cell {
-      padding: 12px 14px;
-      min-height: 42px;
-    }
+    .cell { padding: 12px 14px; min-height: 42px; }
     .key {
       width: 34%;
       background: #FAFBFA;
@@ -181,11 +218,7 @@ export const receiptHtml = r => {
       font-weight: 700;
       letter-spacing: 1px;
     }
-    .recorder-value {
-      margin-top: 5px;
-      font-weight: 700;
-      font-size: 12px;
-    }
+    .recorder-value { margin-top: 5px; font-weight: 700; font-size: 12px; }
     .signature {
       width: 190px;
       margin-left: auto;
@@ -197,10 +230,7 @@ export const receiptHtml = r => {
       font-size: 11px;
     }
     .footer {
-      position: absolute;
-      left: 34px;
-      right: 34px;
-      bottom: 24px;
+      margin-top: 42px;
       border-top: 1px solid #E3E8E5;
       padding-top: 12px;
       display: flex;
@@ -214,23 +244,23 @@ export const receiptHtml = r => {
   <div class="sheet">
     <div class="header">
       <div>
-        <div class="brand-kicker">OFFICIAL PAYMENT RECEIPT</div>
-        <div class="brand">${escapeHtml("Dawoodi Bohra Jamaat")}</div>
-        <div class="address">${escapeHtml(r.jamaatName)}</div>
+        <div class="brand-kicker">OFFICIAL PAYMENT ${documentType}</div>
+        <div class="brand">Dawoodi Bohra Jamaat</div>
+        <div class="address">${escapeHtml(r.jamaatName || "JamaatOne")}</div>
       </div>
       <div class="receipt-box">
-        <div class="receipt-label">RECEIPT NUMBER</div>
+        <div class="receipt-label">${documentType} NUMBER</div>
         <div class="receipt-number">${escapeHtml(r.receiptNumber || "-")}</div>
         <div class="receipt-date">${escapeHtml(r.paymentDate || "-")}</div>
       </div>
     </div>
 
     <div class="content">
-      <span class="status">PAYMENT RECEIVED</span>
+      <span class="status">${isVoucher ? "PAYMENT VOUCHER" : "PAYMENT RECEIVED"}</span>
 
       <div class="amount-panel">
         <div>
-          <div class="amount-caption">AMOUNT RECEIVED</div>
+          <div class="amount-caption">${isVoucher ? "AMOUNT PAID" : "AMOUNT RECEIVED"}</div>
           <div style="margin-top:8px;color:#7A6A52;font-size:12px;">${escapeHtml(paymentDescription)}</div>
         </div>
         <div>
@@ -239,54 +269,23 @@ export const receiptHtml = r => {
         </div>
       </div>
 
-      <div class="section-title">MEMBER DETAILS</div>
-      <div class="grid">
-        <div class="row">
-          <div class="cell key">Paid by</div>
-          <div class="cell value">${escapeHtml(r.userName || "-")}</div>
-        </div>
-        <div class="row">
-          <div class="cell key">ITS ID / Grade</div>
-          <div class="cell value">${escapeHtml(r.itsId || "-")} / ${escapeHtml(r.userGrade || "-")}</div>
-        </div>
-        ${r.paidForUserName ? `
-        <div class="row">
-          <div class="cell key">Madrasa fee paid for</div>
-          <div class="cell value">${escapeHtml(r.paidForUserName)}${r.paidForItsId ? ` · ITS ${escapeHtml(r.paidForItsId)}` : ""}</div>
-        </div>` : ""}
-      </div>
-
-      <div class="section-title">PAYMENT DETAILS</div>
-      <div class="grid">
-        <div class="row">
-          <div class="cell key">Payment category</div>
-          <div class="cell value">${escapeHtml(paymentDescription)}</div>
-        </div>
-        <div class="row">
-          <div class="cell key">Payment method</div>
-          <div class="cell value">${label(r.paymentMethod)}${r.referenceNumber ? ` · ${escapeHtml(r.referenceNumber)}` : ""}</div>
-        </div>
-        <div class="row">
-          <div class="cell key">Notes</div>
-          <div class="cell value">${escapeHtml(r.notes || "-")}</div>
-        </div>
-      </div>
+      ${detailSections}
 
       <div class="recorder">
         <div>
-          <div class="recorder-label">PAYMENT RECORDED BY</div>
+          <div class="recorder-label">${isDayBook ? "ENTRY RECORDED BY" : "PAYMENT RECORDED BY"}</div>
           <div class="recorder-value">${escapeHtml(r.recordedByName || r.createdByName || "-")}</div>
         </div>
         <div style="text-align:right">
           <div class="recorder-label">ITS ID</div>
-          <div class="recorder-value">${escapeHtml(r.recordedByItsId || r.createdByItsId || "-")}</div>
+          <div class="recorder-value">${escapeHtml(r.recordedByItsId || r.createdByItsNo || "-")}</div>
         </div>
       </div>
 
       <div class="signature">Authorised Signature</div>
 
       <div class="footer">
-        <span>Computer-generated receipt. Please retain it for your records.</span>
+        <span>Computer-generated ${documentType.toLowerCase()}. Please retain it for your records.</span>
         <span>Generated by JamaatOne</span>
       </div>
     </div>

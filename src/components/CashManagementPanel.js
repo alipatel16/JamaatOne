@@ -15,6 +15,7 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 import { accountsApi } from "../api/accountsApi";
+import { useAuth } from "../context/AuthContext";
 import { colors, radius, shadows, spacing } from "../theme";
 import ActivityTimeline from "./ActivityTimeline";
 import Button from "./Button";
@@ -100,10 +101,10 @@ export default function CashManagementPanel({ canDelete = false, mode = "overvie
   const phone = width < 600;
   const narrow = width < 380;
   const router = useRouter();
+  const { user } = useAuth();
   const showOverview = mode === "overview";
   const showBanking = mode === "banking";
   const [collectionSummary, setCollectionSummary] = useState(null);
-  const [cashSummary, setCashSummary] = useState([]);
   const [collectionLoading, setCollectionLoading] = useState(false);
   const [collectionError, setCollectionError] = useState("");
   const [collectionUserPage, setCollectionUserPage] = useState(1);
@@ -162,14 +163,12 @@ export default function CashManagementPanel({ canDelete = false, mode = "overvie
   async function loadReferenceData() {
     try {
       setError("");
-      const [collectionResult, cashResult, bankResult, methodResult] = await Promise.all([
+      const [collectionResult, bankResult, methodResult] = await Promise.all([
         accountsApi.getCollectionSummary({ pageNumber: 1, pageSize: 20 }),
-        accountsApi.getCashSummary(),
         accountsApi.getBankAccounts(),
         accountsApi.getPaymentMethods()
       ]);
       setCollectionSummary(collectionResult || null);
-      setCashSummary(Array.isArray(cashResult) ? cashResult : []);
       setBankAccounts(
         (Array.isArray(bankResult) ? bankResult : []).filter(
           item => item?.isActive !== false
@@ -227,30 +226,38 @@ export default function CashManagementPanel({ canDelete = false, mode = "overvie
 
   const paymentMethodOptions = useMemo(
     () =>
-      paymentMethods.map(item => ({
-        value: String(item.paymentMethodId),
-        label: item.paymentMethodName || `Method ${item.paymentMethodId}`
-      })),
+      paymentMethods
+        .filter(item => Boolean(getBalanceType(item?.paymentMethodName)))
+        .map(item => ({
+          value: String(item.paymentMethodId),
+          label: item.paymentMethodName || `Method ${item.paymentMethodId}`
+        })),
     [paymentMethods]
   );
 
-  const myPendingBalances = useMemo(() => {
-    const overview = collectionSummary?.overview || {};
-    const rows = Array.isArray(cashSummary) ? cashSummary : [];
-    let cash = null;
-    let cheque = null;
+  const myPendingRows = useMemo(() => {
+    const userId = user?.userId ?? user?.id;
+    if (userId === undefined || userId === null || userId === "") return [];
+    return (Array.isArray(collectionSummary?.pendingByUser)
+      ? collectionSummary.pendingByUser
+      : []
+    ).filter(item => String(item?.userId) === String(userId));
+  }, [collectionSummary, user?.id, user?.userId]);
 
-    rows.forEach(item => {
-      const type = getBalanceType(item?.paymentMethodName);
-      if (type === "Cash") cash = Number(cash || 0) + Number(item?.inHand || 0);
-      if (type === "Cheque") cheque = Number(cheque || 0) + Number(item?.inHand || 0);
-    });
-
-    return {
-      cash: cash != null ? cash : Number(overview?.currentPendingCashBalance || 0),
-      cheque: cheque != null ? cheque : Number(overview?.currentPendingChequeBalance || 0)
-    };
-  }, [cashSummary, collectionSummary]);
+  const myPendingBalances = useMemo(
+    () =>
+      myPendingRows.reduce(
+        (totals, item) => {
+          const type = getBalanceType(item?.balanceType);
+          const amount = Number(item?.estimatedPendingAmount || 0);
+          if (type === "Cash") totals.cash += amount;
+          if (type === "Cheque") totals.cheque += amount;
+          return totals;
+        },
+        { cash: 0, cheque: 0 }
+      ),
+    [myPendingRows]
+  );
 
   const selectedPending = useMemo(() => {
     const selectedMethod = paymentMethods.find(
@@ -270,30 +277,28 @@ export default function CashManagementPanel({ canDelete = false, mode = "overvie
       };
     }
 
-    const methodCashPosition = (Array.isArray(cashSummary) ? cashSummary : []).find(
-      item => String(item?.paymentMethodId) === String(selectedMethod?.paymentMethodId)
+    const matchingRows = myPendingRows.filter(item => {
+      const sameType = getBalanceType(item?.balanceType) === balanceType;
+      const sameBank = selectedBank
+        ? String(item?.bankAccountId) === String(selectedBank.bankAccountId)
+        : true;
+      return sameType && sameBank;
+    });
+    const available = matchingRows.reduce(
+      (sum, item) => sum + Number(item?.estimatedPendingAmount || 0),
+      0
     );
-    const overview = collectionSummary?.overview || {};
-    const overviewPending = balanceType === "Cash"
-      ? Number(overview?.currentPendingCashBalance || 0)
-      : Number(overview?.currentPendingChequeBalance || 0);
-    const bankPending = selectedBank
-      ? (balanceType === "Cash"
-          ? Number(selectedBank.pendingCashBalance || 0)
-          : Number(selectedBank.pendingChequeBalance || 0))
-      : null;
-    const available = methodCashPosition
-      ? Number(methodCashPosition.inHand || 0)
-      : overviewPending;
 
     return {
       balanceType,
       ownPending: available,
-      bankPending,
+      bankPending: available,
       available,
-      source: methodCashPosition ? `${selectedMethod?.paymentMethodName || balanceType} on hand` : `current pending ${balanceType.toLowerCase()} balance`
+      source: selectedBank
+        ? `your pending ${balanceType.toLowerCase()} for ${selectedBank.bankAccountName || selectedBank.bankName || "the selected bank"}`
+        : `your pending ${balanceType.toLowerCase()}`
     };
-  }, [bankAccounts, cashSummary, collectionSummary, depositForm.bankAccountId, depositForm.paymentMethodId, paymentMethods]);
+  }, [bankAccounts, depositForm.bankAccountId, depositForm.paymentMethodId, myPendingRows, paymentMethods]);
 
   function openCreateDeposit() {
     setEditingDepositId(null);

@@ -13,10 +13,6 @@ export const liveEndpoints = {
     aamilById: userId => `/api/Users/aamils/${userId}`,
     committeeMembers: "/api/Users/committee-members",
     committeeMemberById: userId => `/api/Users/committee-members/${userId}`,
-    fmbUsers: "/api/Users/fmb-users",
-    fmbUserById: userId => `/api/Users/fmb-users/${userId}`,
-    madarsaAdmins: "/api/Users/madarsa-admins",
-    madarsaAdminById: userId => `/api/Users/madarsa-admins/${userId}`,
     paged: (path, { pageNumber = 1, pageSize = 20, search, jamaatId } = {}) => {
       const params = new URLSearchParams({
         pageNumber: String(pageNumber),

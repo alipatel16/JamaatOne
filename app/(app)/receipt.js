@@ -37,12 +37,15 @@ function formatReceiptDate(value) {
   });
 }
 
-function deriveReceiptNumber(payment) {
-  const createdAt = new Date(payment?.createdAt || Date.now());
-  const year = Number.isFinite(createdAt.getTime())
-    ? createdAt.getFullYear()
-    : new Date().getFullYear();
-  return `JMT-${year}-${String(payment?.paymentId || "").padStart(4, "0")}`;
+function isDebitEntry(value) {
+  return String(value || "").trim().toUpperCase() === "DEBIT";
+}
+
+function amountInWords(value) {
+  return `Rupees ${Number(value || 0).toLocaleString("en-IN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  })} only`;
 }
 
 function findPaidForMember(fieldValues = []) {
@@ -58,22 +61,22 @@ function makeLiveReceipt(payment, mumin) {
     .join(" · ");
 
   return {
+    documentType: "RECEIPT",
+    isDayBook: false,
     jamaatName: payment?.jamaatName || "JamaatOne",
     jamaatAddress: "",
-    receiptNumber: deriveReceiptNumber(payment),
+    receiptNumber: payment?.receiptNo || "-",
     paymentDate: formatReceiptDate(payment?.transactionDate || payment?.createdAt),
     paymentFor: category || "Payment",
     amount: Number(payment?.amount || 0),
-    amountInWords: `Rupees ${Number(payment?.amount || 0).toLocaleString("en-IN", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    })} only`,
+    amountInWords: amountInWords(payment?.amount),
     userName: payment?.muminName || mumin?.fullName || mumin?.firstName || "-",
     itsId: mumin?.itsId || "-",
     userGrade: mumin?.category || "-",
     paidForUserName: paidFor?.value || "",
     paidForItsId: "",
     paymentMethod: payment?.paymentMethodName || "-",
+    bankAccountName: payment?.bankAccountName || "-",
     referenceNumber: payment?.paymentReference || "",
     notes: payment?.remarks || "",
     recordedByName: payment?.updatedByName || payment?.createdByName || "-",
@@ -88,10 +91,39 @@ function makeLiveReceipt(payment, mumin) {
   };
 }
 
+function makeDayBookDocument(entry) {
+  const voucher = isDebitEntry(entry?.entryType);
+  const category = [entry?.categoryName, entry?.subCategoryName]
+    .filter(Boolean)
+    .join(" · ");
+
+  return {
+    documentType: voucher ? "VOUCHER" : "RECEIPT",
+    isDayBook: true,
+    entryType: entry?.entryType || (voucher ? "DEBIT" : "CREDIT"),
+    jamaatName: entry?.jamaatName || "JamaatOne",
+    jamaatAddress: "",
+    receiptNumber: voucher ? entry?.voucherNo || "-" : entry?.receiptNo || "-",
+    paymentDate: formatReceiptDate(entry?.transactionDate || entry?.createdAt),
+    paymentFor: category || "Day Book entry",
+    amount: Number(entry?.amount || 0),
+    amountInWords: amountInWords(entry?.amount),
+    paymentMethod: entry?.paymentMethodName || "-",
+    bankAccountName: entry?.bankAccountName || "-",
+    referenceNumber: entry?.paymentReferenceNo || "",
+    notes: entry?.remarks || "",
+    recordedByName: entry?.updatedByName || entry?.createdByName || "-",
+    recordedByItsId: entry?.updatedByItsNo || entry?.createdByItsNo || "-",
+    createdByName: entry?.createdByName || "",
+    createdByItsNo: entry?.createdByItsNo || "",
+    fieldValues: entry?.fieldValues || []
+  };
+}
+
 export default function Receipt() {
   const { user } = useAuth();
   const manager = canManageAccounts(user);
-  const { paymentId } = useLocalSearchParams();
+  const { paymentId, dayBookId } = useLocalSearchParams();
   const { width } = useWindowDimensions();
   const isWide = width >= 760;
   const phone = width < 600;
@@ -100,12 +132,23 @@ export default function Receipt() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (!paymentId) return;
+    if (!paymentId && !dayBookId) return;
 
     let active = true;
     (async () => {
       try {
         setError("");
+        setReceipt(null);
+
+        if (dayBookId) {
+          if (!manager) {
+            throw new Error("This Day Book document is only available to account managers.");
+          }
+          const entry = await accountsApi.getDaybookEntry(dayBookId);
+          if (active) setReceipt(makeDayBookDocument(entry));
+          return;
+        }
+
         const payment = await accountsApi.getPayment(paymentId);
 
         if (!manager) {
@@ -129,14 +172,19 @@ export default function Receipt() {
         }
         if (active) setReceipt(makeLiveReceipt(payment, mumin));
       } catch (result) {
-        if (active) setError(result.message || "Unable to load payment receipt.");
+        if (active) {
+          setError(
+            result.message ||
+              (dayBookId ? "Unable to load Day Book document." : "Unable to load payment receipt.")
+          );
+        }
       }
     })();
 
     return () => {
       active = false;
     };
-  }, [paymentId, manager, user?.itsNo, user?.itsId]);
+  }, [dayBookId, paymentId, manager, user?.itsNo, user?.itsId]);
 
   if (!receipt && !error) return <LoadingView />;
 
@@ -167,7 +215,7 @@ export default function Receipt() {
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(uri, {
           mimeType: "application/pdf",
-          dialogTitle: "Download or share receipt"
+          dialogTitle: `Download or share ${String(receipt?.documentType || "receipt").toLowerCase()}`
         });
       } else {
         Alert.alert("PDF created", uri);
@@ -177,14 +225,20 @@ export default function Receipt() {
     }
   }
 
+  const documentType = String(receipt?.documentType || "RECEIPT").toUpperCase();
+  const isVoucher = documentType === "VOUCHER";
+  const documentTitle = isVoucher ? "Payment voucher" : "Payment receipt";
+
   return (
     <Screen>
       <View style={[styles.pageHeader, isWide && styles.pageHeaderWide]}>
         <View>
-          <Text style={styles.eyebrow}>OFFICIAL RECEIPT</Text>
-          <Text style={styles.pageTitle}>Payment receipt</Text>
+          <Text style={styles.eyebrow}>OFFICIAL {documentType}</Text>
+          <Text style={styles.pageTitle}>{documentTitle}</Text>
           <Text style={styles.pageSubtitle}>
-            Print, download, or share this payment acknowledgement.
+            {isVoucher
+              ? "Print, download, or share this payment voucher."
+              : "Print, download, or share this payment acknowledgement."}
           </Text>
         </View>
 
@@ -219,7 +273,7 @@ export default function Receipt() {
             </View>
 
             <View style={[styles.receiptNumberBox, phone && styles.receiptNumberBoxPhone]}>
-              <Text style={styles.small}>RECEIPT NUMBER</Text>
+              <Text style={styles.small}>{documentType} NUMBER</Text>
               <Text style={styles.receiptNumber}>
                 {receipt.receiptNumber}
               </Text>
@@ -229,7 +283,7 @@ export default function Receipt() {
 
           <View style={[styles.amountPanel, phone && styles.amountPanelPhone]}>
             <View>
-              <Text style={styles.small}>AMOUNT RECEIVED</Text>
+              <Text style={styles.small}>{isVoucher ? "AMOUNT PAID" : "AMOUNT RECEIVED"}</Text>
               <Text style={styles.category}>{receipt.paymentFor}</Text>
             </View>
             <View style={[styles.amountRight, phone && styles.amountRightPhone]}>
@@ -243,54 +297,70 @@ export default function Receipt() {
             </View>
           </View>
 
-          <Text style={[styles.sectionLabel, phone && styles.sectionLabelPhone]}>MEMBER DETAILS</Text>
-          <View style={[styles.detailGrid, phone && styles.detailGridPhone]}>
-            <Row compact={phone} label="Paid by" value={receipt.userName} />
-            <Row
-              compact={phone}
-              label="ITS ID / Grade"
-              value={`${receipt.itsId || "-"} / ${receipt.userGrade || "-"}`}
-            />
-            {receipt.paidForUserName ? (
-              <Row
-                compact={phone}
-                label="Madrasa fee paid for"
-                value={`${receipt.paidForUserName}${
-                  receipt.paidForItsId
-                    ? ` · ITS ${receipt.paidForItsId}`
-                    : ""
-                }`}
-              />
-            ) : null}
-          </View>
+          {receipt.isDayBook ? (
+            <>
+              <Text style={[styles.sectionLabel, phone && styles.sectionLabelPhone]}>DAY BOOK DETAILS</Text>
+              <View style={[styles.detailGrid, phone && styles.detailGridPhone]}>
+                <Row compact={phone} label="Entry type" value={receipt.entryType || "-"} />
+                <Row compact={phone} label="Category" value={receipt.paymentFor || "-"} />
+                <Row compact={phone} label="Payment method" value={receipt.paymentMethod || "-"} />
+                <Row compact={phone} label="Bank account" value={receipt.bankAccountName || "-"} />
+                <Row compact={phone} label="Reference" value={receipt.referenceNumber || "-"} />
+                <Row compact={phone} label="Notes" value={receipt.notes || "-"} />
+              </View>
+            </>
+          ) : (
+            <>
+              <Text style={[styles.sectionLabel, phone && styles.sectionLabelPhone]}>MEMBER DETAILS</Text>
+              <View style={[styles.detailGrid, phone && styles.detailGridPhone]}>
+                <Row compact={phone} label="Paid by" value={receipt.userName} />
+                <Row
+                  compact={phone}
+                  label="ITS ID / Grade"
+                  value={`${receipt.itsId || "-"} / ${receipt.userGrade || "-"}`}
+                />
+                {receipt.paidForUserName ? (
+                  <Row
+                    compact={phone}
+                    label="Madrasa fee paid for"
+                    value={`${receipt.paidForUserName}${
+                      receipt.paidForItsId
+                        ? ` · ITS ${receipt.paidForItsId}`
+                        : ""
+                    }`}
+                  />
+                ) : null}
+              </View>
 
-          <Text style={[styles.sectionLabel, phone && styles.sectionLabelPhone]}>PAYMENT DETAILS</Text>
-          <View style={[styles.detailGrid, phone && styles.detailGridPhone]}>
-            <Row
-              compact={phone}
-              label="Payment for"
-              value={
-                receipt.otherDescription ||
-                receipt.subType ||
-                receipt.lagatType ||
-                receipt.paymentFor
-              }
-            />
-            <Row
-              compact={phone}
-              label="Payment method"
-              value={`${receipt.paymentMethod || "-"}${
-                receipt.referenceNumber
-                  ? ` · ${receipt.referenceNumber}`
-                  : ""
-              }`}
-            />
-            <Row compact={phone} label="Notes" value={receipt.notes || "-"} />
-          </View>
+              <Text style={[styles.sectionLabel, phone && styles.sectionLabelPhone]}>PAYMENT DETAILS</Text>
+              <View style={[styles.detailGrid, phone && styles.detailGridPhone]}>
+                <Row
+                  compact={phone}
+                  label="Payment for"
+                  value={
+                    receipt.otherDescription ||
+                    receipt.subType ||
+                    receipt.lagatType ||
+                    receipt.paymentFor
+                  }
+                />
+                <Row
+                  compact={phone}
+                  label="Payment method"
+                  value={`${receipt.paymentMethod || "-"}${
+                    receipt.referenceNumber
+                      ? ` · ${receipt.referenceNumber}`
+                      : ""
+                  }`}
+                />
+                <Row compact={phone} label="Notes" value={receipt.notes || "-"} />
+              </View>
+            </>
+          )}
 
           <View style={[styles.recorderCard, phone && styles.recorderCardPhone]}>
             <View>
-              <Text style={styles.small}>PAYMENT RECORDED BY</Text>
+              <Text style={styles.small}>{receipt.isDayBook ? "ENTRY RECORDED BY" : "PAYMENT RECORDED BY"}</Text>
               <Text style={styles.recorderName}>
                 {receipt.recordedByName || receipt.createdByName || "-"}
               </Text>
@@ -308,7 +378,7 @@ export default function Receipt() {
           </View>
 
           <Text style={[styles.footerNote, phone && styles.footerNotePhone]}>
-            Computer-generated receipt · Generated by JamaatOne
+            Computer-generated {documentType.toLowerCase()} · Generated by JamaatOne
           </Text>
         </Card>
       ) : null}

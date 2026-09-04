@@ -13,6 +13,7 @@ import {
   View
 } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 
 import { accountsApi } from "../api/accountsApi";
 import { ENTRY_TYPES } from "../constants/accounts";
@@ -85,6 +86,7 @@ async function confirmAction(title, message, actionLabel) {
 }
 
 export default function DayBookPanel({ manager, canDelete = false, canRefund = false, filters = {} }) {
+  const router = useRouter();
   const { width } = useWindowDimensions();
   const phone = width < 600;
   const narrow = width < 380;
@@ -528,6 +530,14 @@ export default function DayBookPanel({ manager, canDelete = false, canRefund = f
     }
   }
 
+  function openDocument(item) {
+    if (!item?.dayBookId) return;
+    router.push({
+      pathname: "/(app)/receipt",
+      params: { dayBookId: String(item.dayBookId) }
+    });
+  }
+
   return (
     <View>
       <View style={[styles.panelHeader, phone && styles.panelHeaderPhone]}>
@@ -602,12 +612,9 @@ export default function DayBookPanel({ manager, canDelete = false, canRefund = f
               {item.paymentReferenceNo ? (
                 <Text style={styles.meta}>Ref: {item.paymentReferenceNo}</Text>
               ) : null}
-              {item.receiptNo ? (
-                <Text style={styles.meta}>Receipt: {item.receiptNo}</Text>
-              ) : null}
-              {item.voucherNo ? (
-                <Text style={styles.meta}>Voucher: {item.voucherNo}</Text>
-              ) : null}
+              {isDebitEntry(item.entryType)
+                ? item.voucherNo ? <Text style={styles.meta}>Voucher: {item.voucherNo}</Text> : null
+                : item.receiptNo ? <Text style={styles.meta}>Receipt: {item.receiptNo}</Text> : null}
               {item.remarks ? <Text style={styles.meta}>{item.remarks}</Text> : null}
               <View style={styles.statusRow}>
                 <Text
@@ -637,6 +644,12 @@ export default function DayBookPanel({ manager, canDelete = false, canRefund = f
 
           {manager ? (
             <View style={styles.actions}>
+              <Button
+                title={isDebitEntry(item.entryType) ? "Voucher" : "Receipt"}
+                compact
+                variant="outline"
+                onPress={() => openDocument(item)}
+              />
               <Button
                 title="Details"
                 compact
@@ -878,18 +891,17 @@ export default function DayBookPanel({ manager, canDelete = false, canRefund = f
                   <Text style={styles.detailValue}>{detail.bankAccountName || "-"}</Text>
                   <Text style={styles.detailLabel}>Reference</Text>
                   <Text style={styles.detailValue}>{detail.paymentReferenceNo || "-"}</Text>
-                  {detail.receiptNo ? (
-                    <>
-                      <Text style={styles.detailLabel}>Receipt number</Text>
-                      <Text style={styles.detailValue}>{detail.receiptNo}</Text>
-                    </>
-                  ) : null}
-                  {detail.voucherNo ? (
+                  {isDebitEntry(detail.entryType) ? (
                     <>
                       <Text style={styles.detailLabel}>Voucher number</Text>
-                      <Text style={styles.detailValue}>{detail.voucherNo}</Text>
+                      <Text style={styles.detailValue}>{detail.voucherNo || "-"}</Text>
                     </>
-                  ) : null}
+                  ) : (
+                    <>
+                      <Text style={styles.detailLabel}>Receipt number</Text>
+                      <Text style={styles.detailValue}>{detail.receiptNo || "-"}</Text>
+                    </>
+                  )}
                   <Text style={styles.detailLabel}>Remarks</Text>
                   <Text style={styles.detailValue}>{detail.remarks || "-"}</Text>
                   <Text style={styles.detailLabel}>Transaction date</Text>
@@ -917,6 +929,15 @@ export default function DayBookPanel({ manager, canDelete = false, canRefund = f
 
                   {manager ? (
                     <View style={styles.detailActions}>
+                      <Button
+                        title={isDebitEntry(detail.entryType) ? "Open voucher" : "Open receipt"}
+                        variant="outline"
+                        onPress={() => {
+                          const entry = detail;
+                          setDetail(null);
+                          openDocument(entry);
+                        }}
+                      />
                       <Button
                         title="Edit entry"
                         variant="outline"

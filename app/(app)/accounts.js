@@ -629,7 +629,7 @@ export default function AccountsScreen() {
         <View style={[styles.tabs, phone && styles.tabsPhone]}>
           {[
             ["STATS", "Summary"],
-            ["PAYMENTS", "Add Payments"],
+            ["PAYMENTS", "Mumineen Payments"],
             ["DAYBOOK", "Day book"],
             ["LEDGERS", "Customer ledgers"],
             ["BANKING", "Banking"],

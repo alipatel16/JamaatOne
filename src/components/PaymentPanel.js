@@ -927,6 +927,9 @@ export default function PaymentPanel({
                 {item.paymentReference ? (
                   <Text style={styles.meta}>Ref: {item.paymentReference}</Text>
                 ) : null}
+                {item.receiptNo ? (
+                  <Text style={styles.meta}>Receipt: {item.receiptNo}</Text>
+                ) : null}
                 <Text style={styles.status}>{item.status || "-"}</Text>
               </View>
               <Text style={[styles.amount, phone && styles.amountPhone]}>{money(item.amount)}</Text>
@@ -1234,6 +1237,8 @@ export default function PaymentPanel({
                   <Text style={styles.detailValue}>
                     {detail.paymentReference || "-"}
                   </Text>
+                  <Text style={styles.detailLabel}>Receipt number</Text>
+                  <Text style={styles.detailValue}>{detail.receiptNo || "-"}</Text>
                   <Text style={styles.detailLabel}>Remarks</Text>
                   <Text style={styles.detailValue}>{detail.remarks || "-"}</Text>
                   <Text style={styles.detailLabel}>Transaction date</Text>

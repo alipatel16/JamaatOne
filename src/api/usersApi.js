@@ -89,37 +89,5 @@ export const usersApi = {
     return removeRoleUser(liveEndpoints.users.committeeMemberById(userId));
   },
 
-  // Aamil -> FMB User CRUD
-  getFmbUsers(filters = {}) {
-    return paged(liveEndpoints.users.fmbUsers, filters);
-  },
-  getFmbUser(userId) {
-    return liveApiRequest(liveEndpoints.users.fmbUserById(userId));
-  },
-  createFmbUser(payload) {
-    return createRoleUser(liveEndpoints.users.fmbUsers, payload);
-  },
-  updateFmbUser(userId, payload) {
-    return updateRoleUser(liveEndpoints.users.fmbUserById(userId), payload);
-  },
-  deleteFmbUser(userId) {
-    return removeRoleUser(liveEndpoints.users.fmbUserById(userId));
-  },
 
-  // Aamil -> Madarsa Admin CRUD (endpoint spelling follows Swagger exactly).
-  getMadarsaAdmins(filters = {}) {
-    return paged(liveEndpoints.users.madarsaAdmins, filters);
-  },
-  getMadarsaAdmin(userId) {
-    return liveApiRequest(liveEndpoints.users.madarsaAdminById(userId));
-  },
-  createMadarsaAdmin(payload) {
-    return createRoleUser(liveEndpoints.users.madarsaAdmins, payload);
-  },
-  updateMadarsaAdmin(userId, payload) {
-    return updateRoleUser(liveEndpoints.users.madarsaAdminById(userId), payload);
-  },
-  deleteMadarsaAdmin(userId) {
-    return removeRoleUser(liveEndpoints.users.madarsaAdminById(userId));
-  }
 };

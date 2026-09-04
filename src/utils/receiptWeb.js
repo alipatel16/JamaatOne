@@ -39,6 +39,9 @@ function createPdfDocument(receipt) {
   const commands = [];
   const pageWidth = 595.28;
   const pageHeight = 841.89;
+  const documentType = String(receipt?.documentType || "RECEIPT").toUpperCase();
+  const isVoucher = documentType === "VOUCHER";
+  const isDayBook = Boolean(receipt?.isDayBook);
 
   const text = (x, y, value, size = 10, font = "F1", color = "0.15 0.19 0.18") => {
     commands.push(
@@ -77,6 +80,13 @@ function createPdfDocument(receipt) {
     );
   };
 
+  const detailRow = (y, key, value, maxCharacters = 50) => {
+    text(68, y, key, 8, "F1", "0.48 0.52 0.50");
+    wrapText(value, maxCharacters).slice(0, 2).forEach((entry, index) => {
+      text(215, y + index * 11, entry, 9, "F2");
+    });
+  };
+
   const paymentSubtype =
     receipt.otherDescription ||
     receipt.subType ||
@@ -87,96 +97,112 @@ function createPdfDocument(receipt) {
   rect(24, 24, 547, 112, "0.20 0.29 0.26", 14);
   rect(24, 116, 547, 20, "0.20 0.29 0.26");
 
-  text(52, 54, "OFFICIAL PAYMENT RECEIPT", 9, "F2", "0.91 0.83 0.67");
-  text(
-    52,
-    78,
-    "Dawoodi Bohra Jamaat",
-    20,
-    "F2",
-    "1 1 1"
-  );
+  text(52, 54, `OFFICIAL PAYMENT ${documentType}`, 9, "F2", "0.91 0.83 0.67");
+  text(52, 78, "Dawoodi Bohra Jamaat", 20, "F2", "1 1 1");
   text(52, 101, receipt.jamaatName, 9, "F1", "0.84 0.89 0.87");
 
   rect(386, 46, 155, 67, "0.27 0.37 0.33", 9);
-  text(402, 65, "RECEIPT NUMBER", 8, "F2", "0.84 0.89 0.87");
+  text(402, 65, `${documentType} NUMBER`, 8, "F2", "0.84 0.89 0.87");
   text(402, 84, receipt.receiptNumber || "-", 13, "F2", "1 1 1");
   text(402, 102, receipt.paymentDate || "-", 8, "F1", "0.91 0.83 0.67");
 
   rect(52, 160, 489, 84, "0.97 0.94 0.88", 12);
-  text(72, 184, "AMOUNT RECEIVED", 8, "F2", "0.48 0.41 0.31");
+  text(72, 184, isVoucher ? "AMOUNT PAID" : "AMOUNT RECEIVED", 8, "F2", "0.48 0.41 0.31");
   text(72, 207, normalizeLabel(paymentSubtype), 11, "F2", "0.48 0.41 0.31");
   text(370, 195, `INR ${formatAmount(receipt.amount)}`, 22, "F2", "0.20 0.29 0.26");
   text(370, 216, receipt.amountInWords || "", 8, "F1", "0.43 0.42 0.39");
 
-  text(52, 276, "MEMBER DETAILS", 8, "F2", "0.48 0.52 0.50");
-  rect(52, 288, 489, receipt.paidForUserName ? 105 : 78, "0.98 0.99 0.98", 9);
+  let recorderY;
 
-  const memberRows = [
-    ["Paid by", receipt.userName || "-"],
-    ["ITS ID / Grade", `${receipt.itsId || "-"} / ${receipt.userGrade || "-"}`]
-  ];
-  if (receipt.paidForUserName) {
-    memberRows.push([
-      "Madrasa fee paid for",
-      `${receipt.paidForUserName}${receipt.paidForItsId ? ` - ITS ${receipt.paidForItsId}` : ""}`
-    ]);
+  if (isDayBook) {
+    text(52, 276, "DAY BOOK DETAILS", 8, "F2", "0.48 0.52 0.50");
+    rect(52, 288, 489, 190, "0.98 0.99 0.98", 9);
+
+    const rows = [
+      ["Entry type", normalizeLabel(receipt.entryType)],
+      ["Category", normalizeLabel(receipt.paymentFor)],
+      ["Payment method", normalizeLabel(receipt.paymentMethod)],
+      ["Bank account", receipt.bankAccountName || "-"],
+      ["Reference", receipt.referenceNumber || "-"],
+      ["Notes", receipt.notes || "-"]
+    ];
+
+    rows.forEach(([key, value], index) => {
+      const rowY = 312 + index * 29;
+      detailRow(rowY, key, value);
+      if (index < rows.length - 1) line(68, rowY + 14, 525, rowY + 14);
+    });
+
+    recorderY = 510;
+  } else {
+    text(52, 276, "MEMBER DETAILS", 8, "F2", "0.48 0.52 0.50");
+    rect(52, 288, 489, receipt.paidForUserName ? 105 : 78, "0.98 0.99 0.98", 9);
+
+    const memberRows = [
+      ["Paid by", receipt.userName || "-"],
+      ["ITS ID / Grade", `${receipt.itsId || "-"} / ${receipt.userGrade || "-"}`]
+    ];
+    if (receipt.paidForUserName) {
+      memberRows.push([
+        "Madrasa fee paid for",
+        `${receipt.paidForUserName}${receipt.paidForItsId ? ` - ITS ${receipt.paidForItsId}` : ""}`
+      ]);
+    }
+
+    memberRows.forEach(([key, value], index) => {
+      const rowY = 310 + index * 27;
+      detailRow(rowY, key, value);
+      if (index < memberRows.length - 1) line(68, rowY + 12, 525, rowY + 12);
+    });
+
+    const paymentSectionY = receipt.paidForUserName ? 424 : 397;
+    text(52, paymentSectionY, "PAYMENT DETAILS", 8, "F2", "0.48 0.52 0.50");
+    rect(52, paymentSectionY + 12, 489, 140, "0.98 0.99 0.98", 9);
+
+    const paymentRows = [
+      ["Payment category", normalizeLabel(paymentSubtype)],
+      [
+        "Payment method",
+        `${normalizeLabel(receipt.paymentMethod)}${receipt.referenceNumber ? ` - ${receipt.referenceNumber}` : ""}`
+      ],
+      ["Bank account", receipt.bankAccountName || "-"],
+      ["Notes", receipt.notes || "-"]
+    ];
+
+    paymentRows.forEach(([key, value], index) => {
+      const rowY = paymentSectionY + 36 + index * 29;
+      detailRow(rowY, key, value);
+      if (index < paymentRows.length - 1) line(68, rowY + 14, 525, rowY + 14);
+    });
+
+    recorderY = paymentSectionY + 182;
   }
 
-  memberRows.forEach(([key, value], index) => {
-    const rowY = 310 + index * 27;
-    text(68, rowY, key, 8, "F1", "0.48 0.52 0.50");
-    text(215, rowY, value, 9, "F2");
-    if (index < memberRows.length - 1) line(68, rowY + 12, 525, rowY + 12);
-  });
-
-  const paymentSectionY = receipt.paidForUserName ? 424 : 397;
-  text(52, paymentSectionY, "PAYMENT DETAILS", 8, "F2", "0.48 0.52 0.50");
-  rect(52, paymentSectionY + 12, 489, 112, "0.98 0.99 0.98", 9);
-
-  const paymentRows = [
-    ["Payment category", normalizeLabel(paymentSubtype)],
-    [
-      "Payment method",
-      `${normalizeLabel(receipt.paymentMethod)}${receipt.referenceNumber ? ` - ${receipt.referenceNumber}` : ""}`
-    ],
-    ["Notes", receipt.notes || "-"]
-  ];
-
-  paymentRows.forEach(([key, value], index) => {
-    const rowY = paymentSectionY + 36 + index * 31;
-    text(68, rowY, key, 8, "F1", "0.48 0.52 0.50");
-    const lines = wrapText(value, 50).slice(0, 2);
-    lines.forEach((entry, lineIndex) => {
-      text(215, rowY + lineIndex * 11, entry, 9, "F2");
-    });
-    if (index < paymentRows.length - 1) line(68, rowY + 16, 525, rowY + 16);
-  });
-
-  const recorderY = paymentSectionY + 148;
   rect(52, recorderY, 489, 66, "0.93 0.95 0.97", 9);
-  text(68, recorderY + 22, "PAYMENT RECORDED BY", 8, "F2", "0.39 0.45 0.52");
   text(
     68,
-    recorderY + 44,
-    receipt.recordedByName || receipt.createdByName || "-",
-    10,
-    "F2"
+    recorderY + 22,
+    isDayBook ? "ENTRY RECORDED BY" : "PAYMENT RECORDED BY",
+    8,
+    "F2",
+    "0.39 0.45 0.52"
   );
+  text(68, recorderY + 44, receipt.recordedByName || receipt.createdByName || "-", 10, "F2");
   text(402, recorderY + 22, "ITS ID", 8, "F2", "0.39 0.45 0.52");
-  text(
-    402,
-    recorderY + 44,
-    receipt.recordedByItsId || receipt.createdByItsId || "-",
-    10,
-    "F2"
-  );
+  text(402, recorderY + 44, receipt.recordedByItsId || receipt.createdByItsId || "-", 10, "F2");
 
-  line(360, recorderY + 132, 520, recorderY + 132, "0.48 0.52 0.50", 0.8);
-  text(388, recorderY + 149, "Authorised Signature", 8, "F1", "0.48 0.52 0.50");
+  line(360, recorderY + 126, 520, recorderY + 126, "0.48 0.52 0.50", 0.8);
+  text(388, recorderY + 143, "Authorised Signature", 8, "F1", "0.48 0.52 0.50");
 
   line(52, 775, 541, 775);
-  text(52, 794, "Computer-generated receipt. Please retain it for your records.", 7, "F1", "0.54 0.58 0.56");
+  text(
+    52,
+    794,
+    `Computer-generated ${documentType.toLowerCase()}. Please retain it for your records.`,
+    7,
+    "F1",
+    "0.54 0.58 0.56"
+  );
   text(458, 794, "JamaatOne", 7, "F2", "0.54 0.58 0.56");
 
   const stream = commands.join("\n");
@@ -283,7 +309,11 @@ export function downloadReceiptPdf(receipt) {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
-  anchor.download = `${receipt.receiptNumber || "JamaatOne-receipt"}.pdf`;
+  const fallbackName =
+    String(receipt?.documentType || "RECEIPT").toUpperCase() === "VOUCHER"
+      ? "JamaatOne-voucher"
+      : "JamaatOne-receipt";
+  anchor.download = `${receipt.receiptNumber || fallbackName}.pdf`;
   document.body.appendChild(anchor);
   anchor.click();
   anchor.remove();

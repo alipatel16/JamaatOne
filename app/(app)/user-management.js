@@ -4,7 +4,6 @@ import {
   Alert,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   useWindowDimensions,
@@ -28,37 +27,15 @@ import { colors, radius, spacing } from "../../src/theme";
 const PAGE_SIZE = 20;
 const EMPTY_FORM = { userId: null, muminId: "", itsNo: "", name: "", password: "", isActive: "true", categoryIds: [] };
 
-const TYPES = {
-  committee: {
-    label: "Committee Members",
-    singular: "Committee Member",
-    caption: "Operational access across Jamaat modules without destructive delete actions.",
-    list: filters => usersApi.getCommitteeMembers(filters),
-    get: id => usersApi.getCommitteeMember(id),
-    create: payload => usersApi.createCommitteeMember(payload),
-    update: (id, payload) => usersApi.updateCommitteeMember(id, payload),
-    remove: id => usersApi.deleteCommitteeMember(id)
-  },
-  fmb: {
-    label: "FMB Users",
-    singular: "FMB User",
-    caption: "FMB management access with account access limited to personal payment history.",
-    list: filters => usersApi.getFmbUsers(filters),
-    get: id => usersApi.getFmbUser(id),
-    create: payload => usersApi.createFmbUser(payload),
-    update: (id, payload) => usersApi.updateFmbUser(id, payload),
-    remove: id => usersApi.deleteFmbUser(id)
-  },
-  madarsa: {
-    label: "Madrasa Admins",
-    singular: "Madrasa Admin",
-    caption: "Reserved for Madrasa Management. FMB management is intentionally unavailable.",
-    list: filters => usersApi.getMadarsaAdmins(filters),
-    get: id => usersApi.getMadarsaAdmin(id),
-    create: payload => usersApi.createMadarsaAdmin(payload),
-    update: (id, payload) => usersApi.updateMadarsaAdmin(id, payload),
-    remove: id => usersApi.deleteMadarsaAdmin(id)
-  }
+const COMMITTEE_CONFIG = {
+  label: "Committee Members",
+  singular: "Committee Member",
+  caption: "Operational access across Jamaat modules without destructive delete actions.",
+  list: filters => usersApi.getCommitteeMembers(filters),
+  get: id => usersApi.getCommitteeMember(id),
+  create: payload => usersApi.createCommitteeMember(payload),
+  update: (id, payload) => usersApi.updateCommitteeMember(id, payload),
+  remove: id => usersApi.deleteCommitteeMember(id)
 };
 
 function muminName(item) {
@@ -89,7 +66,6 @@ export default function UserManagementScreen() {
   const { width } = useWindowDimensions();
   const phone = width < 600;
   const narrow = width < 390;
-  const [type, setType] = useState("committee");
   const [form, setForm] = useState(EMPTY_FORM);
   const [selectedMumin, setSelectedMumin] = useState(null);
   const [categories, setCategories] = useState([]);
@@ -104,7 +80,7 @@ export default function UserManagementScreen() {
   const [deletingId, setDeletingId] = useState(null);
   const [error, setError] = useState("");
 
-  const config = TYPES[type];
+  const config = COMMITTEE_CONFIG;
   const statusOptions = useMemo(() => [
     { label: "Active", value: "true" },
     { label: "Inactive", value: "false" }
@@ -121,13 +97,6 @@ export default function UserManagementScreen() {
         })),
     [categories]
   );
-
-  useEffect(() => {
-    setForm(EMPTY_FORM);
-    setSelectedMumin(null);
-    setSearch("");
-    setPageNumber(1);
-  }, [type]);
 
   useEffect(() => {
     if (!canManageUsers(user)) return undefined;
@@ -161,7 +130,7 @@ export default function UserManagementScreen() {
     if (!canManageUsers(user)) return;
     const timer = setTimeout(() => load(pageNumber), search.trim() ? 300 : 0);
     return () => clearTimeout(timer);
-  }, [type, pageNumber, search, user?.role]);
+  }, [pageNumber, search, user?.role]);
 
   if (!canManageUsers(user)) return <Redirect href="/(app)" />;
 
@@ -279,33 +248,13 @@ export default function UserManagementScreen() {
         <Text style={styles.eyebrow}>AAMIL ACCESS</Text>
         <Text style={[styles.pageTitle, phone && styles.pageTitlePhone]}>User Management</Text>
         <Text style={styles.pageSubtitle}>
-          Create and maintain Jamaat operational users. Committee, FMB and Madrasa permissions remain separated by role.
+          Create and maintain Committee Members for Jamaat operational access.
         </Text>
       </View>
 
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.tabs}
-        style={styles.tabsScroll}
-      >
-        {Object.entries(TYPES).map(([key, item]) => {
-          const active = key === type;
-          return (
-            <Pressable
-              key={key}
-              onPress={() => setType(key)}
-              style={[styles.tab, active && styles.tabActive]}
-            >
-              <Text style={[styles.tabText, active && styles.tabTextActive]}>{item.label}</Text>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
-
       <View style={[styles.roleIntro, phone && styles.roleIntroPhone]}>
         <View style={styles.roleIcon}>
-          <Text style={styles.roleIconText}>{type === "committee" ? "C" : type === "fmb" ? "F" : "M"}</Text>
+          <Text style={styles.roleIconText}>C</Text>
         </View>
         <View style={styles.flex}>
           <Text style={styles.roleTitle}>{config.label}</Text>
