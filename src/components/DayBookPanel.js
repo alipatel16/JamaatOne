@@ -85,7 +85,7 @@ async function confirmAction(title, message, actionLabel) {
   });
 }
 
-export default function DayBookPanel({ manager, canDelete = false, canRefund = false, filters = {} }) {
+export default function DayBookPanel({ manager, canEdit = false, canDelete = false, canRefund = false, filters = {} }) {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const phone = width < 600;
@@ -411,6 +411,10 @@ export default function DayBookPanel({ manager, canDelete = false, canRefund = f
       setFormError("");
       const payload = buildPayload();
       if (editingId) {
+        if (!canEdit) {
+          setFormError("You do not have permission to edit Day Book entries.");
+          return;
+        }
         await accountsApi.updateDaybookEntry(editingId, payload);
       } else {
         await accountsApi.createDaybookEntry(payload);
@@ -439,6 +443,7 @@ export default function DayBookPanel({ manager, canDelete = false, canRefund = f
   }
 
   async function editEntry(dayBookId) {
+    if (!canEdit) return;
     try {
       setDetailLoading(true);
       setError("");
@@ -656,12 +661,14 @@ export default function DayBookPanel({ manager, canDelete = false, canRefund = f
                 variant="outline"
                 onPress={() => openDetail(item.dayBookId)}
               />
-              <Button
-                title="Edit"
-                compact
-                variant="outline"
-                onPress={() => editEntry(item.dayBookId)}
-              />
+              {canEdit ? (
+                <Button
+                  title="Edit"
+                  compact
+                  variant="outline"
+                  onPress={() => editEntry(item.dayBookId)}
+                />
+              ) : null}
               <Button
                 title="Timeline"
                 compact
@@ -938,15 +945,17 @@ export default function DayBookPanel({ manager, canDelete = false, canRefund = f
                           openDocument(entry);
                         }}
                       />
-                      <Button
-                        title="Edit entry"
-                        variant="outline"
-                        onPress={() => {
-                          const id = detail.dayBookId;
-                          setDetail(null);
-                          editEntry(id);
-                        }}
-                      />
+                      {canEdit ? (
+                        <Button
+                          title="Edit entry"
+                          variant="outline"
+                          onPress={() => {
+                            const id = detail.dayBookId;
+                            setDetail(null);
+                            editEntry(id);
+                          }}
+                        />
+                      ) : null}
                       <Button
                         title="View timeline"
                         variant="outline"

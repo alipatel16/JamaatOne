@@ -848,6 +848,7 @@ export default function AccountsScreen() {
       {manager && tab === "DAYBOOK" ? (
         <DayBookPanel
           manager={manager}
+          canEdit={canDelete}
           canDelete={canDelete}
           canRefund={canRefund}
           filters={{
@@ -861,7 +862,7 @@ export default function AccountsScreen() {
         <CustomerLedgerPanel />
       ) : null}
       {manager && tab === "BANKING" ? (
-        <CashManagementPanel canDelete={canDelete} mode="banking" />
+        <CashManagementPanel canEdit={canDelete} canDelete={canDelete} mode="banking" />
       ) : null}
 
       <Modal

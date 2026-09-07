@@ -74,7 +74,7 @@ const money = value =>
     maximumFractionDigits: 2
   }).format(Number(value || 0));
 
-export default function BankAccountsPanel({ canManage = false, canDelete = false }) {
+export default function BankAccountsPanel({ canManage = false, canEdit = false, canDelete = false }) {
   const { width } = useWindowDimensions();
   const wide = width >= 820;
   const phone = width < 600;
@@ -143,6 +143,7 @@ export default function BankAccountsPanel({ canManage = false, canDelete = false
   }
 
   function openEdit(item) {
+    if (!canEdit) return;
     setEditingId(item.bankAccountId);
     setForm({
       bankAccountName: item.bankAccountName || "",
@@ -191,6 +192,10 @@ export default function BankAccountsPanel({ canManage = false, canDelete = false
       setSaving(true);
       setFormError("");
       if (editingId) {
+        if (!canEdit) {
+          setFormError("You do not have permission to edit bank accounts.");
+          return;
+        }
         const { openingBalance, accountCode, startingReceiptNo, startingVoucherNo, ...editableForm } = form;
         const updated = await accountsApi.updateBankAccount(editingId, editableForm);
         setAccounts(current =>
@@ -364,12 +369,14 @@ export default function BankAccountsPanel({ canManage = false, canDelete = false
 
               {canManage ? (
                 <View style={styles.actions}>
-                  <Button
-                    title="Edit account"
-                    compact
-                    variant="outline"
-                    onPress={() => openEdit(item)}
-                  />
+                  {canEdit ? (
+                    <Button
+                      title="Edit account"
+                      compact
+                      variant="outline"
+                      onPress={() => openEdit(item)}
+                    />
+                  ) : null}
                   {canDelete ? (
                     <Button
                       title="Delete"

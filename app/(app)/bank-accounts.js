@@ -15,7 +15,7 @@ export default function BankAccountsScreen() {
 
   return (
     <Screen>
-      <BankAccountsPanel canManage={canManage} canDelete={canDelete} />
+      <BankAccountsPanel canManage={canManage} canEdit={canDelete} canDelete={canDelete} />
     </Screen>
   );
 }

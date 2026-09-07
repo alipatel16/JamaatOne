@@ -96,7 +96,7 @@ async function confirmAction(title, message, actionLabel = "Delete") {
   });
 }
 
-export default function CashManagementPanel({ canDelete = false, mode = "overview" }) {
+export default function CashManagementPanel({ canEdit = false, canDelete = false, mode = "overview" }) {
   const { width } = useWindowDimensions();
   const phone = width < 600;
   const narrow = width < 380;
@@ -312,6 +312,7 @@ export default function CashManagementPanel({ canDelete = false, mode = "overvie
   }
 
   function openEditDeposit(item) {
+    if (!canEdit) return;
     setEditingDepositId(item.bankDepositId);
     setDepositError("");
     setDepositForm({
@@ -362,6 +363,10 @@ export default function CashManagementPanel({ canDelete = false, mode = "overvie
       setDepositSaving(true);
       setDepositError("");
       if (editingDepositId) {
+        if (!canEdit) {
+          setDepositError("You do not have permission to edit bank deposits.");
+          return;
+        }
         const updated = await accountsApi.updateBankDeposit(editingDepositId, payload);
         setDeposits(current =>
           updated?.isActive === false
@@ -386,6 +391,7 @@ export default function CashManagementPanel({ canDelete = false, mode = "overvie
   }
 
   async function removeDeposit(item) {
+    if (!canDelete) return;
     const proceed = await confirmAction(
       "Delete deposit",
       "Delete this bank deposit entry?",
@@ -516,12 +522,14 @@ export default function CashManagementPanel({ canDelete = false, mode = "overvie
               <Text style={[styles.amount, phone && styles.amountPhone]}>{money(item.amount)}</Text>
             </View>
             <View style={styles.actionsRow}>
-              <Button
-                title="Edit"
-                compact
-                variant="outline"
-                onPress={() => openEditDeposit(item)}
-              />
+              {canEdit ? (
+                <Button
+                  title="Edit"
+                  compact
+                  variant="outline"
+                  onPress={() => openEditDeposit(item)}
+                />
+              ) : null}
               <Button
                 title="Timeline"
                 compact

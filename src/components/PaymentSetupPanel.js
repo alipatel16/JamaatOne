@@ -13,6 +13,7 @@ import {
 
 import { accountsApi } from "../api/accountsApi";
 import { ENTRY_TYPES } from "../constants/accounts";
+import { buildPaymentSubCategoryGroups } from "../utils/paymentSetupGrouping";
 import { colors, radius, spacing } from "../theme";
 import Button from "./Button";
 import Card from "./Card";
@@ -117,6 +118,11 @@ export default function PaymentSetupPanel({ section = "all", jamaats = [] }) {
       value: String(item.subCategoryId)
     })),
     [subCategories]
+  );
+
+  const subCategoryGroups = useMemo(
+    () => buildPaymentSubCategoryGroups(categories, subCategories),
+    [categories, subCategories]
   );
 
   useEffect(() => {
@@ -328,14 +334,54 @@ export default function PaymentSetupPanel({ section = "all", jamaats = [] }) {
           <Button title={subForm.id ? "Update subcategory" : "Add subcategory"} compact loading={savingKey === "subcategory"} onPress={saveSubCategory} />
           {subForm.id ? <Button title="Cancel" compact variant="outline" onPress={() => setSubForm({ id: null, categoryId: "", name: "", entryType: "", isActive: true })} /> : null}
         </View>
-        <View style={styles.list}>{subCategories.map(item => (
-          <View key={item.subCategoryId} style={[styles.row, phone && styles.rowPhone]}>
-            <View style={[styles.flex, phone && styles.flexPhone]}><Text style={styles.name}>{item.subCategoryName}</Text><Text style={styles.meta}>{item.jamaatName ? `${item.jamaatName} · ` : ""}{item.categoryName} · {String(item.entryType || "-").toUpperCase()} · ID {item.subCategoryId}</Text></View>
-            <Status active={item.isActive !== false} />
-            <Button title="Edit" compact variant="outline" onPress={() => setSubForm({ id: item.subCategoryId, categoryId: String(item.categoryId), name: item.subCategoryName || "", entryType: String(item.entryType || "").toUpperCase(), isActive: item.isActive !== false })} />
-            <Button title="Delete" compact variant="danger" onPress={() => remove("subcategory", item.subCategoryId, item.subCategoryName)} />
-          </View>
-        ))}</View>
+        <View style={styles.groupedList}>
+          {subCategoryGroups.map(group => {
+            const total = group.credit.length + group.debit.length + group.other.length;
+            const entryGroups = [
+              { key: "credit", label: "Credit", items: group.credit },
+              { key: "debit", label: "Debit", items: group.debit },
+              ...(group.other.length ? [{ key: "other", label: "Other", items: group.other }] : [])
+            ];
+
+            return (
+              <View key={`category-${group.categoryId}`} style={styles.categoryGroup}>
+                <View style={styles.categoryGroupHeader}>
+                  <View style={styles.flex}>
+                    <Text style={styles.categoryGroupTitle}>{group.categoryName}</Text>
+                    <Text style={styles.categoryGroupMeta}>
+                      {group.jamaatName || (group.jamaatId ? `Jamaat ${group.jamaatId}` : "All Jamaats")} · {total} subcategor{total === 1 ? "y" : "ies"}
+                    </Text>
+                  </View>
+                  <Status active={group.isActive !== false} />
+                </View>
+
+                {entryGroups.map(entryGroup => (
+                  <View key={`${group.categoryId}-${entryGroup.key}`} style={styles.entryGroup}>
+                    <View style={styles.entryGroupHeader}>
+                      <Text style={styles.entryGroupTitle}>{entryGroup.label}</Text>
+                      <Text style={styles.entryGroupCount}>{entryGroup.items.length}</Text>
+                    </View>
+                    {entryGroup.items.length ? entryGroup.items.map(item => (
+                      <View key={item.subCategoryId} style={[styles.row, phone && styles.rowPhone]}>
+                        <View style={[styles.flex, phone && styles.flexPhone]}>
+                          <Text style={styles.name}>{item.subCategoryName}</Text>
+                          <Text style={styles.meta}>
+                            {item.jamaatName ? `${item.jamaatName} · ` : ""}{item.categoryName} · {String(item.entryType || "-").toUpperCase()} · ID {item.subCategoryId}
+                          </Text>
+                        </View>
+                        <Status active={item.isActive !== false} />
+                        <Button title="Edit" compact variant="outline" onPress={() => setSubForm({ id: item.subCategoryId, categoryId: String(item.categoryId), name: item.subCategoryName || "", entryType: String(item.entryType || "").toUpperCase(), isActive: item.isActive !== false })} />
+                        <Button title="Delete" compact variant="danger" onPress={() => remove("subcategory", item.subCategoryId, item.subCategoryName)} />
+                      </View>
+                    )) : (
+                      <Text style={styles.emptyEntryGroup}>No {entryGroup.label.toLowerCase()} subcategories.</Text>
+                    )}
+                  </View>
+                ))}
+              </View>
+            );
+          })}
+        </View>
       </Section>
 
       <Section sectionKey="fields" activeSection={section} title="Dynamic payment fields" description="Fields are loaded by subcategory. Use MEMBER for the Madrasa ‘paid for whom’ family dropdown, and MONTH for from/to month fields.">
@@ -395,6 +441,16 @@ const styles = StyleSheet.create({
   switchRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: spacing.md, minHeight: 42 },
   switchLabel: { color: colors.text, fontWeight: "700" },
   list: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, marginTop: spacing.sm },
+  groupedList: { gap: spacing.md, marginTop: spacing.sm },
+  categoryGroup: { borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, borderRadius: radius.md, overflow: "hidden" },
+  categoryGroupHeader: { flexDirection: "row", alignItems: "center", gap: spacing.sm, padding: spacing.md, backgroundColor: colors.surfaceTint, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+  categoryGroupTitle: { color: colors.text, fontSize: 16, fontWeight: "900" },
+  categoryGroupMeta: { color: colors.muted, fontSize: 12, marginTop: 3 },
+  entryGroup: { paddingHorizontal: spacing.md, paddingTop: spacing.sm },
+  entryGroupHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: spacing.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+  entryGroupTitle: { color: colors.text, fontSize: 13, fontWeight: "900", textTransform: "uppercase", letterSpacing: 0.4 },
+  entryGroupCount: { color: colors.muted, fontSize: 12, fontWeight: "800" },
+  emptyEntryGroup: { color: colors.muted, fontSize: 12, fontStyle: "italic", paddingVertical: spacing.md },
   row: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: spacing.sm, paddingVertical: spacing.md, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   rowPhone: { alignItems: "stretch" },
   flex: { flex: 1, minWidth: 180, flexShrink: 1 },

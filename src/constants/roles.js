@@ -55,11 +55,11 @@ export const canManageAccounts = canManageJamaat;
 // broad operational access but cannot manage privileged application users.
 export const canManageUsers = roleOrUser => isAamil(roleOrUser);
 
-// Committee members can perform normal operational actions, including edits
-// and refunds, but destructive DELETE actions are reserved for Aamil/admin.
+// Committee members can record and view operational account data, but
+// mutations of existing records (edit/delete/refund) are Aamil-only.
 export const canDeleteJamaatData = roleOrUser => isAamil(roleOrUser);
 
-export const canRefundPayments = roleOrUser => canManageJamaat(roleOrUser);
+export const canRefundPayments = roleOrUser => isAamil(roleOrUser);
 
 export const canManageFmb = roleOrUser =>
   canManageJamaat(roleOrUser) || isFmbUser(roleOrUser);
