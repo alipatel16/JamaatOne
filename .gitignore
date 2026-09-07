@@ -13,7 +13,7 @@ bin-release/
 *.ipa
 *.apk
 
-node_modules
+/node_modules
 package-lock.json
 
 # Project files, i.e. `.project`, `.actionScriptProperties` and `.flexProperties`
