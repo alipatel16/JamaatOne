@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { Image, Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { router } from "expo-router";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 
@@ -49,7 +49,7 @@ export default function DashboardScreen() {
     <Screen>
       <View style={[styles.hero, phone && styles.heroPhone, wide && styles.heroWide]}>
         <View style={styles.heroCopy}>
-          <Text style={styles.eyebrow}>ASSALAMU ALAIKUM</Text>
+          <Text style={styles.eyebrow}>Ahlan Wa Sahlan</Text>
           <Text style={[styles.greeting, phone && styles.greetingPhone]}>Salaam, {user?.firstName || user?.name || "Member"}</Text>
           <Text style={styles.heroText}>Everything important for your Jamaat, at a glance.</Text>
           <View style={styles.dateRow}>
@@ -57,7 +57,7 @@ export default function DashboardScreen() {
             {data?.hijriDate ? <View style={[styles.datePill, styles.hijriPill]}><Text style={styles.hijriText}>{data.hijriDate}</Text></View> : null}
           </View>
         </View>
-        <View style={styles.heroMark}><Text style={styles.heroMarkText}>J</Text></View>
+        <View style={styles.heroMark}><Image source={require("../../assets/favicon.png")} style={styles.heroMarkImage} resizeMode="contain" accessible={false} /></View>
       </View>
 
       {error ? <View style={styles.errorBox}><Text style={styles.error}>{error}</Text></View> : null}
@@ -160,7 +160,7 @@ const styles = StyleSheet.create({
   hijriPill: { backgroundColor: "rgba(200,155,70,0.15)", borderColor: "rgba(216,187,123,0.30)" },
   hijriText: { color: "#F1D9A8", fontSize: 11, fontWeight: "900" },
   heroMark: { position: "absolute", right: -18, bottom: -40, width: 210, height: 210, borderRadius: 105, backgroundColor: "rgba(255,255,255,0.055)", alignItems: "center", justifyContent: "center" },
-  heroMarkText: { color: "rgba(255,255,255,0.10)", fontSize: 120, fontWeight: "900" },
+  heroMarkImage: { width: 128, height: 128, opacity: 0.18 },
   errorBox: { backgroundColor: colors.dangerSoft, padding: spacing.md, borderRadius: radius.md, marginBottom: spacing.md },
   error: { color: colors.danger, fontWeight: "700" },
   sectionEyebrow: { color: colors.accentStrong, fontSize: 10, fontWeight: "900", letterSpacing: 1.2, marginBottom: spacing.sm },

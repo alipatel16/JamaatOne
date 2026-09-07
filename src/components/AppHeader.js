@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import {
+  Image,
   Modal,
   Platform,
   Pressable,
@@ -82,9 +83,7 @@ export default function AppHeader({ title, showBack = false, fallbackRoute = "/"
             <MaterialCommunityIcons name={showBack ? "arrow-left" : "menu"} size={showBack ? 23 : 25} color={colors.primaryStrong} />
           </Pressable>
 
-          <View style={[styles.brandMark, isNarrow && styles.brandMarkNarrow]}>
-            <Text style={styles.brandInitial}>J</Text>
-          </View>
+          <Image source={require("../../assets/favicon.png")} style={[styles.brandMark, isNarrow && styles.brandMarkNarrow]} resizeMode="contain" accessibilityLabel="JamaatOne logo" />
           <View style={styles.titleWrap}>
             {!isNarrow ? <Text style={styles.brand}>JAMAATONE</Text> : null}
             <Text numberOfLines={1} style={styles.title}>{title || "JamaatOne"}</Text>
@@ -132,7 +131,7 @@ export default function AppHeader({ title, showBack = false, fallbackRoute = "/"
           <View style={[styles.drawer, isPhone && styles.drawerPhone, shadows.floating]}>
             <View style={styles.drawerHeader}>
               <View style={styles.drawerBrandRow}>
-                <View style={styles.drawerBrandMark}><Text style={styles.drawerBrandInitial}>J</Text></View>
+                <Image source={require("../../assets/favicon.png")} style={styles.drawerBrandMark} resizeMode="contain" accessibilityLabel="JamaatOne logo" />
                 <View>
                   <Text style={styles.drawerEyebrow}>JAMAATONE</Text>
                   <Text style={styles.drawerTitle}>Community hub</Text>
@@ -219,9 +218,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border
   },
-  brandMark: { width: 38, height: 38, marginLeft: spacing.sm, borderRadius: 12, backgroundColor: colors.primaryStrong, alignItems: "center", justifyContent: "center" },
-  brandMarkNarrow: { width: 34, height: 34, borderRadius: 11, marginLeft: spacing.xs },
-  brandInitial: { color: "#FFFFFF", fontSize: 20, fontWeight: "900" },
+  brandMark: { width: 38, height: 38, marginLeft: spacing.sm },
+  brandMarkNarrow: { width: 34, height: 34, marginLeft: spacing.xs },
   titleWrap: { marginLeft: spacing.sm, flex: 1, minWidth: 0 },
   brand: { color: colors.accentStrong, fontSize: 9, fontWeight: "900", letterSpacing: 1.5 },
   title: { color: colors.text, fontFamily: typography.family, fontSize: 16, fontWeight: "800", marginTop: 1, textTransform: "capitalize" },
@@ -245,8 +243,7 @@ const styles = StyleSheet.create({
   drawerScrollContent: { paddingBottom: spacing.md },
   drawerHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: spacing.xl },
   drawerBrandRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
-  drawerBrandMark: { width: 46, height: 46, borderRadius: 15, backgroundColor: colors.primaryStrong, alignItems: "center", justifyContent: "center" },
-  drawerBrandInitial: { color: "#fff", fontSize: 23, fontWeight: "900" },
+  drawerBrandMark: { width: 46, height: 46 },
   drawerEyebrow: { color: colors.accentStrong, fontSize: 10, fontWeight: "900", letterSpacing: 1.4 },
   drawerTitle: { color: colors.text, fontSize: 21, fontWeight: "900", marginTop: 2 },
   closeButton: { width: 40, height: 40, borderRadius: radius.md, alignItems: "center", justifyContent: "center", backgroundColor: colors.backgroundAlt },

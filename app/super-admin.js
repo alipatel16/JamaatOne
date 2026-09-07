@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
+  Image,
   Platform,
   Pressable,
   ScrollView,
@@ -92,9 +93,7 @@ function PageHeader({ user, onLogout, phone, narrow }) {
       <View style={[styles.header, styles.headerPhone, shadows.card]}>
         <View style={styles.mobileHeaderTop}>
           <View style={[styles.brandBlock, styles.brandBlockPhone]}>
-            <View style={[styles.brandMark, narrow && styles.brandMarkNarrow]}>
-              <Text style={styles.brandInitial}>J</Text>
-            </View>
+            <Image source={require("../assets/favicon.png")} style={[styles.brandMark, narrow && styles.brandMarkNarrow]} resizeMode="contain" accessibilityLabel="JamaatOne logo" />
             <View style={styles.brandText}>
               <Text style={styles.eyebrow}>JAMAATONE</Text>
               <Text style={styles.headerTitle}>Super Admin</Text>
@@ -125,9 +124,7 @@ function PageHeader({ user, onLogout, phone, narrow }) {
   return (
     <View style={[styles.header, shadows.card]}>
       <View style={styles.brandBlock}>
-        <View style={[styles.brandMark, narrow && styles.brandMarkNarrow]}>
-          <Text style={styles.brandInitial}>J</Text>
-        </View>
+        <Image source={require("../assets/favicon.png")} style={[styles.brandMark, narrow && styles.brandMarkNarrow]} resizeMode="contain" accessibilityLabel="JamaatOne logo" />
         <View style={styles.brandText}>
           <Text style={styles.eyebrow}>JAMAATONE</Text>
           <Text style={styles.headerTitle}>Super Admin</Text>
@@ -737,18 +734,9 @@ const styles = StyleSheet.create({
   brandBlockPhone: { flex: 1, minWidth: 0 },
   brandMark: {
     width: 44,
-    height: 44,
-    borderRadius: 14,
-    backgroundColor: colors.primaryStrong,
-    alignItems: "center",
-    justifyContent: "center"
+    height: 44
   },
-  brandMarkNarrow: { width: 38, height: 38, borderRadius: 12 },
-  brandInitial: {
-    color: "#FFFFFF",
-    fontSize: 23,
-    fontWeight: "800"
-  },
+  brandMarkNarrow: { width: 38, height: 38 },
   brandText: {
     marginLeft: spacing.sm,
     flexShrink: 1

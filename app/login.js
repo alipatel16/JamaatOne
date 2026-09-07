@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { Image, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { router } from "expo-router";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 
@@ -51,7 +51,7 @@ export default function LoginScreen() {
     <Screen contentStyle={[styles.page, isWide && styles.pageWide]}>
       <View style={[styles.hero, isPhone && styles.heroPhone, isWide && styles.heroWide]}>
         <View style={styles.brandRow}>
-          <View style={styles.logo}><Text style={styles.logoText}>J</Text></View>
+          <Image source={require("../assets/favicon.png")} style={styles.logo} resizeMode="contain" accessibilityLabel="JamaatOne logo" />
           <View>
             <Text style={styles.kicker}>JAMAATONE</Text>
             <Text style={styles.brandCaption}>Community. Connected.</Text>
@@ -121,8 +121,7 @@ const styles = StyleSheet.create({
   heroWide: { paddingHorizontal: spacing.lg },
   heroPhone: { paddingTop: spacing.sm, paddingBottom: spacing.md },
   brandRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
-  logo: { width: 56, height: 56, borderRadius: 18, backgroundColor: colors.primaryStrong, alignItems: "center", justifyContent: "center" },
-  logoText: { color: "#FFFFFF", fontSize: 29, fontWeight: "900" },
+  logo: { width: 56, height: 56 },
   kicker: { color: colors.accentStrong, fontSize: 11, fontWeight: "900", letterSpacing: 1.8 },
   brandCaption: { color: colors.muted, fontSize: 12, marginTop: 3, fontWeight: "700" },
   heroTitle: { color: colors.text, fontFamily: typography.family, fontSize: 35, lineHeight: 42, fontWeight: "900", marginTop: spacing.xl, maxWidth: 650 },
