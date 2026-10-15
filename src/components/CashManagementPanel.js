@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -23,6 +23,7 @@ import Card from "./Card";
 import CollectionSummaryDashboard from "./CollectionSummaryDashboard";
 import Input from "./Input";
 import Select from "./Select";
+import { selectedChequeDeposit } from "../utils/chequeDeposit";
 
 const PAGE_SIZE = 20;
 const today = () => new Date().toISOString().slice(0, 10);
@@ -121,6 +122,63 @@ export default function CashManagementPanel({ canEdit = false, canDelete = false
   const [depositForm, setDepositForm] = useState(EMPTY_DEPOSIT);
   const [depositSaving, setDepositSaving] = useState(false);
   const [depositError, setDepositError] = useState("");
+  const [cheques, setCheques] = useState([]);
+  const [selectedChequeIds, setSelectedChequeIds] = useState([]);
+  const [chequePage, setChequePage] = useState(0);
+  const [chequeTotalPages, setChequeTotalPages] = useState(1);
+  const [chequesLoading, setChequesLoading] = useState(false);
+  const [chequesError, setChequesError] = useState("");
+  const chequeRequest = useRef(0);
+
+  const chequeDeposit = !editingDepositId && getBalanceType(paymentMethods.find(
+    item => String(item.paymentMethodId) === String(depositForm.paymentMethodId)
+  )?.paymentMethodName) === "Cheque";
+  const chequeTotal = cheques.reduce((sum, item) =>
+    selectedChequeIds.includes(String(item.chequeId))
+      ? sum + Math.round(Number(item.amount || 0) * 100) : sum, 0) / 100;
+
+  async function loadCheques(pageNumber = 1, requestId = chequeRequest.current) {
+    setChequesLoading(true);
+    setChequesError("");
+    try {
+      const result = await accountsApi.getCheques({
+        pageNumber, pageSize: PAGE_SIZE,
+        bankAccountId: Number(depositForm.bankAccountId), mine: true
+      });
+      if (requestId !== chequeRequest.current) return;
+      const items = (Array.isArray(result?.items) ? result.items : []).filter(
+        item => item?.chequeId && !item.bankDepositId && !item.spentDayBookId &&
+          String(item.bankAccountId) === String(depositForm.bankAccountId)
+      );
+      setCheques(current => {
+        const unique = new Map((pageNumber === 1 ? [] : current).map(item => [String(item.chequeId), item]));
+        items.forEach(item => unique.set(String(item.chequeId), item));
+        return [...unique.values()];
+      });
+      setChequePage(pageNumber);
+      setChequeTotalPages(Math.max(1, Number(result?.totalPages || 1)));
+    } catch (requestError) {
+      if (requestId === chequeRequest.current) {
+        setChequesError(requestError.message || "Unable to load undeposited cheques.");
+      }
+    } finally {
+      if (requestId === chequeRequest.current) setChequesLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    const requestId = ++chequeRequest.current;
+    setCheques([]);
+    setSelectedChequeIds([]);
+    setChequePage(0);
+    setChequeTotalPages(1);
+    setChequesError("");
+    setChequesLoading(false);
+    if (depositModal && chequeDeposit && depositForm.bankAccountId) {
+      loadCheques(1, requestId);
+    }
+    return () => { chequeRequest.current += 1; };
+  }, [depositModal, chequeDeposit, depositForm.bankAccountId, depositForm.paymentMethodId]);
 
   const [logsVisible, setLogsVisible] = useState(false);
   const [logs, setLogs] = useState([]);
@@ -327,10 +385,24 @@ export default function CashManagementPanel({ canEdit = false, canDelete = false
   }
 
   async function saveDeposit() {
-    const amount = Number(depositForm.amount);
+    let amount = Number(depositForm.amount);
+    let chequeSelection = null;
     if (!depositForm.paymentMethodId || !depositForm.bankAccountId) {
       setDepositError("Select a payment method and bank account.");
       return;
+    }
+    if (chequeDeposit) {
+      if (chequesLoading || chequesError) {
+        setDepositError("Wait for the cheque list to load, or retry loading it.");
+        return;
+      }
+      try {
+        chequeSelection = selectedChequeDeposit(selectedChequeIds, cheques);
+        amount = chequeSelection.amount;
+      } catch (selectionError) {
+        setDepositError(selectionError.message);
+        return;
+      }
     }
     if (!Number.isFinite(amount) || amount <= 0) {
       setDepositError("Enter a valid deposit amount.");
@@ -346,7 +418,7 @@ export default function CashManagementPanel({ canEdit = false, canDelete = false
     const available = selectedPending.available == null
       ? null
       : Number(selectedPending.available || 0) + (existingMatchesSelection ? Number(existing?.amount || 0) : 0);
-    if (available != null && amount > available) {
+    if (!chequeDeposit && available != null && amount > available) {
       setDepositError(
         `Deposit cannot exceed ${money(available)} available from ${selectedPending.source || "the current pending balance"}.`
       );
@@ -356,6 +428,7 @@ export default function CashManagementPanel({ canEdit = false, canDelete = false
     const payload = {
       ...depositForm,
       amount,
+      ...(chequeSelection ? { chequeIds: chequeSelection.chequeIds } : {}),
       depositDate: toApiDate(depositForm.depositDate)
     };
 
@@ -632,8 +705,10 @@ export default function CashManagementPanel({ canEdit = false, canDelete = false
                 options={paymentMethodOptions}
                 onChange={paymentMethodId => {
                   setDepositError("");
+                  setSelectedChequeIds([]);
                   setDepositForm(value => ({ ...value, paymentMethodId }));
                 }}
+                disabled={depositSaving}
               />
               <Select
                 label="Bank account"
@@ -641,10 +716,67 @@ export default function CashManagementPanel({ canEdit = false, canDelete = false
                 options={bankOptions}
                 onChange={bankAccountId => {
                   setDepositError("");
+                  setSelectedChequeIds([]);
                   setDepositForm(value => ({ ...value, bankAccountId }));
                 }}
+                disabled={depositSaving}
               />
-              <Input
+              {chequeDeposit ? (
+                <View style={styles.chequeSection}>
+                  <Select
+                    label="Undeposited cheques"
+                    value=""
+                    options={cheques.filter(item => !selectedChequeIds.includes(String(item.chequeId))).map(item => ({
+                      value: String(item.chequeId),
+                      label: `${item.chequeNo || `Cheque #${item.chequeId}`} · ${money(item.amount)}${item.muminName ? ` · ${item.muminName}` : ""}${item.drawerBank ? ` · ${item.drawerBank}` : ""}`
+                    }))}
+                    placeholder={chequesLoading ? "Loading cheques…" : "Select a cheque to add"}
+                    disabled={chequesLoading || depositSaving || !depositForm.bankAccountId || Boolean(chequesError)}
+                    onChange={id => {
+                      setDepositError("");
+                      setSelectedChequeIds(current => current.includes(id) ? current : [...current, id]);
+                    }}
+                  />
+                  {chequesLoading ? <ActivityIndicator color={colors.primary} /> : null}
+                  {chequesError ? (
+                    <View style={styles.chequeMessage}>
+                      <Text style={styles.error}>{chequesError}</Text>
+                      <Button title="Retry loading cheques" compact variant="outline" onPress={() => loadCheques(chequePage ? chequePage + 1 : 1)} />
+                    </View>
+                  ) : null}
+                  {!chequesLoading && !chequesError && !cheques.length ? (
+                    <Text style={styles.chequeHelp}>No undeposited cheques are available in your name for this bank account.</Text>
+                  ) : null}
+                  {cheques.filter(item => selectedChequeIds.includes(String(item.chequeId))).map(item => (
+                    <View key={String(item.chequeId)} style={styles.selectedCheque}>
+                      <View style={styles.flex}>
+                        <Text style={styles.chequeNumber}>{item.chequeNo || `Cheque #${item.chequeId}`}</Text>
+                        {item.muminName ? <Text style={styles.meta}>{item.muminName}</Text> : null}
+                        <Text style={styles.chequeAmount}>{money(item.amount)}</Text>
+                      </View>
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={`Remove cheque ${item.chequeNo || item.chequeId}`}
+                        disabled={depositSaving}
+                        style={styles.chequeRemove}
+                        onPress={() => {
+                          setDepositError("");
+                          setSelectedChequeIds(current => current.filter(id => id !== String(item.chequeId)));
+                        }}
+                      >
+                        <MaterialCommunityIcons name="close" size={20} color={colors.danger} />
+                      </Pressable>
+                    </View>
+                  ))}
+                  {chequePage > 0 && chequePage < chequeTotalPages && !chequesError ? (
+                    <Button title="Load more cheques" compact variant="outline" disabled={chequesLoading || depositSaving} onPress={() => loadCheques(chequePage + 1)} />
+                  ) : null}
+                  <View style={styles.chequeTotal}>
+                    <Text style={styles.chequeHelp}>{selectedChequeIds.length} selected · Deposit total</Text>
+                    <Text style={styles.chequeAmount}>{money(chequeTotal)}</Text>
+                  </View>
+                </View>
+              ) : <Input
                 label="Amount"
                 value={depositForm.amount}
                 keyboardType="decimal-pad"
@@ -653,7 +785,7 @@ export default function CashManagementPanel({ canEdit = false, canDelete = false
                   setDepositError("");
                   setDepositForm(value => ({ ...value, amount }));
                 }}
-              />
+              />}
               <Input
                 label="Deposit date"
                 value={depositForm.depositDate}
@@ -686,6 +818,7 @@ export default function CashManagementPanel({ canEdit = false, canDelete = false
                 <Button
                   title={editingDepositId ? "Update deposit" : "Save deposit"}
                   loading={depositSaving}
+                  disabled={chequeDeposit && (chequesLoading || Boolean(chequesError) || !selectedChequeIds.length)}
                   onPress={saveDeposit}
                 />
               </View>
@@ -731,6 +864,14 @@ export default function CashManagementPanel({ canEdit = false, canDelete = false
 }
 
 const styles = StyleSheet.create({
+  chequeSection: { marginBottom: spacing.md, gap: spacing.xs },
+  chequeMessage: { gap: spacing.xs },
+  chequeHelp: { color: colors.muted, fontSize: 12, lineHeight: 18 },
+  selectedCheque: { flexDirection: "row", alignItems: "center", padding: spacing.sm, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surfaceMuted, gap: spacing.sm },
+  chequeNumber: { color: colors.text, fontSize: 14, fontWeight: "800" },
+  chequeAmount: { color: colors.primaryStrong, fontSize: 16, fontWeight: "800", marginTop: 3 },
+  chequeRemove: { padding: spacing.sm, borderRadius: radius.sm, backgroundColor: colors.dangerSoft },
+  chequeTotal: { padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.primarySoft, gap: 3 },
   flex: { flex: 1, minWidth: 0 },
   bankingHero: {
     minHeight: 126,

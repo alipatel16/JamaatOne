@@ -97,6 +97,9 @@ export const liveEndpoints = {
     paymentById: paymentId => `/api/Accounts/payments/${paymentId}`,
     refundPayment: paymentId => `/api/Accounts/payments/${paymentId}/refund`,
     paymentLogs: paymentId => `/api/Accounts/payments/${paymentId}/logs`,
+    receipts: "/api/Accounts/receipts",
+    receiptById: receiptId => `/api/Accounts/receipts/${receiptId}`,
+    refundReceipt: receiptId => `/api/Accounts/receipts/${receiptId}/refund`,
     muminLedger: (muminId, pageNumber = 1, pageSize = 20) => {
       const params = new URLSearchParams({
         pageNumber: String(pageNumber),
@@ -141,6 +144,7 @@ export const liveEndpoints = {
     bankAccountById: bankAccountId =>
       `/api/Accounts/bank-accounts/${bankAccountId}`,
     deposits: "/api/Accounts/deposits",
+    cheques: "/api/Accounts/cheques",
     depositById: bankDepositId => `/api/Accounts/deposits/${bankDepositId}`,
     depositLogs: bankDepositId =>
       `/api/Accounts/deposits/${bankDepositId}/logs`,

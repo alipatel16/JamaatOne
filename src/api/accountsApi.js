@@ -66,6 +66,41 @@ function normalizePaymentPayload(payload, includeMuminId) {
   };
 }
 
+function normalizeReceiptPayload(payload) {
+  const fieldValues = Array.isArray(payload?.fieldValues)
+    ? payload.fieldValues
+        .filter(item => item && item.fieldId != null)
+        .map(item => ({
+          fieldId: Number(item.fieldId),
+          value: item.value == null ? null : String(item.value)
+        }))
+    : [];
+
+  const lines = Array.isArray(payload?.lines)
+    ? payload.lines
+        .filter(Boolean)
+        .map(item => ({
+          paymentMethodId: Number(item.paymentMethodId),
+          amount: Number(item.amount),
+          paymentReference: String(item.paymentReference || "").trim() || null,
+          chequeNo: String(item.chequeNo || "").trim() || null,
+          drawerBank: String(item.drawerBank || "").trim() || null,
+          remarks: String(item.remarks || "").trim() || null
+        }))
+    : [];
+
+  return {
+    muminId: Number(payload?.muminId),
+    categoryId: Number(payload?.categoryId),
+    subCategoryId: payload?.subCategoryId ? Number(payload.subCategoryId) : null,
+    bankAccountId: Number(payload?.bankAccountId),
+    transactionDate: payload?.transactionDate || null,
+    remarks: payload?.remarks || null,
+    fieldValues,
+    lines
+  };
+}
+
 function normalizeBankAccountBasePayload(payload) {
   return {
     bankAccountName: payload?.bankAccountName || null,
@@ -102,7 +137,10 @@ function normalizeBankDepositPayload(payload) {
     amount: Number(payload?.amount),
     depositDate: payload?.depositDate || null,
     depositReferenceNo: payload?.depositReferenceNo || null,
-    remarks: payload?.remarks || null
+    remarks: payload?.remarks || null,
+    ...(Array.isArray(payload?.chequeIds)
+      ? { chequeIds: payload.chequeIds.map(Number) }
+      : {})
   };
 }
 
@@ -295,6 +333,20 @@ export const accountsApi = {
   getPaymentLogs(paymentId) {
     return liveApiRequest(liveEndpoints.accounts.paymentLogs(paymentId));
   },
+  createReceipt(payload) {
+    return liveApiRequest(liveEndpoints.accounts.receipts, {
+      method: "POST",
+      body: normalizeReceiptPayload(payload)
+    });
+  },
+  getReceiptById(receiptId) {
+    return liveApiRequest(liveEndpoints.accounts.receiptById(receiptId));
+  },
+  refundReceipt(receiptId) {
+    return liveApiRequest(liveEndpoints.accounts.refundReceipt(receiptId), {
+      method: "PUT"
+    });
+  },
   getMuminLedger(muminId, pageNumber = 1, pageSize = 20) {
     return liveApiRequest(
       liveEndpoints.accounts.muminLedger(muminId, pageNumber, pageSize)
@@ -361,6 +413,14 @@ export const accountsApi = {
 
   getBankDeposits(filters = {}) {
     return liveApiRequest(liveEndpoints.accounts.pagedDeposits(filters));
+  },
+  getCheques(filters = {}) {
+    const { pageNumber = 1, pageSize = 20, status, bankAccountId,
+      bankDepositId, dayBookId, search, fromDate, toDate, holderUserId, mine } = filters;
+    return liveApiRequest(withOptionalQuery(liveEndpoints.accounts.cheques, {
+      pageNumber, pageSize, status, bankAccountId, bankDepositId, dayBookId,
+      search, fromDate, toDate, holderUserId, mine
+    }));
   },
   getBankDeposit(bankDepositId) {
     return liveApiRequest(liveEndpoints.accounts.depositById(bankDepositId));

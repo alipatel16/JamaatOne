@@ -59,6 +59,25 @@ function makeLiveReceipt(payment, mumin) {
   const category = [payment?.categoryName, payment?.subCategoryName]
     .filter(Boolean)
     .join(" · ");
+  const paymentLines = Array.isArray(payment?.lines)
+    ? payment.lines.map(line => ({
+        paymentMethodId: line?.paymentMethodId,
+        paymentMethodName: line?.paymentMethodName || `Method ${line?.paymentMethodId || "-"}`,
+        amount: Number(line?.amount || 0),
+        paymentReference: line?.paymentReference || ""
+      }))
+    : [];
+  const paymentMethod = paymentLines.length
+    ? paymentLines
+        .map(line =>
+          `${line.paymentMethodName} · INR ${Number(line.amount || 0).toLocaleString("en-IN", {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+          })}${line.paymentReference ? ` · ${line.paymentReference}` : ""}`
+        )
+        .join(" | ")
+    : payment?.paymentMethodName || "-";
+  const amount = Number(payment?.totalAmount ?? payment?.amount ?? 0);
 
   return {
     documentType: "RECEIPT",
@@ -68,16 +87,17 @@ function makeLiveReceipt(payment, mumin) {
     receiptNumber: payment?.receiptNo || "-",
     paymentDate: formatReceiptDate(payment?.transactionDate || payment?.createdAt),
     paymentFor: category || "Payment",
-    amount: Number(payment?.amount || 0),
-    amountInWords: amountInWords(payment?.amount),
+    amount,
+    amountInWords: amountInWords(amount),
     userName: payment?.muminName || mumin?.fullName || mumin?.firstName || "-",
     itsId: mumin?.itsId || "-",
     userGrade: mumin?.category || "-",
     paidForUserName: paidFor?.value || "",
     paidForItsId: "",
-    paymentMethod: payment?.paymentMethodName || "-",
+    paymentMethod,
+    paymentLines,
     bankAccountName: payment?.bankAccountName || "-",
-    referenceNumber: payment?.paymentReference || "",
+    referenceNumber: paymentLines.length ? "" : payment?.paymentReference || "",
     notes: payment?.remarks || "",
     recordedByName: payment?.updatedByName || payment?.createdByName || "-",
     recordedByItsId:
@@ -123,7 +143,7 @@ function makeDayBookDocument(entry) {
 export default function Receipt() {
   const { user } = useAuth();
   const manager = canManageAccounts(user);
-  const { paymentId, dayBookId } = useLocalSearchParams();
+  const { paymentId, receiptId, dayBookId } = useLocalSearchParams();
   const { width } = useWindowDimensions();
   const isWide = width >= 760;
   const phone = width < 600;
@@ -132,7 +152,7 @@ export default function Receipt() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (!paymentId && !dayBookId) return;
+    if (!paymentId && !receiptId && !dayBookId) return;
 
     let active = true;
     (async () => {
@@ -149,7 +169,9 @@ export default function Receipt() {
           return;
         }
 
-        const payment = await accountsApi.getPayment(paymentId);
+        const payment = receiptId
+          ? await accountsApi.getReceiptById(receiptId)
+          : await accountsApi.getPayment(paymentId);
 
         if (!manager) {
           const itsNo = String(user?.itsNo || user?.itsId || "").trim();
@@ -184,7 +206,7 @@ export default function Receipt() {
     return () => {
       active = false;
     };
-  }, [dayBookId, paymentId, manager, user?.itsNo, user?.itsId]);
+  }, [dayBookId, paymentId, receiptId, manager, user?.itsNo, user?.itsId]);
 
   if (!receipt && !error) return <LoadingView />;
 
@@ -344,15 +366,29 @@ export default function Receipt() {
                     receipt.paymentFor
                   }
                 />
-                <Row
-                  compact={phone}
-                  label="Payment method"
-                  value={`${receipt.paymentMethod || "-"}${
-                    receipt.referenceNumber
-                      ? ` · ${receipt.referenceNumber}`
-                      : ""
-                  }`}
-                />
+                {Array.isArray(receipt.paymentLines) && receipt.paymentLines.length ? (
+                  receipt.paymentLines.map((line, index) => (
+                    <Row
+                      key={`${line.paymentMethodId || line.paymentMethodName}-${index}`}
+                      compact={phone}
+                      label={`Payment method ${index + 1}`}
+                      value={`${line.paymentMethodName || "-"} · ₹${Number(line.amount || 0).toLocaleString("en-IN", {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2
+                      })}${line.paymentReference ? ` · ${line.paymentReference}` : ""}`}
+                    />
+                  ))
+                ) : (
+                  <Row
+                    compact={phone}
+                    label="Payment method"
+                    value={`${receipt.paymentMethod || "-"}${
+                      receipt.referenceNumber
+                        ? ` · ${receipt.referenceNumber}`
+                        : ""
+                    }`}
+                  />
+                )}
                 <Row compact={phone} label="Notes" value={receipt.notes || "-"} />
               </View>
             </>

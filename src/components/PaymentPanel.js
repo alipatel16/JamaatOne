@@ -25,6 +25,10 @@ import DatePickerField, { localDateValue, transactionDateToIso } from "./DatePic
 import Input from "./Input";
 import RemoteMumineenSelect from "./RemoteMumineenSelect";
 import Select from "./Select";
+import {
+  chequeNumberForReceiptLine,
+  validateReceiptChequeNumbers
+} from "../utils/receiptPayment";
 
 const PAGE_SIZE = 20;
 const MONTHS = [
@@ -45,6 +49,43 @@ function createEmptyForm() {
     transactionDate: localDateValue(),
     fieldValues: {}
   };
+}
+
+function createEmptyReceiptLine() {
+  return {
+    paymentMethodId: "",
+    amount: "",
+    paymentReference: "",
+    chequeNo: "",
+    drawerBank: "",
+    remarks: ""
+  };
+}
+
+function validateSplitPayment(totalAmount, lines) {
+  const items = Array.isArray(lines) ? lines : [];
+  if (!items.length) return "Add at least one payment method.";
+
+  for (let index = 0; index < items.length; index += 1) {
+    const line = items[index] || {};
+    if (!line.paymentMethodId) {
+      return `Please select a payment method for split payment ${index + 1}.`;
+    }
+    if (!line.amount || Number(line.amount) <= 0) {
+      return `Enter a valid amount for split payment ${index + 1}.`;
+    }
+  }
+
+  const expectedPaise = Math.round(Number(totalAmount || 0) * 100);
+  const actualPaise = items.reduce(
+    (sum, line) => sum + Math.round(Number(line.amount || 0) * 100),
+    0
+  );
+  if (actualPaise !== expectedPaise) {
+    return "Split payment amounts must equal the total payment amount.";
+  }
+
+  return "";
 }
 
 const money = value =>
@@ -337,6 +378,8 @@ export default function PaymentPanel({
   const [family, setFamily] = useState([]);
   const [familyLoading, setFamilyLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [useMultipleMethods, setUseMultipleMethods] = useState(false);
+  const [receiptLines, setReceiptLines] = useState([createEmptyReceiptLine()]);
 
   const [detail, setDetail] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -579,6 +622,8 @@ export default function PaymentPanel({
   function resetForm() {
     setEditingId(null);
     setForm(createEmptyForm());
+    setUseMultipleMethods(false);
+    setReceiptLines([createEmptyReceiptLine()]);
     setSelectedPayer(null);
     setSubCategories([]);
     setFields([]);
@@ -660,6 +705,47 @@ export default function PaymentPanel({
     }
   }
 
+  function enableMultipleMethods() {
+    setUseMultipleMethods(true);
+    setReceiptLines([
+      {
+        ...createEmptyReceiptLine(),
+        paymentMethodId: form.paymentMethodId || "",
+        amount: form.amount || "",
+        paymentReference: form.paymentReference || ""
+      },
+      createEmptyReceiptLine()
+    ]);
+    setFormError("");
+  }
+
+  function disableMultipleMethods() {
+    const firstLine = receiptLines[0] || createEmptyReceiptLine();
+    setUseMultipleMethods(false);
+    setForm(current => ({
+      ...current,
+      paymentMethodId: firstLine.paymentMethodId || current.paymentMethodId,
+      paymentReference: firstLine.paymentReference || current.paymentReference
+    }));
+    setFormError("");
+  }
+
+  function updateReceiptLine(index, changes) {
+    setReceiptLines(current =>
+      current.map((line, lineIndex) =>
+        lineIndex === index ? { ...line, ...changes } : line
+      )
+    );
+  }
+
+  function addReceiptLine() {
+    setReceiptLines(current => [...current, createEmptyReceiptLine()]);
+  }
+
+  function removeReceiptLine(index) {
+    setReceiptLines(current => current.filter((_, lineIndex) => lineIndex !== index));
+  }
+
   function validateForm() {
     if (!form.muminId) return "Please search and select the Mumin making the payment.";
     if (!form.categoryId) return "Please select a payment category.";
@@ -667,7 +753,14 @@ export default function PaymentPanel({
       return "Please select a payment subcategory.";
     }
     if (!form.amount || Number(form.amount) <= 0) return "Enter a valid payment amount.";
-    if (!form.paymentMethodId) return "Please select a payment method.";
+    if (useMultipleMethods && !editingId) {
+      const splitValidation = validateSplitPayment(form.amount, receiptLines);
+      if (splitValidation) return splitValidation;
+      const chequeValidation = validateReceiptChequeNumbers(receiptLines, methods);
+      if (chequeValidation) return chequeValidation;
+    } else if (!form.paymentMethodId) {
+      return "Please select a payment method.";
+    }
     if (!form.bankAccountId) return "Please select a bank account.";
     if (!form.transactionDate) return "Please select a transaction date.";
 
@@ -703,6 +796,33 @@ export default function PaymentPanel({
     };
   }
 
+  function buildReceiptPayload() {
+    const fieldValues = fields
+      .map(field => ({
+        fieldId: Number(field.fieldId),
+        value: String(form.fieldValues[String(field.fieldId)] || "").trim()
+      }))
+      .filter(item => item.value !== "");
+
+    return {
+      muminId: Number(form.muminId),
+      categoryId: Number(form.categoryId),
+      subCategoryId: form.subCategoryId ? Number(form.subCategoryId) : null,
+      bankAccountId: Number(form.bankAccountId),
+      transactionDate: transactionDateToIso(form.transactionDate),
+      remarks: form.remarks.trim() || null,
+      fieldValues,
+      lines: receiptLines.map(line => ({
+        paymentMethodId: Number(line.paymentMethodId),
+        amount: Number(line.amount),
+        paymentReference: line.paymentReference.trim() || null,
+        chequeNo: chequeNumberForReceiptLine(line, methods),
+        drawerBank: null,
+        remarks: null
+      }))
+    };
+  }
+
   async function savePayment() {
     const validation = validateForm();
     if (validation) {
@@ -713,11 +833,12 @@ export default function PaymentPanel({
     try {
       setSaving(true);
       setFormError("");
-      const payload = buildPayload();
       if (editingId) {
-        await accountsApi.updatePayment(editingId, payload);
+        await accountsApi.updatePayment(editingId, buildPayload());
+      } else if (useMultipleMethods) {
+        await accountsApi.createReceipt(buildReceiptPayload());
       } else {
-        await accountsApi.createPayment(payload);
+        await accountsApi.createPayment(buildPayload());
       }
       setShowForm(false);
       resetForm();
@@ -730,11 +851,24 @@ export default function PaymentPanel({
     }
   }
 
-  async function openDetail(paymentId) {
+  async function openDetail(item) {
+    const paymentId = typeof item === "object" ? item?.paymentId : item;
+    const receiptId = typeof item === "object" ? item?.receiptId : null;
     try {
       setDetailLoading(true);
       setError("");
-      setDetail(await accountsApi.getPayment(paymentId));
+      if (receiptId) {
+        const receipt = await accountsApi.getReceiptById(receiptId);
+        setDetail({
+          ...receipt,
+          paymentId,
+          receiptId: receipt?.receiptId || receiptId,
+          amount: Number(receipt?.totalAmount || 0),
+          isReceiptDetail: true
+        });
+      } else {
+        setDetail(await accountsApi.getPayment(paymentId));
+      }
     } catch (requestError) {
       setError(requestError.message || "Unable to load payment details.");
     } finally {
@@ -770,6 +904,8 @@ export default function PaymentPanel({
       });
 
       setSelectedPayer(payer);
+      setUseMultipleMethods(false);
+      setReceiptLines([createEmptyReceiptLine()]);
       setEditingId(item.paymentId);
       setForm({
         muminId: String(item.muminId),
@@ -818,11 +954,17 @@ export default function PaymentPanel({
 
     const proceed =
       Platform.OS === "web"
-        ? globalThis.confirm?.(`Delete payment #${item.paymentId}?`) ?? false
+        ? globalThis.confirm?.(
+            item.receiptId
+              ? `Delete receipt ${item.receiptNo || `#${item.receiptId}`}?`
+              : `Delete payment #${item.paymentId}?`
+          ) ?? false
         : await new Promise(resolve => {
             Alert.alert(
-              "Delete payment?",
-              "The payment will remain in history with its refunded status.",
+              item.receiptId ? "Delete receipt?" : "Delete payment?",
+              item.receiptId
+                ? "All payment methods in this receipt will be refunded together and remain in history with refunded status."
+                : "The payment will remain in history with its refunded status.",
               [
                 { text: "Cancel", style: "cancel", onPress: () => resolve(false) },
                 {
@@ -838,10 +980,25 @@ export default function PaymentPanel({
 
     try {
       setError("");
-      await accountsApi.refundPayment(item.paymentId);
+      if (item.receiptId) {
+        await accountsApi.refundReceipt(item.receiptId);
+      } else {
+        await accountsApi.refundPayment(item.paymentId);
+      }
       await loadPayments(pageNumber);
-      if (detail?.paymentId === item.paymentId) {
-        setDetail(await accountsApi.getPayment(item.paymentId));
+      if (detail?.paymentId === item.paymentId || (item.receiptId && detail?.receiptId === item.receiptId)) {
+        if (item.receiptId) {
+          const receipt = await accountsApi.getReceiptById(item.receiptId);
+          setDetail({
+            ...receipt,
+            paymentId: item.paymentId,
+            receiptId: receipt?.receiptId || item.receiptId,
+            amount: Number(receipt?.totalAmount || 0),
+            isReceiptDetail: true
+          });
+        } else {
+          setDetail(await accountsApi.getPayment(item.paymentId));
+        }
       }
     } catch (requestError) {
       setError(requestError.message || "Unable to refund payment.");
@@ -906,7 +1063,7 @@ export default function PaymentPanel({
       {payments.map(item => (
         <Pressable
           key={String(item.paymentId)}
-          onPress={() => openDetail(item.paymentId)}
+          onPress={() => openDetail(item)}
         >
           <Card style={styles.paymentCard}>
             <View style={[styles.row, phone && styles.rowPhone]}>
@@ -919,7 +1076,9 @@ export default function PaymentPanel({
                   {item.muminName || `Mumin ${item.muminId}`}
                 </Text>
                 <Text style={styles.meta}>
-                  {item.paymentMethodName || "-"} · {formatDateTime(item.transactionDate || item.createdAt)}
+                  {item.receiptId
+                    ? `${item.paymentMethodName || "-"} · Split receipt`
+                    : item.paymentMethodName || "-"} · {formatDateTime(item.transactionDate || item.createdAt)}
                 </Text>
                 {item.bankAccountName ? (
                   <Text style={styles.meta}>Bank: {item.bankAccountName}</Text>
@@ -943,7 +1102,9 @@ export default function PaymentPanel({
                 onPress={() =>
                   router.push({
                     pathname: "/(app)/receipt",
-                    params: { paymentId: String(item.paymentId) }
+                    params: item.receiptId
+                      ? { receiptId: String(item.receiptId) }
+                      : { paymentId: String(item.paymentId) }
                   })
                 }
               />
@@ -951,9 +1112,9 @@ export default function PaymentPanel({
                 title="Details"
                 compact
                 variant="outline"
-                onPress={() => openDetail(item.paymentId)}
+                onPress={() => openDetail(item)}
               />
-              {manager && canEdit ? (
+              {manager && canEdit && !item.receiptId ? (
                 <Button
                   title="Edit"
                   compact
@@ -1121,15 +1282,94 @@ export default function PaymentPanel({
                     setForm(current => ({ ...current, amount }))
                   }
                 />
-                <Select
-                  label="Payment method"
-                  value={form.paymentMethodId}
-                  options={methodOptions}
-                  onChange={paymentMethodId =>
-                    setForm(current => ({ ...current, paymentMethodId }))
-                  }
-                  placeholder="Select payment method"
-                />
+                {!editingId ? (
+                  <View style={styles.splitToggleBlock}>
+                    <Button
+                      title={
+                        useMultipleMethods
+                          ? "Use single payment method"
+                          : "Use multiple payment methods"
+                      }
+                      compact
+                      variant="outline"
+                      onPress={
+                        useMultipleMethods
+                          ? disableMultipleMethods
+                          : enableMultipleMethods
+                      }
+                    />
+                    <Text style={styles.splitHelper}>
+                      {useMultipleMethods
+                        ? "Split the total amount across one or more payment methods. The split amounts must add up to the total above."
+                        : "Optional: split this payment across cash, UPI, bank transfer, or other configured methods."}
+                    </Text>
+                  </View>
+                ) : null}
+
+                {useMultipleMethods && !editingId ? (
+                  <View style={styles.splitSection}>
+                    {receiptLines.map((line, index) => (
+                      <View key={`receipt-line-${index}`} style={styles.splitLineCard}>
+                        <View style={styles.splitLineHeader}>
+                          <Text style={styles.splitLineTitle}>Payment method {index + 1}</Text>
+                          {receiptLines.length > 1 ? (
+                            <Pressable
+                              onPress={() => removeReceiptLine(index)}
+                              style={styles.splitRemoveButton}
+                            >
+                              <MaterialCommunityIcons
+                                name="close"
+                                size={18}
+                                color={colors.danger}
+                              />
+                              <Text style={styles.splitRemoveText}>Remove</Text>
+                            </Pressable>
+                          ) : null}
+                        </View>
+                        <Select
+                          label="Payment method"
+                          value={line.paymentMethodId}
+                          options={methodOptions}
+                          onChange={paymentMethodId =>
+                            updateReceiptLine(index, { paymentMethodId })
+                          }
+                          placeholder="Select payment method"
+                        />
+                        <Input
+                          label="Amount"
+                          value={line.amount}
+                          keyboardType="decimal-pad"
+                          onChangeText={amount => updateReceiptLine(index, { amount })}
+                        />
+                        <Input
+                          label="Reference / cheque / UPI number"
+                          value={line.paymentReference}
+                          onChangeText={paymentReference =>
+                            updateReceiptLine(index, { paymentReference })
+                          }
+                        />
+                      </View>
+                    ))}
+                    <Button
+                      title="Add another payment method"
+                      compact
+                      variant="outline"
+                      onPress={addReceiptLine}
+                    />
+                  </View>
+                ) : (
+                  <>
+                    <Select
+                      label="Payment method"
+                      value={form.paymentMethodId}
+                      options={methodOptions}
+                      onChange={paymentMethodId =>
+                        setForm(current => ({ ...current, paymentMethodId }))
+                      }
+                      placeholder="Select payment method"
+                    />
+                  </>
+                )}
                 <Select
                   label="Bank account"
                   value={form.bankAccountId}
@@ -1157,13 +1397,15 @@ export default function PaymentPanel({
                     setForm(current => ({ ...current, transactionDate }))
                   }
                 />
-                <Input
-                  label="Reference / cheque / UPI number"
-                  value={form.paymentReference}
-                  onChangeText={paymentReference =>
-                    setForm(current => ({ ...current, paymentReference }))
-                  }
-                />
+                {!useMultipleMethods || editingId ? (
+                  <Input
+                    label="Reference / cheque / UPI number"
+                    value={form.paymentReference}
+                    onChangeText={paymentReference =>
+                      setForm(current => ({ ...current, paymentReference }))
+                    }
+                  />
+                ) : null}
                 <Input
                   label="Remarks"
                   value={form.remarks}
@@ -1204,7 +1446,7 @@ export default function PaymentPanel({
                 <View style={[styles.modalHeader, phone && styles.modalHeaderPhone]}>
                   <View style={styles.flex}>
                     <Text style={styles.modalTitle}>
-                      Payment #{detail.paymentId}
+                      {detail.receiptId ? `Receipt ${detail.receiptNo || `#${detail.receiptId}`}` : `Payment #${detail.paymentId}`}
                     </Text>
                     <Text style={styles.subtitle}>{detail.status || "-"}</Text>
                   </View>
@@ -1225,18 +1467,59 @@ export default function PaymentPanel({
                   </Text>
                   <Text style={styles.detailLabel}>Amount</Text>
                   <Text style={styles.detailValue}>{money(detail.amount)}</Text>
-                  <Text style={styles.detailLabel}>Payment method</Text>
-                  <Text style={styles.detailValue}>
-                    {detail.paymentMethodName || "-"}
-                  </Text>
+                  {detail.receiptId && Array.isArray(detail.lines) && detail.lines.length ? (
+                    <View style={styles.splitDetails}>
+                      <View style={styles.splitDetailsHeader}>
+                        <Text style={styles.splitDetailsTitle}>Payment breakdown</Text>
+                        <Text style={styles.splitDetailsCount}>{detail.lines.length} methods</Text>
+                      </View>
+                      {detail.lines.map((line, index) => (
+                        <View
+                          key={`${line.paymentId || line.paymentMethodId}-${index}`}
+                          style={styles.splitDetailCard}
+                        >
+                          <View style={[styles.splitDetailHeader, narrow && styles.splitDetailHeaderNarrow]}>
+                            <View style={styles.splitDetailMethod}>
+                              <View style={styles.splitDetailIcon}>
+                                <MaterialCommunityIcons name="wallet-outline" size={18} color={colors.primaryStrong} />
+                              </View>
+                              <Text style={styles.splitDetailMethodName}>
+                                {line.paymentMethodName || `Method ${line.paymentMethodId}`}
+                              </Text>
+                            </View>
+                            <Text style={styles.splitDetailAmount}>
+                              {money(line.amount)}
+                            </Text>
+                          </View>
+                          {line.chequeNo || line.paymentReference ? (
+                            <View style={styles.splitDetailReferenceRow}>
+                              <Text style={styles.splitDetailReferenceLabel}>{line.chequeNo ? "Cheque number" : "Reference"}</Text>
+                              <Text selectable style={styles.splitDetailReference}>{line.chequeNo || line.paymentReference}</Text>
+                            </View>
+                          ) : null}
+                        </View>
+                      ))}
+                    </View>
+                  ) : (
+                    <>
+                      <Text style={styles.detailLabel}>Payment method</Text>
+                      <Text style={styles.detailValue}>
+                        {detail.paymentMethodName || "-"}
+                      </Text>
+                    </>
+                  )}
                   <Text style={styles.detailLabel}>Bank account</Text>
                   <Text style={styles.detailValue}>
                     {detail.bankAccountName || "-"}
                   </Text>
-                  <Text style={styles.detailLabel}>Reference</Text>
-                  <Text style={styles.detailValue}>
-                    {detail.paymentReference || "-"}
-                  </Text>
+                  {!detail.receiptId ? (
+                    <>
+                      <Text style={styles.detailLabel}>Reference</Text>
+                      <Text style={styles.detailValue}>
+                        {detail.paymentReference || "-"}
+                      </Text>
+                    </>
+                  ) : null}
                   <Text style={styles.detailLabel}>Receipt number</Text>
                   <Text style={styles.detailValue}>{detail.receiptNo || "-"}</Text>
                   <Text style={styles.detailLabel}>Remarks</Text>
@@ -1275,14 +1558,17 @@ export default function PaymentPanel({
                       variant="outline"
                       onPress={() => {
                         const paymentId = detail.paymentId;
+                        const receiptId = detail.receiptId;
                         setDetail(null);
                         router.push({
                           pathname: "/(app)/receipt",
-                          params: { paymentId: String(paymentId) }
+                          params: receiptId
+                            ? { receiptId: String(receiptId) }
+                            : { paymentId: String(paymentId) }
                         });
                       }}
                     />
-                    {manager && canEdit ? (
+                    {manager && canEdit && !detail.receiptId ? (
                       <Button
                         title="Edit payment"
                         variant="outline"
@@ -1486,6 +1772,73 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     fontSize: 15,
     marginBottom: spacing.sm
+  },
+  splitToggleBlock: {
+    marginBottom: spacing.md,
+    gap: spacing.xs
+  },
+  splitHelper: {
+    color: colors.muted,
+    fontSize: 12,
+    lineHeight: 18
+  },
+  splitSection: {
+    gap: spacing.sm,
+    marginBottom: spacing.md
+  },
+  splitLineCard: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceMuted,
+    padding: spacing.md
+  },
+  splitLineHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.sm,
+    marginBottom: spacing.sm
+  },
+  splitLineTitle: {
+    color: colors.text,
+    fontWeight: "900",
+    fontSize: 14
+  },
+  splitRemoveButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    paddingVertical: 4,
+    paddingHorizontal: 6
+  },
+  splitRemoveText: {
+    color: colors.danger,
+    fontSize: 12,
+    fontWeight: "800"
+  },
+  splitDetails: { marginTop: spacing.lg, gap: spacing.sm },
+  splitDetailsHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm },
+  splitDetailsTitle: { color: colors.textSoft, fontSize: 13, fontWeight: "800" },
+  splitDetailsCount: { color: colors.primaryStrong, backgroundColor: colors.primarySoft, paddingHorizontal: spacing.xs, paddingVertical: 4, borderRadius: radius.pill, fontSize: 11, fontWeight: "700" },
+  splitDetailHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm },
+  splitDetailHeaderNarrow: { alignItems: "flex-start", flexDirection: "column" },
+  splitDetailMethod: { flexDirection: "row", alignItems: "center", gap: spacing.xs, flex: 1, minWidth: 0 },
+  splitDetailIcon: { width: 32, height: 32, borderRadius: radius.sm, backgroundColor: colors.primarySoft, alignItems: "center", justifyContent: "center" },
+  splitDetailMethodName: { color: colors.text, fontSize: 14, fontWeight: "700", flex: 1 },
+  splitDetailAmount: { color: colors.primaryStrong, fontSize: 15, fontWeight: "800", flexShrink: 0 },
+  splitDetailReferenceRow: { marginTop: spacing.sm, paddingTop: spacing.xs, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, gap: 3 },
+  splitDetailReferenceLabel: { color: colors.muted, fontSize: 11 },
+  splitDetailCard: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceMuted,
+    padding: spacing.sm
+  },
+  splitDetailReference: {
+    color: colors.textSoft,
+    fontSize: 13
   },
   helper: {
     color: colors.muted,
