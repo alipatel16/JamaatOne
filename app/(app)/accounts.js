@@ -21,6 +21,8 @@ import CustomerLedgerPanel from "../../src/components/CustomerLedgerPanel";
 import DayBookPanel from "../../src/components/DayBookPanel";
 import Input from "../../src/components/Input";
 import PaymentPanel from "../../src/components/PaymentPanel";
+import TakhmeenPanel from "../../src/components/TakhmeenPanel";
+import useFmbCategories from "../../src/hooks/useFmbCategories";
 import RemoteMumineenSelect from "../../src/components/RemoteMumineenSelect";
 import Screen from "../../src/components/Screen";
 import { canDeleteJamaatData, canManageAccounts, canRefundPayments } from "../../src/constants/roles";
@@ -406,6 +408,8 @@ export default function AccountsScreen() {
   const narrow = width < 380;
   const { user } = useAuth();
   const manager = canManageAccounts(user);
+  const fmbAccess = useFmbCategories(user);
+  const canRecordTakhmeen = fmbAccess.categories.length > 0;
   const canRefund = canRefundPayments(user);
   const canDelete = canDeleteJamaatData(user);
   const [tab, setTab] = useState(manager ? "STATS" : "PAYMENTS");
@@ -615,7 +619,7 @@ export default function AccountsScreen() {
       <View style={styles.heading}>
         <View style={styles.flex}>
           <Text style={styles.title}>
-            {manager ? "Accounts" : "My payments"}
+            {manager || canRecordTakhmeen ? "Accounts" : "My payments"}
           </Text>
           <Text style={styles.subtitle}>
             {manager
@@ -625,14 +629,18 @@ export default function AccountsScreen() {
         </View>
       </View>
       {error ? <Text style={styles.error}>{error}</Text> : null}
-      {manager ? (
+      {fmbAccess.error ? <Text style={styles.error}>{fmbAccess.error}</Text> : null}
+      {manager || canRecordTakhmeen ? (
         <View style={[styles.tabs, phone && styles.tabsPhone]}>
           {[
-            ["STATS", "Summary"],
-            ["PAYMENTS", "Mumineen Payments"],
-            ["DAYBOOK", "Day book"],
-            ["LEDGERS", "Customer ledgers"],
-            ["BANKING", "Banking"],
+            ...(manager ? [
+              ["STATS", "Summary"],
+              ["PAYMENTS", "Mumineen Payments"],
+              ["DAYBOOK", "Day book"],
+              ["LEDGERS", "Customer ledgers"],
+              ["BANKING", "Banking"],
+            ] : [["PAYMENTS", "My payments"]]),
+            ...(canRecordTakhmeen ? [["TAKHMEEN", "Takhmeen"]] : []),
           ].map(([v, l]) => (
             <Pressable
               key={v}
@@ -863,6 +871,9 @@ export default function AccountsScreen() {
       ) : null}
       {manager && tab === "BANKING" ? (
         <CashManagementPanel canEdit={canDelete} canDelete={canDelete} mode="banking" />
+      ) : null}
+      {canRecordTakhmeen && tab === "TAKHMEEN" ? (
+        <TakhmeenPanel categories={fmbAccess.categories} />
       ) : null}
 
       <Modal

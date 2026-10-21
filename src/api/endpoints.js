@@ -78,6 +78,8 @@ export const liveEndpoints = {
   },
 
   accounts: {
+    takhmeen: "/api/Accounts/takhmeen",
+    takhmeenById: id => `/api/Accounts/takhmeen/${id}`,
     paymentCategories: "/api/Accounts/payment-categories",
     paymentCategoryById: categoryId =>
       `/api/Accounts/payment-categories/${categoryId}`,

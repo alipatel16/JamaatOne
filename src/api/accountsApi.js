@@ -54,6 +54,7 @@ function normalizePaymentPayload(payload, includeMuminId) {
 
   return {
     ...(includeMuminId ? { muminId: Number(payload?.muminId) } : {}),
+    ...(includeMuminId ? { considerTakhmeen: payload?.considerTakhmeen === true } : {}),
     categoryId: Number(payload?.categoryId),
     subCategoryId: payload?.subCategoryId ? Number(payload.subCategoryId) : null,
     amount: Number(payload?.amount),
@@ -97,7 +98,19 @@ function normalizeReceiptPayload(payload) {
     transactionDate: payload?.transactionDate || null,
     remarks: payload?.remarks || null,
     fieldValues,
-    lines
+    lines,
+    considerTakhmeen: payload?.considerTakhmeen === true
+  };
+}
+
+function normalizeTakhmeenPayload(payload, creating) {
+  return {
+    ...(creating ? { muminId: Number(payload.muminId), categoryId: Number(payload.categoryId) } : {}),
+    fromDate: payload.fromDate,
+    toDate: payload.toDate,
+    niyatAmount: Number(payload.niyatAmount),
+    bankAccountId: Number(payload.bankAccountId),
+    remarks: String(payload.remarks || "").trim() || null
   };
 }
 
@@ -145,6 +158,24 @@ function normalizeBankDepositPayload(payload) {
 }
 
 export const accountsApi = {
+  getTakhmeen(filters = {}) {
+    const { pageNumber = 1, pageSize = 20, jamaatId, muminId, categoryId, status, fromDate, toDate, hasRemaining, search } = filters;
+    return liveApiRequest(withOptionalQuery(liveEndpoints.accounts.takhmeen, {
+      pageNumber, pageSize, jamaatId, muminId, categoryId, status, fromDate, toDate, hasRemaining, search
+    }));
+  },
+  getTakhmeenById(id) {
+    return liveApiRequest(liveEndpoints.accounts.takhmeenById(id));
+  },
+  createTakhmeen(payload) {
+    return liveApiRequest(liveEndpoints.accounts.takhmeen, { method: "POST", body: normalizeTakhmeenPayload(payload, true) });
+  },
+  updateTakhmeen(id, payload) {
+    return liveApiRequest(liveEndpoints.accounts.takhmeenById(id), { method: "PUT", body: normalizeTakhmeenPayload(payload, false) });
+  },
+  deleteTakhmeen(id) {
+    return liveApiRequest(liveEndpoints.accounts.takhmeenById(id), { method: "DELETE" });
+  },
   // Published payment configuration APIs.
   getPaymentCategories(jamaatId) {
     return liveApiRequest(

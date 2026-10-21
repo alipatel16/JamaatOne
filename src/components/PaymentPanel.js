@@ -25,6 +25,7 @@ import DatePickerField, { localDateValue, transactionDateToIso } from "./DatePic
 import Input from "./Input";
 import RemoteMumineenSelect from "./RemoteMumineenSelect";
 import Select from "./Select";
+import { isFmbCategory } from "../utils/takhmeen";
 import {
   chequeNumberForReceiptLine,
   validateReceiptChequeNumbers
@@ -45,6 +46,7 @@ function createEmptyForm() {
     paymentMethodId: "",
     bankAccountId: "",
     paymentReference: "",
+    considerTakhmeen: false,
     remarks: "",
     transactionDate: localDateValue(),
     fieldValues: {}
@@ -648,6 +650,7 @@ export default function PaymentPanel({
     setForm(current => ({
       ...current,
       categoryId,
+      considerTakhmeen: false,
       subCategoryId: "",
       bankAccountId: "",
       fieldValues: {}
@@ -783,6 +786,7 @@ export default function PaymentPanel({
 
     return {
       ...(editingId ? {} : { muminId: Number(form.muminId) }),
+      ...(!editingId ? { considerTakhmeen: form.considerTakhmeen === true && isFmbCategory(categories.find(item => String(item.categoryId) === String(form.categoryId))) } : {}),
       categoryId: Number(form.categoryId),
       // No configured/selected subcategory must be sent as null, not 0.
       subCategoryId: form.subCategoryId ? Number(form.subCategoryId) : null,
@@ -819,7 +823,8 @@ export default function PaymentPanel({
         chequeNo: chequeNumberForReceiptLine(line, methods),
         drawerBank: null,
         remarks: null
-      }))
+      })),
+      considerTakhmeen: form.considerTakhmeen === true && isFmbCategory(categories.find(item => String(item.categoryId) === String(form.categoryId)))
     };
   }
 
@@ -1274,6 +1279,21 @@ export default function PaymentPanel({
                 ) : null}
 
                 <Text style={styles.formSectionTitle}>Payment details</Text>
+                {!editingId && isFmbCategory(categories.find(item => String(item.categoryId) === String(form.categoryId))) ? (
+                  <Pressable
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: form.considerTakhmeen === true }}
+                    style={styles.takhmeenCheckbox}
+                    disabled={saving}
+                    onPress={() => setForm(current => ({ ...current, considerTakhmeen: !current.considerTakhmeen }))}
+                  >
+                    <MaterialCommunityIcons name={form.considerTakhmeen ? "checkbox-marked" : "checkbox-blank-outline"} size={24} color={colors.primaryStrong} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.label}>Consider Takhmeen</Text>
+                      <Text style={styles.meta}>Count this payment toward the member’s eligible FMB takhmeen.</Text>
+                    </View>
+                  </Pressable>
+                ) : null}
                 <Input
                   label="Amount"
                   value={form.amount}
@@ -1646,6 +1666,7 @@ export default function PaymentPanel({
 }
 
 const styles = StyleSheet.create({
+  takhmeenCheckbox: { flexDirection: "row", alignItems: "center", gap: spacing.sm, padding: spacing.md, marginBottom: spacing.md, borderRadius: radius.md, backgroundColor: colors.primarySoft },
   flex: { flex: 1, minWidth: 0 },
   panelHeader: {
     flexDirection: "row",
