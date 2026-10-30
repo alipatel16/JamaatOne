@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { accountsApi } from "../api/accountsApi";
-import { usersApi } from "../api/usersApi";
-import { canManageAccounts, isCommitteeMember, isFmbUser } from "../constants/roles";
+import { canManageAccounts } from "../constants/roles";
 import { fmbCategoriesForUser } from "../utils/takhmeen";
 
 export default function useFmbCategories(user) {
@@ -11,17 +10,15 @@ export default function useFmbCategories(user) {
     setState({ categories: [], loading: true, error: "" });
     async function load() {
       try {
-        if (!canManageAccounts(user) && !isFmbUser(user)) {
+        if (!canManageAccounts(user)) {
           if (active) setState({ categories: [], loading: false, error: "" });
           return;
         }
-        const [categories, record] = await Promise.all([
-          accountsApi.getPaymentCategories(user.jamaatId),
-          isCommitteeMember(user) || isFmbUser(user)
-            ? usersApi.getCommitteeMember(user.userId || user.id) : null
-        ]);
+        // This API returns the signed-in user's accessible categories. Reading
+        // a user-management record is neither needed nor available to every role.
+        const categories = await accountsApi.getPaymentCategories(user.jamaatId);
         if (active) setState({
-          categories: fmbCategoriesForUser(user, Array.isArray(categories) ? categories : [], record?.categories || []),
+          categories: fmbCategoriesForUser(user, Array.isArray(categories) ? categories : []),
           loading: false, error: ""
         });
       } catch (error) {
@@ -30,6 +27,6 @@ export default function useFmbCategories(user) {
     }
     load();
     return () => { active = false; };
-  }, [user?.userId, user?.id, user?.role, user?.roleName, user?.jamaatId]);
+  }, [user?.userId, user?.id, user?.role, user?.roleName, user?.roles, user?.jamaatId]);
   return state;
 }

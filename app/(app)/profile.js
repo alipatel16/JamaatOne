@@ -59,7 +59,7 @@ export default function ProfileScreen() {
           <View style={styles.avatar}><Text style={styles.avatarText}>{initial}</Text></View>
           <View style={[styles.profileCopy, narrow && styles.profileCopyNarrow]}>
             <Text style={styles.name}>{user?.name || "Member"}</Text>
-            <Text style={styles.role}>{user?.role || "Member"}</Text>
+            <Text style={styles.role}>{user?.roleName || user?.role || "Member"}</Text>
           </View>
         </View>
 

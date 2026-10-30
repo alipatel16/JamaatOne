@@ -1,17 +1,19 @@
-import { apiClient } from "./client";
-import { endpoints } from "./endpoints";
+import { liveApiRequest } from "./client";
+import { liveEndpoints } from "./endpoints";
 
 export const announcementsApi = {
-  getAll(query) {
-    return apiClient.get(endpoints.announcements, { query });
+  getAll({ pageNumber = 1, pageSize = 20 } = {}) {
+    return liveApiRequest(`${liveEndpoints.announcements.root}?${new URLSearchParams({ pageNumber: String(pageNumber), pageSize: String(pageSize) })}`);
   },
+  get(id) { return liveApiRequest(liveEndpoints.announcements.byId(id)); },
+  getLogs(id) { return liveApiRequest(liveEndpoints.announcements.logs(id)); },
   create(payload) {
-    return apiClient.post(endpoints.announcements, payload);
+    return liveApiRequest(liveEndpoints.announcements.root, { method: "POST", body: payload });
   },
   update(id, payload) {
-    return apiClient.put(endpoints.announcementById(id), payload);
+    return liveApiRequest(liveEndpoints.announcements.byId(id), { method: "PUT", body: payload });
   },
   remove(id) {
-    return apiClient.delete(endpoints.announcementById(id));
+    return liveApiRequest(liveEndpoints.announcements.byId(id), { method: "DELETE" });
   },
 };

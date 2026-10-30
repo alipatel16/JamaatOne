@@ -1,6 +1,6 @@
 import React, { useState } from "react";
-import { Image, StyleSheet, Text, useWindowDimensions, View } from "react-native";
-import { router } from "expo-router";
+import { Image, Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { router, useLocalSearchParams } from "expo-router";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 
 import Button from "../src/components/Button";
@@ -18,6 +18,7 @@ const FEATURES = [
 ];
 
 export default function LoginScreen() {
+  const { passwordChanged } = useLocalSearchParams();
   const { width } = useWindowDimensions();
   const isWide = width >= 900;
   const isPhone = width < 600;
@@ -83,6 +84,7 @@ export default function LoginScreen() {
         <Text style={styles.formBody}>Use your ITS credentials to continue.</Text>
 
         <View style={styles.form}>
+          {passwordChanged === "1" && !error ? <View style={styles.successBox}><Text accessibilityRole="alert" style={styles.success}>Password changed successfully. Sign in with your new password.</Text></View> : null}
           <Input
             label="ITS ID"
             value={itsId}
@@ -103,6 +105,9 @@ export default function LoginScreen() {
           />
           {error ? <View style={styles.errorBox}><Text style={styles.error}>{error}</Text></View> : null}
           <Button title="Sign in" onPress={handleLogin} loading={loading} />
+          <Pressable accessibilityRole="link" disabled={loading} style={styles.forgotLink} onPress={() => router.push("/forgot-password")}>
+            <Text style={styles.forgotText}>Forgot password?</Text>
+          </Pressable>
         </View>
 
         <View style={styles.secureRow}>
@@ -146,6 +151,10 @@ const styles = StyleSheet.create({
   form: { marginTop: spacing.xl },
   errorBox: { backgroundColor: colors.dangerSoft, borderRadius: radius.md, padding: spacing.sm, marginBottom: spacing.md },
   error: { color: colors.danger, fontSize: 13, fontWeight: "700" },
+  successBox: { backgroundColor: colors.successSoft, borderRadius: radius.md, padding: spacing.sm, marginBottom: spacing.md },
+  success: { color: colors.success, fontSize: 13, fontWeight: "700", lineHeight: 20 },
+  forgotLink: { alignItems: "center", justifyContent: "center", minHeight: 44, marginTop: spacing.xs },
+  forgotText: { color: colors.primaryStrong, fontSize: 13, fontWeight: "800" },
   secureRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7, marginTop: spacing.lg },
   secureText: { color: colors.muted, fontSize: 11, fontWeight: "700" }
 });

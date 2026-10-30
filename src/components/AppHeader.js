@@ -14,12 +14,12 @@ import { usePathname, useRouter } from "expo-router";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 
 import { useAuth } from "../context/AuthContext";
-import { canAccessFmb, canAccessMumineen, canManageJamaat, canManageUsers } from "../constants/roles";
+import { canAccessFmb, canAccessMumineen, canViewAccounts, canManageJamaat, canManageUsers } from "../constants/roles";
 import { colors, radius, shadows, spacing, typography } from "../theme";
 
 const PRIMARY_ITEMS = [
   { label: "Home", route: "/(app)", match: "/", icon: "view-dashboard-outline", activeIcon: "view-dashboard" },
-  { label: "Accounts", route: "/(app)/accounts", match: "/accounts", icon: "wallet-outline", activeIcon: "wallet" },
+  { label: "Accounts", route: "/(app)/accounts", match: "/accounts", icon: "wallet-outline", activeIcon: "wallet", accountsOnly: true },
   { label: "Mumineen", route: "/(app)/users", match: "/users", icon: "account-group-outline", activeIcon: "account-group", mumineenOnly: true },
   { label: "Profile", route: "/(app)/profile", match: "/profile", icon: "account-circle-outline", activeIcon: "account-circle" }
 ];
@@ -28,8 +28,8 @@ const MENU_ITEMS = [
   { label: "Namaaz timings", route: "/(app)/namaz", icon: "mosque", caption: "Location-based prayer schedule" },
   { label: "Hijri calendar", route: "/(app)/calendar", icon: "calendar-month-outline", caption: "Calendar and important dates" },
   { label: "FMB services", route: "/(app)/fmb", icon: "silverware-fork-knife", caption: "Menu and thali services", access: "fmb" },
-  { label: "User management", route: "/(app)/user-management", icon: "account-cog-outline", caption: "Committee, FMB and Madrasa access", access: "aamil" },
-  { label: "Announcements", route: "/(app)/announcements", icon: "bullhorn-outline", caption: "Create and manage community updates", access: "manager" }
+  { label: "User management", route: "/(app)/user-management", icon: "account-cog-outline", caption: "Committee and FMB user accounts", access: "aamil" },
+  { label: "Announcements", route: "/(app)/announcements", icon: "bullhorn-outline", caption: "Community updates and announcements" }
 ];
 
 export default function AppHeader({ title, showBack = false, fallbackRoute = "/" }) {
@@ -38,7 +38,7 @@ export default function AppHeader({ title, showBack = false, fallbackRoute = "/"
   const { user } = useAuth();
   const { width } = useWindowDimensions();
   const [open, setOpen] = useState(false);
-  const manager = canManageJamaat(user?.role);
+  const manager = canManageJamaat(user);
   const isDesktop = width >= 1024;
   const isPhone = width < 600;
   const isNarrow = width < 390;
@@ -62,7 +62,7 @@ export default function AppHeader({ title, showBack = false, fallbackRoute = "/"
     return pathname?.includes(match);
   }
 
-  const primaryItems = PRIMARY_ITEMS.filter(item => !item.mumineenOnly || canAccessMumineen(user));
+  const primaryItems = PRIMARY_ITEMS.filter(item => (!item.mumineenOnly || canAccessMumineen(user)) && (!item.accountsOnly || canViewAccounts(user)));
   const menuItems = MENU_ITEMS.filter(item => {
     if (item.access === "fmb") return canAccessFmb(user);
     if (item.access === "aamil") return canManageUsers(user);

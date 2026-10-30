@@ -491,7 +491,7 @@ export default function PaymentPanel({
       const [categoryData, methodData, bankData] = await Promise.all([
         accountsApi.getPaymentCategories(),
         accountsApi.getPaymentMethods(),
-        accountsApi.getBankAccounts()
+        manager ? accountsApi.getBankAccounts() : Promise.resolve([])
       ]);
       setCategories(Array.isArray(categoryData) ? categoryData : []);
       setMethods(Array.isArray(methodData) ? methodData : []);
@@ -517,6 +517,7 @@ export default function PaymentPanel({
     try {
       setLoading(true);
       setError("");
+      if (!manager && (!Number.isSafeInteger(Number(filters.muminId)) || Number(filters.muminId) <= 0)) throw new Error("Your Mumineen record is required to load personal payment history.");
       const result = await accountsApi.getPayments({
         pageNumber: page,
         pageSize: PAGE_SIZE,

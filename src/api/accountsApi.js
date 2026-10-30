@@ -158,6 +158,21 @@ function normalizeBankDepositPayload(payload) {
 }
 
 export const accountsApi = {
+  getCashTransfers(filters = {}) {
+    const { pageNumber = 1, pageSize = 20, userId, fromUserId, toUserId, bankAccountId, fromDate, toDate } = filters;
+    return liveApiRequest(withOptionalQuery(liveEndpoints.accounts.cashTransfers, {
+      pageNumber, pageSize, userId, fromUserId, toUserId, bankAccountId, fromDate, toDate
+    }));
+  },
+  getCashTransfer(id) { return liveApiRequest(liveEndpoints.accounts.cashTransferById(id)); },
+  getUserHoldings(id) { return liveApiRequest(liveEndpoints.accounts.userHoldings(id)); },
+  createCashTransfer(payload) {
+    return liveApiRequest(liveEndpoints.accounts.cashTransfers, { method: "POST", body: {
+      fromUserId: Number(payload.fromUserId), toUserId: Number(payload.toUserId), bankAccountId: Number(payload.bankAccountId),
+      cashAmount: Number(payload.cashAmount || 0), chequeIds: (payload.chequeIds || []).map(Number),
+      remarks: String(payload.remarks || "").trim() || null
+    } });
+  },
   getTakhmeen(filters = {}) {
     const { pageNumber = 1, pageSize = 20, jamaatId, muminId, categoryId, status, fromDate, toDate, hasRemaining, search } = filters;
     return liveApiRequest(withOptionalQuery(liveEndpoints.accounts.takhmeen, {
@@ -479,9 +494,6 @@ export const accountsApi = {
   getCashSummary(filters = {}) {
     return liveApiRequest(liveEndpoints.accounts.cashSummary(filters));
   },
-  getAccountsSummary(filters = {}) {
-    return liveApiRequest(liveEndpoints.accounts.summary(filters));
-  },
   getCollectionSummary(filters = {}) {
     return liveApiRequest(liveEndpoints.accounts.collectionSummary(filters));
   },
@@ -491,9 +503,6 @@ export const accountsApi = {
   },
 
   // Legacy aliases retained for older callers.
-  getSummary(filters = {}) {
-    return liveApiRequest(liveEndpoints.accounts.summary(filters));
-  },
   getMyPayments() {
     return apiRequest(endpoints.myPayments);
   },

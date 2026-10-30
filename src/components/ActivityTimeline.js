@@ -36,6 +36,13 @@ const FIELD_LABELS = {
 
 const HIDDEN_KEYS = new Set([
   "paymentId",
+  "announcementId",
+  "announcementLogId",
+  "menuId",
+  "menuLogId",
+  "pauseId",
+  "pauseLogId",
+  "windowLogId",
   "paymentLogId",
   "dayBookId",
   "dayBookLogId",

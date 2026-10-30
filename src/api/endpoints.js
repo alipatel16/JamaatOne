@@ -1,9 +1,31 @@
 export const liveEndpoints = {
+  announcements: {
+    root: "/api/Announcement",
+    byId: id => `/api/Announcement/${id}`,
+    logs: id => `/api/Announcement/${id}/log`
+  },
+  fmb: {
+    thaali: "/api/FMB/thaali",
+    bulkThaali: "/api/FMB/thaali/bulk",
+    thaaliById: id => `/api/FMB/thaali/${id}`,
+    stopThaali: id => `/api/FMB/thaali/${id}/stop`,
+    summary: "/api/FMB/summary",
+    requestWindow: "/api/FMB/thaali/request-window",
+    requestWindowLog: "/api/FMB/thaali/request-window/log",
+    pauses: "/api/FMB/thaali/pauses",
+    pauseById: id => `/api/FMB/thaali/pauses/${id}`,
+    resumePause: id => `/api/FMB/thaali/pauses/${id}/resume`,
+    pauseLog: id => `/api/FMB/thaali/pauses/${id}/log`,
+    menus: "/api/FMB/menu",
+    menuById: id => `/api/FMB/menu/${id}`,
+    menuLog: id => `/api/FMB/menu/${id}/log`
+  },
   auth: {
     login: "/api/Auth/login",
     refreshToken: "/api/Auth/refresh-token",
     roles: "/api/Auth/roles",
-    logout: "/api/Auth/logout"
+    logout: "/api/Auth/logout",
+    changePassword: "/api/Auth/change-password"
   },
 
 
@@ -13,6 +35,9 @@ export const liveEndpoints = {
     aamilById: userId => `/api/Users/aamils/${userId}`,
     committeeMembers: "/api/Users/committee-members",
     committeeMemberById: userId => `/api/Users/committee-members/${userId}`,
+    fmbUsers: "/api/Users/fmb-users",
+    fmbUserById: userId => `/api/Users/fmb-users/${userId}`,
+    userRoles: userId => `/api/Users/${userId}/roles`,
     paged: (path, { pageNumber = 1, pageSize = 20, search, jamaatId } = {}) => {
       const params = new URLSearchParams({
         pageNumber: String(pageNumber),
@@ -78,6 +103,9 @@ export const liveEndpoints = {
   },
 
   accounts: {
+    cashTransfers: "/api/Accounts/cash-transfers",
+    cashTransferById: id => `/api/Accounts/cash-transfers/${id}`,
+    userHoldings: id => `/api/Accounts/cash-transfers/holdings/${id}`,
     takhmeen: "/api/Accounts/takhmeen",
     takhmeenById: id => `/api/Accounts/takhmeen/${id}`,
     paymentCategories: "/api/Accounts/payment-categories",
@@ -176,13 +204,6 @@ export const liveEndpoints = {
       if (toDate) params.set("toDate", String(toDate));
       const query = params.toString();
       return `/api/Accounts/cash-summary${query ? `?${query}` : ""}`;
-    },
-    summary: ({ fromDate, toDate } = {}) => {
-      const params = new URLSearchParams();
-      if (fromDate) params.set("fromDate", String(fromDate));
-      if (toDate) params.set("toDate", String(toDate));
-      const query = params.toString();
-      return `/api/Accounts/summary${query ? `?${query}` : ""}`;
     },
     collectionSummary: ({
       categoryId,

@@ -8,12 +8,14 @@ import { endpoints } from "../../src/api/endpoints";
 import Card from "../../src/components/Card";
 import LoadingView from "../../src/components/LoadingView";
 import Screen from "../../src/components/Screen";
-import { canAccessFmb, canAccessMumineen, canManageJamaat, canManageUsers } from "../../src/constants/roles";
+import TodayFmbMenu from "../../src/components/fmb/TodayFmbMenu";
+import AnnouncementFeed from "../../src/components/AnnouncementFeed";
+import { canAccessFmb, canAccessMumineen, canViewAccounts, canManageJamaat, canManageUsers, canManageAnnouncements } from "../../src/constants/roles";
 import { useAuth } from "../../src/context/AuthContext";
 import { colors, radius, spacing } from "../../src/theme";
 
 const QUICK_LINKS = [
-  { title: "Accounts", caption: "Payments & ledgers", icon: "wallet-outline", route: "/(app)/accounts", managerOnly: false },
+  { title: "Accounts", caption: "Payments & ledgers", icon: "wallet-outline", route: "/(app)/accounts", access: "accounts" },
   { title: "Namaaz", caption: "Prayer timings", icon: "mosque", route: "/(app)/namaz", managerOnly: false },
   { title: "Calendar", caption: "Hijri calendar", icon: "calendar-month-outline", route: "/(app)/calendar", managerOnly: false },
   { title: "FMB", caption: "Menu & thali", icon: "silverware-fork-knife", route: "/(app)/fmb", access: "fmb" },
@@ -24,7 +26,7 @@ const QUICK_LINKS = [
 export default function DashboardScreen() {
   const { width } = useWindowDimensions();
   const { user } = useAuth();
-  const manager = canManageJamaat(user?.role);
+  const manager = canManageJamaat(user);
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
 
@@ -33,12 +35,13 @@ export default function DashboardScreen() {
   }, []);
 
   const quickLinks = useMemo(() => QUICK_LINKS.filter(item => {
+    if (item.access === "accounts") return canViewAccounts(user);
     if (item.access === "manager") return manager;
     if (item.access === "mumineen") return canAccessMumineen(user);
     if (item.access === "aamil") return canManageUsers(user);
     if (item.access === "fmb") return canAccessFmb(user);
     return true;
-  }), [manager, user?.role]);
+  }), [manager, user]);
   const wide = width >= 850;
   const phone = width < 600;
   const narrow = width < 340;
@@ -81,7 +84,7 @@ export default function DashboardScreen() {
             </View>
             <View style={phone ? styles.quickCopyPhone : undefined}>
               <Text numberOfLines={1} style={[styles.quickTitle, phone && styles.quickTitlePhone]}>{item.title}</Text>
-              <Text numberOfLines={2} style={[styles.quickCaption, phone && styles.quickCaptionPhone]}>{item.caption}</Text>
+              <Text numberOfLines={2} style={[styles.quickCaption, phone && styles.quickCaptionPhone]}>{item.access === "accounts" && !manager ? "Your payment history" : item.caption}</Text>
             </View>
             <MaterialCommunityIcons name="chevron-right" size={phone ? 21 : 24} color={colors.accentStrong} style={[styles.quickArrow, phone && styles.quickArrowPhone]} />
           </Pressable>
@@ -95,37 +98,21 @@ export default function DashboardScreen() {
               <Text style={styles.sectionEyebrow}>COMMUNITY</Text>
               <Text style={styles.sectionTitle}>Announcements</Text>
             </View>
-            {manager ? (
               <Pressable style={styles.manageButton} onPress={() => router.push("/(app)/announcements")}>
-                <Text style={styles.manageText}>Manage</Text>
+                <Text style={styles.manageText}>{canManageAnnouncements(user) ? "Manage" : "View all"}</Text>
               </Pressable>
-            ) : null}
           </View>
 
-          {data?.announcements?.length ? data.announcements.map(item => (
-            <Card key={item.id} style={styles.announcementCard}>
-              <View style={styles.announcementTop}>
-                <View style={styles.typeBadge}><Text style={styles.type}>{item.type || "Update"}</Text></View>
-                {item.location ? <Text style={styles.location}>{item.location}</Text> : null}
-              </View>
-              <Text style={styles.cardTitle}>{item.title}</Text>
-              <Text style={styles.body}>{item.body}</Text>
-            </Card>
-          )) : (
-            <Card><Text style={styles.empty}>No announcements for today.</Text></Card>
-          )}
+          <AnnouncementFeed key={user?.userId} embedded />
         </View>
 
-        <View style={styles.sideColumn}>
+        <View style={[styles.sideColumn, phone && styles.sideColumnPhone]}>
           {canAccessFmb(user) ? (
             <Pressable onPress={() => router.push("/(app)/fmb")}> 
               <Card style={styles.fmbCard}>
                 <View style={styles.fmbIcon}><MaterialCommunityIcons name="silverware-fork-knife" size={22} color={colors.accentStrong} /></View>
                 <Text style={styles.fmbLabel}>TODAY'S FMB</Text>
-                <Text style={styles.fmbStatus}>
-                  {data?.fmb?.status === "NO_FMB" ? "No FMB today" : data?.fmb?.status === "DELIVERED" ? "FMB delivered" : "FMB scheduled"}
-                </Text>
-                {data?.fmb?.menu ? <Text style={styles.fmbMenu}>{data.fmb.menu}</Text> : null}
+                <TodayFmbMenu />
                 <View style={styles.linkRow}><Text style={styles.fmbLink}>View FMB</Text><MaterialCommunityIcons name="chevron-right" size={18} color={colors.accentStrong} /></View>
               </Card>
             </Pressable>
@@ -184,6 +171,7 @@ const styles = StyleSheet.create({
   contentGridWide: { flexDirection: "row", alignItems: "flex-start", gap: spacing.lg },
   mainColumn: { flex: 1, minWidth: 0 },
   sideColumn: { width: "100%", maxWidth: 350 },
+  sideColumnPhone: { maxWidth: "100%" },
   sectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md, marginBottom: spacing.sm },
   sectionHeaderNarrow: { alignItems: "flex-start", flexWrap: "wrap" },
   sectionTitle: { color: colors.text, fontWeight: "900", fontSize: 23, marginTop: -4 },

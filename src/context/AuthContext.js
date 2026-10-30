@@ -15,25 +15,9 @@ import {
   setSessionUpdatedHandler,
   storeSession
 } from "../api/client";
-import { normalizeRole } from "../constants/roles";
+import { sessionUser as mapSessionUser } from "../utils/userRoles";
 
 const AuthContext = createContext(null);
-
-function mapSessionUser(session) {
-  if (!session) return null;
-
-  return {
-    id: session.userId,
-    userId: session.userId,
-    itsId: session.itsNo,
-    itsNo: session.itsNo,
-    name: session.name,
-    roleId: session.roleId,
-    roleName: session.roleName,
-    role: normalizeRole(session.roleName),
-    jamaatId: session.jamaatId ?? null
-  };
-}
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);

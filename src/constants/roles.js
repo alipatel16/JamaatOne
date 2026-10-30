@@ -1,59 +1,31 @@
+import { normalizeRole, hasRole } from "../utils/userRoles";
+export { normalizeRole, hasRole };
+
 export const ROLES = {
   SUPER_ADMIN: "SUPER_ADMIN",
   AAMIL: "AAMIL",
   ADMIN: "ADMIN",
   COMMITTEE_MEMBER: "COMMITTEE_MEMBER",
   FMB_USER: "FMB_USER",
+  FMB_ADMIN: "FMB_ADMIN",
   MADARSA_ADMIN: "MADARSA_ADMIN",
   USER: "USER"
 };
 
-export function normalizeRole(roleName) {
-  const normalized = String(roleName || "")
-    .trim()
-    .toUpperCase()
-    .replace(/[\s-]+/g, "_");
-
-  if (normalized === "SUPERADMIN") return ROLES.SUPER_ADMIN;
-  if (normalized === "AMIL") return ROLES.AAMIL;
-  if (normalized === "COMMITTEEMEMBER") return ROLES.COMMITTEE_MEMBER;
-  if (["FMBUSER", "FMB"].includes(normalized)) return ROLES.FMB_USER;
-  if (["MADARSAADMIN", "MADRASAADMIN", "MADRASA_ADMIN"].includes(normalized)) {
-    return ROLES.MADARSA_ADMIN;
-  }
-  if (Object.values(ROLES).includes(normalized)) return normalized;
-  return normalized || ROLES.USER;
-}
-
-const roleFrom = roleOrUser =>
-  normalizeRole(
-    typeof roleOrUser === "object"
-      ? roleOrUser?.role || roleOrUser?.roleName
-      : roleOrUser
-  );
-
-export const isSuperAdmin = roleOrUser => roleFrom(roleOrUser) === ROLES.SUPER_ADMIN;
-export const isAamil = roleOrUser => {
-  const role = roleFrom(roleOrUser);
-  // Older JamaatOne builds used ADMIN for the same Jamaat-level authority.
-  // Keep that alias so existing Aamil accounts do not lose access after the
-  // Users-controller migration.
-  return role === ROLES.AAMIL || role === ROLES.ADMIN;
-};
-export const isCommitteeMember = roleOrUser => roleFrom(roleOrUser) === ROLES.COMMITTEE_MEMBER;
-export const isFmbUser = roleOrUser => roleFrom(roleOrUser) === ROLES.FMB_USER;
-export const isMadarsaAdmin = roleOrUser => roleFrom(roleOrUser) === ROLES.MADARSA_ADMIN;
-
-export const canManageJamaat = roleOrUser => {
-  const role = roleFrom(roleOrUser);
-  return [ROLES.AAMIL, ROLES.ADMIN, ROLES.COMMITTEE_MEMBER].includes(role);
-};
+export const isSuperAdmin = user => hasRole(user, ROLES.SUPER_ADMIN);
+export const isAamil = user => hasRole(user, ROLES.AAMIL) || hasRole(user, ROLES.ADMIN);
+export const isCommitteeMember = user => hasRole(user, ROLES.COMMITTEE_MEMBER);
+export const isFmbUser = user => hasRole(user, ROLES.FMB_USER);
+export const isFmbAdmin = user => hasRole(user, ROLES.FMB_ADMIN);
+export const canEditFmb = user => isAamil(user) || isFmbAdmin(user);
+export const isMadarsaAdmin = user => hasRole(user, ROLES.MADARSA_ADMIN);
+export const canManageJamaat = user => isAamil(user) || isCommitteeMember(user);
 
 export const canManageAccounts = canManageJamaat;
+export const canViewAccounts = user => Boolean(user) && !isSuperAdmin(user);
 
-// User/role management is intentionally Aamil-only. Committee members have
-// broad operational access but cannot manage privileged application users.
-export const canManageUsers = roleOrUser => isAamil(roleOrUser);
+// Aamil manages all supported users; FMB Admin is limited to FMB users in the UI.
+export const canManageUsers = user => isAamil(user) || isFmbAdmin(user);
 
 // Committee members can record and view operational account data, but
 // mutations of existing records (edit/delete/refund) are Aamil-only.
@@ -62,19 +34,19 @@ export const canDeleteJamaatData = roleOrUser => isAamil(roleOrUser);
 export const canRefundPayments = roleOrUser => isAamil(roleOrUser);
 
 export const canManageFmb = roleOrUser =>
-  canManageJamaat(roleOrUser) || isFmbUser(roleOrUser);
+  canManageJamaat(roleOrUser) || isFmbUser(roleOrUser) || isFmbAdmin(roleOrUser);
 
 // Madrasa Admin is deliberately isolated from FMB. Existing normal members
 // retain the personal FMB experience already present in the app.
-export const canAccessFmb = roleOrUser => !isMadarsaAdmin(roleOrUser);
+export const canAccessFmb = user => !isMadarsaAdmin(user) || isAamil(user) || isCommitteeMember(user) || isFmbUser(user) || isFmbAdmin(user);
 
 export const canAccessMumineen = roleOrUser =>
-  canManageJamaat(roleOrUser) || isFmbUser(roleOrUser) || isMadarsaAdmin(roleOrUser);
+  canManageJamaat(roleOrUser) || isFmbUser(roleOrUser) || isFmbAdmin(roleOrUser) || isMadarsaAdmin(roleOrUser);
 
 // Editing/importing Mumineen remains a management capability. FMB users and
 // Madrasa admins can browse the directory and open member details read-only.
 export const canManageMumineen = roleOrUser => canManageJamaat(roleOrUser);
-export const canManageAnnouncements = roleOrUser => canManageJamaat(roleOrUser);
+export const canManageAnnouncements = roleOrUser => isAamil(roleOrUser) || isCommitteeMember(roleOrUser);
 
 // The Madrasa module itself will be added later; this capability is ready now
 // so future routing can be wired without changing the role model again.

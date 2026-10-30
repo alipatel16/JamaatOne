@@ -23,6 +23,8 @@ import Card from "./Card";
 import CollectionSummaryDashboard from "./CollectionSummaryDashboard";
 import Input from "./Input";
 import Select from "./Select";
+import CashTransfersPanel from "./CashTransfersPanel";
+import { isAamil } from "../constants/roles";
 import { selectedChequeDeposit } from "../utils/chequeDeposit";
 
 const PAGE_SIZE = 20;
@@ -641,6 +643,7 @@ export default function CashManagementPanel({ canEdit = false, canDelete = false
           onPress={() => setPage(value => value + 1)}
         />
       </View>
+      {isAamil(user) ? <CashTransfersPanel onTransferred={refreshAll} /> : null}
       </>) : null}
 
       <Modal

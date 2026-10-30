@@ -35,6 +35,30 @@ const updateRoleUser = (path, payload) =>
 const removeRoleUser = path => liveApiRequest(path, { method: "DELETE" });
 
 export const usersApi = {
+  getFmbUsers(filters = {}) { return paged(liveEndpoints.users.fmbUsers, filters); },
+  getFmbUser(id) { return liveApiRequest(liveEndpoints.users.fmbUserById(id)); },
+  createFmbUser(payload) {
+    return liveApiRequest(liveEndpoints.users.fmbUsers, {
+      method: "POST", body: {
+        itsNo: String(payload.itsNo || "").trim(), name: String(payload.name || "").trim(), password: payload.password || "",
+        ...(typeof payload.isFmbAdmin === "boolean" ? { isFmbAdmin: payload.isFmbAdmin } : {})
+      }
+    });
+  },
+  updateFmbUser(id, payload) {
+    return liveApiRequest(liveEndpoints.users.fmbUserById(id), { method: "PUT", body: {
+      name: String(payload.name || "").trim(),
+      ...(typeof payload.isActive === "boolean" ? { isActive: payload.isActive } : {}),
+      ...(typeof payload.isFmbAdmin === "boolean" ? { isFmbAdmin: payload.isFmbAdmin } : {})
+    } });
+  },
+  deleteFmbUser(id) { return removeRoleUser(liveEndpoints.users.fmbUserById(id)); },
+  grantRole(id, payload) {
+    return liveApiRequest(liveEndpoints.users.userRoles(id), { method: "POST", body: {
+      roleId: Number(payload.roleId),
+      ...(Number(payload.roleId) === 3 && Array.isArray(payload.categoryIds) && payload.categoryIds.length ? { categoryIds: payload.categoryIds.map(Number) } : {})
+    } });
+  },
   // Super Admin -> Aamil CRUD
   getAamils(filters = {}) {
     return paged(liveEndpoints.users.aamils, filters);

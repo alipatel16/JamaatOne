@@ -4,13 +4,13 @@ import {
   Modal,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   useWindowDimensions,
   View,
 } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { Redirect } from "expo-router";
 import { accountsApi } from "../../src/api/accountsApi";
 import { mumineenApi } from "../../src/api/mumineenApi";
 import Button from "../../src/components/Button";
@@ -21,6 +21,7 @@ import CustomerLedgerPanel from "../../src/components/CustomerLedgerPanel";
 import DayBookPanel from "../../src/components/DayBookPanel";
 import Input from "../../src/components/Input";
 import PaymentPanel from "../../src/components/PaymentPanel";
+import PersonalAccountsPanel from "../../src/components/PersonalAccountsPanel";
 import TakhmeenPanel from "../../src/components/TakhmeenPanel";
 import useFmbCategories from "../../src/hooks/useFmbCategories";
 import RemoteMumineenSelect from "../../src/components/RemoteMumineenSelect";
@@ -172,237 +173,15 @@ function DatePickerField({ label, value, onChange, allowClear = false }) {
   );
 }
 
-const money = (v) =>
-  new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 2,
-  }).format(Number(v || 0));
-
-function SummaryKpi({ icon, label, value, caption, tone = "primary", phone }) {
-  const toneStyle =
-    tone === "danger"
-      ? styles.summaryKpiDanger
-      : tone === "success"
-        ? styles.summaryKpiSuccess
-        : tone === "warning"
-          ? styles.summaryKpiWarning
-          : styles.summaryKpiPrimary;
-  const iconColor =
-    tone === "danger"
-      ? colors.danger
-      : tone === "success"
-        ? colors.success
-        : tone === "warning"
-          ? colors.warning
-          : colors.primaryStrong;
-
-  return (
-    <View style={[styles.summaryKpi, phone && styles.summaryKpiPhone, toneStyle]}>
-      <View style={styles.summaryKpiIcon}>
-        <MaterialCommunityIcons name={icon} size={20} color={iconColor} />
-      </View>
-      <Text style={styles.summaryKpiLabel}>{label}</Text>
-      <Text style={styles.summaryKpiValue} numberOfLines={1} adjustsFontSizeToFit>{money(value)}</Text>
-      {caption ? <Text style={styles.summaryKpiCaption}>{caption}</Text> : null}
-    </View>
-  );
-}
-
-function QuickMetric({ icon, label, value }) {
-  return (
-    <View style={styles.quickMetric}>
-      <View style={styles.quickMetricIcon}>
-        <MaterialCommunityIcons name={icon} size={18} color={colors.primaryStrong} />
-      </View>
-      <View style={styles.flex}>
-        <Text style={styles.quickMetricLabel}>{label}</Text>
-        <Text style={styles.quickMetricValue}>{value}</Text>
-      </View>
-    </View>
-  );
-}
-
 const toApiFromDate = value => value ? `${value}T00:00:00` : undefined;
 const toApiToDate = value => value ? `${value}T23:59:59.999` : undefined;
 
-function CollectionBreakdown({ title, items = [], nameKey }) {
-  const maxAmount = Math.max(
-    1,
-    ...items.map(item => Number(item?.totalAmount || 0))
-  );
-
-  return (
-    <View style={styles.collectionSection}>
-      <Text style={styles.collectionSectionTitle}>{title}</Text>
-      {items.length ? (
-        items.map((item, index) => {
-          const amount = Number(item?.totalAmount || 0);
-          const width = amount > 0 ? `${Math.max(4, (amount / maxAmount) * 100)}%` : "0%";
-          return (
-            <View
-              key={String(item?.categoryId ?? item?.bankAccountId ?? index)}
-              style={styles.collectionRow}
-            >
-              <View style={styles.collectionRowTop}>
-                <View style={styles.flex}>
-                  <Text style={styles.collectionName}>
-                    {item?.[nameKey] || "Unassigned"}
-                  </Text>
-                  <Text style={styles.collectionMeta}>
-                    {Number(item?.paymentCount || 0)} payment{Number(item?.paymentCount || 0) === 1 ? "" : "s"}
-                  </Text>
-                </View>
-                <Text style={styles.collectionAmount}>{money(amount)}</Text>
-              </View>
-              <View style={styles.collectionTrack}>
-                <View style={[styles.collectionBar, { width }]} />
-              </View>
-            </View>
-          );
-        })
-      ) : (
-        <Text style={styles.collectionEmpty}>No payment collection data for this period.</Text>
-      )}
-    </View>
-  );
-}
-
-function AccountsSummaryDashboard({
-  summary,
-  loading,
-  error,
-  stats,
-  dailyStats,
-  statsDates,
-  phone,
-  narrow,
-  onRetry,
-}) {
-  if (loading && !summary) {
-    return (
-      <View style={styles.collectionLoading}>
-        <ActivityIndicator color={colors.primary} />
-        <Text style={styles.meta}>Loading account summary...</Text>
-      </View>
-    );
-  }
-
-  return (
-    <View style={styles.accountSummaryModalContent}>
-      {error ? (
-        <View style={styles.inlineErrorBanner}>
-          <MaterialCommunityIcons name="alert-circle-outline" size={20} color={colors.danger} />
-          <View style={styles.flex}>
-            <Text style={styles.inlineErrorTitle}>Unable to load account summary</Text>
-            <Text style={styles.inlineErrorText}>{error}</Text>
-          </View>
-          {onRetry ? (
-            <Pressable style={styles.inlineRetryButton} onPress={onRetry}>
-              <Text style={styles.inlineRetryText}>Retry</Text>
-            </Pressable>
-          ) : null}
-        </View>
-      ) : null}
-
-      <View style={[styles.summaryHero, phone && styles.summaryHeroPhone, narrow && styles.summaryHeroNarrow]}>
-        <View style={styles.summaryHeroIcon}>
-          <MaterialCommunityIcons name="chart-donut-variant" size={28} color="#FFFFFF" />
-        </View>
-        <View style={styles.flex}>
-          <Text style={styles.summaryEyebrow}>FINANCIAL OVERVIEW</Text>
-          <Text style={[styles.summaryHeroTitle, phone && styles.summaryHeroTitlePhone]}>Accounts summary</Text>
-          <Text style={styles.summaryHeroSubtitle}>
-            A focused view of collections, refunds, daybook movement and available balance.
-          </Text>
-          <View style={styles.summaryPeriodPill}>
-            <MaterialCommunityIcons name="calendar-month-outline" size={15} color="#E4EFEA" />
-            <Text style={styles.summaryPeriodText}>{statsDates.from} to {statsDates.to}</Text>
-          </View>
-        </View>
-      </View>
-
-      {loading ? (
-        <ActivityIndicator color={colors.primary} style={{ marginVertical: spacing.md }} />
-      ) : null}
-
-      <View style={styles.summaryKpiGrid}>
-        <SummaryKpi phone={phone} icon="cash-multiple" label="Money received" value={stats.received} caption="Payments + other credits" />
-        <SummaryKpi phone={phone} icon="cash-clock" label="Member payments" value={stats.paymentIncome} caption="Net after refunds" tone="success" />
-        <SummaryKpi phone={phone} icon="bank-transfer" label="Total expenses" value={stats.expenses} caption="Daybook debits" tone="danger" />
-        <SummaryKpi phone={phone} icon="wallet-outline" label="Available balance" value={stats.balance} caption="Net position for period" tone="warning" />
-      </View>
-
-      <View style={[styles.summaryDetailGrid, phone && styles.summaryDetailGridPhone]}>
-        <Card style={styles.summaryDetailCard}>
-          <View style={styles.summarySectionHeader}>
-            <View style={styles.summarySectionIcon}>
-              <MaterialCommunityIcons name="finance" size={20} color={colors.primaryStrong} />
-            </View>
-            <View style={styles.flex}>
-              <Text style={styles.summarySectionTitle}>Account breakdown</Text>
-              <Text style={styles.summarySectionSubtitle}>How the current balance is composed.</Text>
-            </View>
-          </View>
-          <View style={[styles.statLine, narrow && styles.statLineNarrow]}><Text style={styles.meta}>Member payments received</Text><Text style={styles.statValue}>{money(stats.paymentGross)}</Text></View>
-          <View style={[styles.statLine, narrow && styles.statLineNarrow]}><Text style={styles.meta}>Payment refunds</Text><Text style={[styles.statValue, styles.debit]}>-{money(stats.paymentRefunds)}</Text></View>
-          <View style={[styles.statLine, narrow && styles.statLineNarrow]}><Text style={styles.meta}>Net member payments</Text><Text style={styles.statValue}>{money(stats.paymentIncome)}</Text></View>
-          <View style={[styles.statLine, narrow && styles.statLineNarrow]}><Text style={styles.meta}>Other credit entries</Text><Text style={styles.statValue}>{money(stats.otherIncome)}</Text></View>
-          <View style={[styles.statLine, narrow && styles.statLineNarrow]}><Text style={styles.meta}>Expenses recorded</Text><Text style={[styles.statValue, styles.debit]}>{money(stats.expenses)}</Text></View>
-          <View style={[styles.statLine, styles.totalLine, narrow && styles.statLineNarrow]}><Text style={styles.paymentTitle}>Available balance</Text><Text style={styles.paymentAmount}>{money(stats.balance)}</Text></View>
-        </Card>
-
-        <Card style={styles.summaryDetailCard}>
-          <View style={styles.summarySectionHeader}>
-            <View style={styles.summarySectionIcon}>
-              <MaterialCommunityIcons name="chart-box-outline" size={20} color={colors.primaryStrong} />
-            </View>
-            <View style={styles.flex}>
-              <Text style={styles.summarySectionTitle}>Activity snapshot</Text>
-              <Text style={styles.summarySectionSubtitle}>Useful counts behind the money movement.</Text>
-            </View>
-          </View>
-          <View style={styles.quickMetricGrid}>
-            <QuickMetric icon="account-group-outline" label="Mumineen paid" value={Number(summary?.quickCounts?.totalMuminsPaid || 0)} />
-            <QuickMetric icon="bank-outline" label="Bank accounts" value={Number(summary?.quickCounts?.totalBankAccounts || 0)} />
-            <QuickMetric icon="cash-multiple" label="Paid transactions" value={Number(summary?.paymentsOverview?.totalPaidCount || 0)} />
-            <QuickMetric icon="cash-clock" label="Refunded payments" value={Number(summary?.paymentsOverview?.totalRefundedCount || 0)} />
-            <QuickMetric icon="bank-transfer" label="Credit entries" value={Number(summary?.dayBookOverview?.totalCreditCount || 0)} />
-            <QuickMetric icon="bank-transfer" label="Debit entries" value={Number(summary?.dayBookOverview?.totalDebitCount || 0)} />
-          </View>
-        </Card>
-      </View>
-
-      <View style={styles.summaryDateHeader}>
-        <View style={styles.summarySectionIcon}>
-          <MaterialCommunityIcons name="calendar-month-outline" size={20} color={colors.primaryStrong} />
-        </View>
-        <View style={styles.flex}>
-          <Text style={styles.summarySectionTitle}>Date-wise summary</Text>
-          <Text style={styles.summarySectionSubtitle}>Daily money received, expenses and resulting balance.</Text>
-        </View>
-      </View>
-
-      {dailyStats.length ? (
-        <View style={styles.dailyGrid}>
-          {dailyStats.map(item => (
-            <Card key={item.date} style={[styles.dailyCard, phone && styles.dailyCardPhone]}>
-              <View style={styles.dailyDateRow}>
-                <MaterialCommunityIcons name="calendar-outline" size={17} color={colors.primaryStrong} />
-                <Text style={styles.dailyDate}>{item.date}</Text>
-              </View>
-              <View style={styles.dailyMetricRow}><Text style={styles.dailyMetricLabel}>Received</Text><Text style={styles.dailyReceived}>{money(item.received)}</Text></View>
-              <View style={styles.dailyMetricRow}><Text style={styles.dailyMetricLabel}>Expenses</Text><Text style={styles.dailyExpense}>{money(item.expenses)}</Text></View>
-              <View style={styles.dailyBalanceRow}><Text style={styles.dailyBalanceLabel}>Balance</Text><Text style={styles.dailyBalanceValue}>{money(item.balance)}</Text></View>
-            </Card>
-          ))}
-        </View>
-      ) : <Card><Text style={styles.meta}>No account entries found for this period.</Text></Card>}
-    </View>
-  );
-}
-
 export default function AccountsScreen() {
+  const { user } = useAuth();
+  return canManageAccounts(user) ? <ManagedAccountsScreen key={user?.userId} /> : <PersonalAccountsPanel key={`${user?.userId}-${user?.itsNo || user?.itsId}`} user={user} />;
+}
+
+function ManagedAccountsScreen() {
   const { width } = useWindowDimensions();
   const phone = width < 600;
   const narrow = width < 380;
@@ -413,10 +192,6 @@ export default function AccountsScreen() {
   const canRefund = canRefundPayments(user);
   const canDelete = canDeleteJamaatData(user);
   const [tab, setTab] = useState(manager ? "STATS" : "PAYMENTS");
-  const [summary, setSummary] = useState(null);
-  const [summaryLoading, setSummaryLoading] = useState(false);
-  const [summaryVisible, setSummaryVisible] = useState(false);
-  const [summaryError, setSummaryError] = useState("");
   const [collectionSummary, setCollectionSummary] = useState(null);
   const [cashSummary, setCashSummary] = useState([]);
   const [collectionLoading, setCollectionLoading] = useState(false);
@@ -451,6 +226,7 @@ export default function AccountsScreen() {
     let active = true;
 
     async function resolveOwnMuminId() {
+      if (!manager) return;
       const directMuminId = user?.muminId;
       if (directMuminId) {
         if (active) {
@@ -518,26 +294,6 @@ export default function AccountsScreen() {
     return { from: statsFrom, to: statsTo };
   }, [statsRange, statsFrom, statsTo]);
 
-  useEffect(() => {
-    if (!manager || tab !== "STATS") return;
-    let active = true;
-    (async () => {
-      try {
-        setSummaryLoading(true);
-        setSummaryError("");
-        const result = await accountsApi.getAccountsSummary({
-          fromDate: toApiFromDate(statsDates.from),
-          toDate: toApiToDate(statsDates.to)
-        });
-        if (active) setSummary(result || null);
-      } catch (requestError) {
-        if (active) setSummaryError(requestError.message || "Unable to load account summary.");
-      } finally {
-        if (active) setSummaryLoading(false);
-      }
-    })();
-    return () => { active = false; };
-  }, [manager, tab, statsDates.from, statsDates.to]);
 
   async function loadCollectionDetails(pageNumber = 1) {
     setCollectionLoading(true);
@@ -580,39 +336,9 @@ export default function AccountsScreen() {
     loadCollectionDetails(1);
   }, [manager, tab, statsDates.from, statsDates.to]);
 
-  const stats = useMemo(() => {
-    const payments = summary?.paymentsOverview || {};
-    const daybook = summary?.dayBookOverview || {};
-    const paymentIncome = Number(payments.netAmount || 0);
-    const otherIncome = Number(daybook.totalCreditAmount || 0);
-    const expenses = Number(daybook.totalDebitAmount || 0);
-    const received = paymentIncome + otherIncome;
-    return {
-      paymentIncome,
-      paymentGross: Number(payments.totalPaidAmount || 0),
-      paymentRefunds: Number(payments.totalRefundedAmount || 0),
-      otherIncome,
-      expenses,
-      received,
-      balance: paymentIncome + Number(daybook.netAmount || 0)
-    };
-  }, [summary]);
 
-  const dailyStats = useMemo(() =>
-    (Array.isArray(summary?.dailyTrend) ? summary.dailyTrend : [])
-      .map(item => {
-        const received = Number(item.paymentsAmount || 0) + Number(item.dayBookCreditAmount || 0);
-        const expenses = Number(item.dayBookDebitAmount || 0);
-        return {
-          date: item.entryDate ? String(item.entryDate).slice(0, 10) : "-",
-          received,
-          expenses,
-          balance: received - expenses
-        };
-      })
-      .sort((a, b) => b.date.localeCompare(a.date)),
-    [summary]
-  );
+
+  if (!manager) return <Redirect href="/(app)" />;
 
   return (
     <Screen>
@@ -802,13 +528,6 @@ export default function AccountsScreen() {
               <Text style={[styles.collectionTitle, phone && styles.collectionTitlePhone]}>Payment collection details</Text>
               <Text style={styles.collectionSubtitle}>{statsDates.from} to {statsDates.to}</Text>
             </View>
-            <Pressable
-              style={[styles.collectionButton, phone && styles.collectionButtonPhone]}
-              onPress={() => setSummaryVisible(true)}
-            >
-              <MaterialCommunityIcons name="chart-donut-variant" size={18} color="#FFFFFF" />
-              <Text style={styles.collectionButtonText}>View account summary</Text>
-            </Pressable>
           </View>
 
           <CollectionSummaryDashboard
@@ -876,58 +595,6 @@ export default function AccountsScreen() {
         <TakhmeenPanel categories={fmbAccess.categories} />
       ) : null}
 
-      <Modal
-        visible={summaryVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setSummaryVisible(false)}
-      >
-        <View style={[styles.collectionBackdrop, phone && styles.collectionBackdropPhone]}>
-          <View style={[styles.collectionSheet, phone && styles.collectionSheetPhone]}>
-            <View style={[styles.collectionHeader, phone && styles.collectionHeaderPhone]}>
-              <View style={styles.flex}>
-                <Text style={styles.collectionEyebrow}>FINANCIAL OVERVIEW</Text>
-                <Text style={[styles.collectionTitle, phone && styles.collectionTitlePhone]}>Accounts summary</Text>
-                <Text style={styles.collectionSubtitle}>{statsDates.from} to {statsDates.to}</Text>
-              </View>
-              <Pressable style={styles.collectionClose} onPress={() => setSummaryVisible(false)}>
-                <Text style={styles.collectionCloseText}>×</Text>
-              </Pressable>
-            </View>
-
-            <ScrollView
-              contentContainerStyle={[styles.collectionContent, phone && styles.collectionContentPhone]}
-              showsVerticalScrollIndicator={false}
-            >
-              <AccountsSummaryDashboard
-                summary={summary}
-                loading={summaryLoading}
-                error={summaryError}
-                stats={stats}
-                dailyStats={dailyStats}
-                statsDates={statsDates}
-                phone={phone}
-                narrow={narrow}
-                onRetry={async () => {
-                  try {
-                    setSummaryLoading(true);
-                    setSummaryError("");
-                    const result = await accountsApi.getAccountsSummary({
-                      fromDate: toApiFromDate(statsDates.from),
-                      toDate: toApiToDate(statsDates.to)
-                    });
-                    setSummary(result || null);
-                  } catch (requestError) {
-                    setSummaryError(requestError.message || "Unable to load account summary.");
-                  } finally {
-                    setSummaryLoading(false);
-                  }
-                }}
-              />
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
     </Screen>
   );
 }
@@ -981,71 +648,6 @@ const styles = StyleSheet.create({
   summaryControls: { marginBottom: spacing.sm },
   summaryControlLabel: { color: colors.muted, fontSize: 9, fontWeight: "900", letterSpacing: 1.2, marginBottom: spacing.xs },
   customRangeCard: { marginBottom: spacing.md },
-  summaryHero: {
-    minHeight: 150,
-    borderRadius: radius.xl,
-    padding: spacing.lg,
-    backgroundColor: colors.primaryStrong,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
-    marginBottom: spacing.md
-  },
-  summaryHeroPhone: { padding: spacing.md, alignItems: "flex-start", flexWrap: "wrap" },
-  summaryHeroNarrow: { flexDirection: "column" },
-  summaryHeroIcon: {
-    width: 58,
-    height: 58,
-    borderRadius: 19,
-    backgroundColor: "rgba(255,255,255,.12)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,.16)",
-    alignItems: "center",
-    justifyContent: "center",
-    flexShrink: 0
-  },
-  summaryEyebrow: { color: "#D8E6E0", fontSize: 9, fontWeight: "900", letterSpacing: 1.4 },
-  summaryHeroTitle: { color: "#FFFFFF", fontSize: 28, fontWeight: "900", marginTop: 4 },
-  summaryHeroTitlePhone: { fontSize: 23 },
-  summaryHeroSubtitle: { color: "#DDE6E2", fontSize: 12, lineHeight: 18, marginTop: 5, maxWidth: 620 },
-  summaryPeriodPill: { alignSelf: "flex-start", flexDirection: "row", alignItems: "center", gap: 6, marginTop: spacing.sm, paddingHorizontal: 10, paddingVertical: 6, borderRadius: radius.pill, backgroundColor: "rgba(255,255,255,.10)" },
-  summaryPeriodText: { color: "#E4EFEA", fontSize: 10, fontWeight: "800" },
-  summaryKpiGrid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginBottom: spacing.md },
-  summaryKpi: { flex: 1, minWidth: 190, minHeight: 136, borderWidth: 1, borderRadius: radius.lg, padding: spacing.md, backgroundColor: colors.surface },
-  summaryKpiPhone: { minWidth: "100%", width: "100%", flexBasis: "100%" },
-  summaryKpiPrimary: { borderColor: colors.primarySoftStrong, backgroundColor: colors.surfaceTint },
-  summaryKpiSuccess: { borderColor: "#D8EADC", backgroundColor: colors.successSoft },
-  summaryKpiDanger: { borderColor: "#F3D6D6", backgroundColor: colors.dangerSoft },
-  summaryKpiWarning: { borderColor: "#F0DFC3", backgroundColor: colors.warningSoft },
-  summaryKpiIcon: { width: 36, height: 36, borderRadius: 12, backgroundColor: "rgba(255,255,255,.7)", alignItems: "center", justifyContent: "center", marginBottom: spacing.sm },
-  summaryKpiLabel: { color: colors.textSoft, fontSize: 11, fontWeight: "800" },
-  summaryKpiValue: { color: colors.text, fontSize: 21, fontWeight: "900", marginTop: 4 },
-  summaryKpiCaption: { color: colors.muted, fontSize: 10, marginTop: 4 },
-  summaryDetailGrid: { flexDirection: "row", alignItems: "stretch", gap: spacing.md, marginBottom: spacing.md },
-  summaryDetailGridPhone: { flexDirection: "column" },
-  summaryDetailCard: { flex: 1, minWidth: 0, marginBottom: 0 },
-  summarySectionHeader: { flexDirection: "row", alignItems: "center", gap: spacing.sm, marginBottom: spacing.sm },
-  summarySectionIcon: { width: 40, height: 40, borderRadius: 13, backgroundColor: colors.primarySoft, alignItems: "center", justifyContent: "center", flexShrink: 0 },
-  summarySectionTitle: { color: colors.text, fontSize: 18, fontWeight: "900" },
-  summarySectionSubtitle: { color: colors.muted, fontSize: 11, lineHeight: 16, marginTop: 3 },
-  quickMetricGrid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.xs },
-  quickMetric: { flexDirection: "row", alignItems: "center", gap: spacing.sm, flexGrow: 1, flexBasis: 150, minWidth: 0, padding: spacing.sm, borderRadius: radius.md, backgroundColor: colors.backgroundAlt },
-  quickMetricIcon: { width: 32, height: 32, borderRadius: 10, backgroundColor: colors.primarySoft, alignItems: "center", justifyContent: "center" },
-  quickMetricLabel: { color: colors.muted, fontSize: 10, fontWeight: "700" },
-  quickMetricValue: { color: colors.text, fontSize: 17, fontWeight: "900", marginTop: 2 },
-  summaryDateHeader: { flexDirection: "row", alignItems: "center", gap: spacing.sm, marginTop: spacing.xs, marginBottom: spacing.sm },
-  dailyGrid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
-  dailyCard: { flex: 1, minWidth: 250, marginBottom: 0 },
-  dailyCardPhone: { minWidth: "100%", width: "100%" },
-  dailyDateRow: { flexDirection: "row", alignItems: "center", gap: 6, paddingBottom: spacing.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
-  dailyDate: { color: colors.text, fontSize: 14, fontWeight: "900" },
-  dailyMetricRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm, paddingVertical: spacing.xs },
-  dailyMetricLabel: { color: colors.muted, fontSize: 11 },
-  dailyReceived: { color: colors.success, fontSize: 12, fontWeight: "900" },
-  dailyExpense: { color: colors.danger, fontSize: 12, fontWeight: "900" },
-  dailyBalanceRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm, marginTop: spacing.xs, paddingTop: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
-  dailyBalanceLabel: { color: colors.text, fontSize: 12, fontWeight: "800" },
-  dailyBalanceValue: { color: colors.primaryStrong, fontSize: 15, fontWeight: "900" },
   summary: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   summaryCard: { minWidth: 190, flex: 1, marginHorizontal: 0, backgroundColor: colors.surfaceTint, borderColor: colors.primarySoftStrong },
   summaryCardPhone: { minWidth: "100%", width: "100%" },
@@ -1076,22 +678,6 @@ const styles = StyleSheet.create({
   },
   collectionPageHeaderPhone: { flexDirection: "column", alignItems: "stretch", gap: spacing.sm },
   collectionTitlePhone: { fontSize: 20 },
-  accountSummaryModalContent: { width: "100%", minWidth: 0 },
-  inlineErrorBanner: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: spacing.sm,
-    padding: spacing.md,
-    marginBottom: spacing.md,
-    borderWidth: 1,
-    borderColor: "#F3D6D6",
-    borderRadius: radius.md,
-    backgroundColor: colors.dangerSoft,
-  },
-  inlineErrorTitle: { color: colors.danger, fontWeight: "900", fontSize: 12 },
-  inlineErrorText: { color: colors.textSoft, fontSize: 11, lineHeight: 16, marginTop: 2 },
-  inlineRetryButton: { paddingHorizontal: 10, paddingVertical: 7, borderRadius: radius.md, backgroundColor: colors.surface, flexShrink: 0 },
-  inlineRetryText: { color: colors.danger, fontSize: 10, fontWeight: "900" },
   dateFieldContainer: { marginBottom: spacing.md },
   fieldLabel: { color: colors.text, fontWeight: "700", marginBottom: spacing.xs },
   dateField: {
@@ -1218,12 +804,9 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   row: { flexDirection: "row", gap: 12 },
-  paymentTitle: { fontSize: 17, fontWeight: "800", color: colors.text },
   member: { color: colors.primary, fontWeight: "700", marginTop: 4 },
   loadingRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   meta: { color: colors.muted, marginTop: 4 },
-  paymentAmount: { fontSize: 18, fontWeight: "800", color: colors.primary },
-  debit: { color: colors.danger },
   bankAccountName: { color: colors.muted, fontSize: 11, marginTop: 3 },
   recordedBy: { color: colors.info, fontSize: 11, fontWeight: "700", marginTop: 5 },
   actions: {
@@ -1235,49 +818,21 @@ const styles = StyleSheet.create({
   ledgerLabel: { fontSize: 12, color: colors.muted, textAlign: "right" },
   summaryToolbar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md, marginBottom: spacing.md },
   summaryToolbarPhone: { flexDirection: "column", alignItems: "stretch", gap: spacing.sm },
-  collectionButton: { minHeight: 46, paddingHorizontal: spacing.md, borderRadius: radius.md, backgroundColor: colors.accentStrong, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 7, flexShrink: 0 },
-  collectionButtonPhone: { width: "100%" },
-  collectionButtonText: { color: "#FFFFFF", fontWeight: "900", fontSize: 12 },
   rangeTabs: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: spacing.md },
   rangeTab: { paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
   activeRangeTab: { backgroundColor: colors.primaryStrong, borderColor: colors.primaryStrong },
   rangeTabText: { color: colors.text, fontWeight: "700" },
   activeRangeTabText: { color: "white" },
   periodLabel: { color: colors.muted, fontWeight: "700", marginBottom: spacing.md },
-  statLine: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: spacing.md, paddingVertical: spacing.sm },
-  statLineNarrow: { alignItems: "flex-start", flexWrap: "wrap", gap: spacing.xs },
-  statValue: { color: colors.text, fontWeight: "800" },
-  totalLine: { borderTopWidth: 1, borderTopColor: colors.border, marginTop: spacing.sm, paddingTop: spacing.md },
   pending: { color: colors.danger },
   bankGrid: { flexDirection: "row", flexWrap: "wrap", marginHorizontal: -4 },
   bankCard: { flex: 1, minWidth: 180, marginHorizontal: 4 },
-  collectionBackdrop: { flex: 1, backgroundColor: colors.overlay, justifyContent: "center", padding: spacing.md },
-  collectionBackdropPhone: { justifyContent: "flex-end", padding: 0 },
-  collectionSheet: { width: "100%", maxWidth: 1120, maxHeight: "92%", alignSelf: "center", backgroundColor: colors.surface, borderRadius: radius.xl, overflow: "hidden" },
-  collectionSheetPhone: { maxHeight: "94%", borderTopLeftRadius: 24, borderTopRightRadius: 24, borderBottomLeftRadius: 0, borderBottomRightRadius: 0 },
-  collectionHeader: { flexDirection: "row", alignItems: "flex-start", gap: spacing.md, padding: spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.border },
-  collectionHeaderPhone: { padding: spacing.md },
   collectionEyebrow: { color: colors.accentStrong, fontSize: 9, fontWeight: "900", letterSpacing: 1.3 },
   collectionTitle: { color: colors.text, fontSize: 23, fontWeight: "900", marginTop: 4 },
   collectionSubtitle: { color: colors.muted, fontSize: 12, marginTop: 4 },
-  collectionClose: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.backgroundAlt, alignItems: "center", justifyContent: "center" },
-  collectionCloseText: { color: colors.textSoft, fontSize: 25, lineHeight: 27 },
-  collectionContent: { padding: spacing.lg },
-  collectionContentPhone: { padding: spacing.md },
-  collectionLoading: { minHeight: 220, alignItems: "center", justifyContent: "center", gap: spacing.sm },
   collectionTotals: { flexDirection: "row", gap: spacing.sm },
   collectionTotalsPhone: { flexDirection: "column" },
   collectionTotalCard: { flex: 1, marginHorizontal: 0, backgroundColor: colors.surfaceTint, borderColor: colors.primarySoftStrong },
   collectionTotalLabel: { color: colors.muted, fontSize: 12, fontWeight: "800" },
   collectionTotalValue: { color: colors.primaryStrong, fontSize: 24, fontWeight: "900", marginTop: 4 },
-  collectionSection: { gap: spacing.sm },
-  collectionSectionTitle: { color: colors.text, fontSize: 18, fontWeight: "900" },
-  collectionRow: { paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border },
-  collectionRowTop: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: spacing.md },
-  collectionName: { color: colors.text, fontWeight: "800", fontSize: 14 },
-  collectionMeta: { color: colors.muted, fontSize: 11, marginTop: 3 },
-  collectionAmount: { color: colors.primaryStrong, fontWeight: "900", fontSize: 14 },
-  collectionTrack: { height: 9, marginTop: spacing.sm, borderRadius: radius.pill, backgroundColor: colors.backgroundAlt, overflow: "hidden" },
-  collectionBar: { height: "100%", borderRadius: radius.pill, backgroundColor: colors.primaryStrong },
-  collectionEmpty: { color: colors.muted, paddingVertical: spacing.lg, textAlign: "center" },
 });

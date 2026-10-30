@@ -4,6 +4,7 @@ import { Platform } from "react-native";
 import { API_CONFIG } from "./apiConfig";
 import { liveEndpoints, isPublishedApiPath } from "./endpoints";
 import { mockApiRequest } from "./mockStore";
+import { userRoles } from "../utils/userRoles";
 
 const SESSION_KEY = "jamaatone_auth_session";
 const LEGACY_TOKEN_KEY = "jamaat_access_token";
@@ -112,6 +113,7 @@ function normalizeSession(session, previousSession = null) {
 
   return {
     ...merged,
+    roles: userRoles(Array.isArray(session?.roles) || session?.roleName || session?.role ? session : merged),
     accessTokenExpiresAt,
     refreshTokenExpiresAt,
     sessionReceivedAt: new Date(receivedAt).toISOString()

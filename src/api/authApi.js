@@ -2,6 +2,18 @@ import { liveApiRequest } from "./client";
 import { liveEndpoints } from "./endpoints";
 
 export const authApi = {
+  changePassword(payload) {
+    return liveApiRequest(liveEndpoints.auth.changePassword, {
+      method: "PUT",
+      skipAuth: true,
+      skipRefresh: true,
+      body: {
+        itsNo: String(payload.itsNo || "").trim(),
+        oldPassword: payload.oldPassword || "",
+        newPassword: payload.newPassword || ""
+      }
+    });
+  },
   login(itsNo, password) {
     return liveApiRequest(liveEndpoints.auth.login, {
       method: "POST",

@@ -7,7 +7,7 @@ import {
   useWindowDimensions,
   View
 } from "react-native";
-import { useLocalSearchParams } from "expo-router";
+import { Redirect, useLocalSearchParams } from "expo-router";
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
 
@@ -152,6 +152,7 @@ export default function Receipt() {
   const [error, setError] = useState("");
 
   useEffect(() => {
+    if (!manager) return;
     if (!paymentId && !receiptId && !dayBookId) return;
 
     let active = true;
@@ -250,6 +251,8 @@ export default function Receipt() {
   const documentType = String(receipt?.documentType || "RECEIPT").toUpperCase();
   const isVoucher = documentType === "VOUCHER";
   const documentTitle = isVoucher ? "Payment voucher" : "Payment receipt";
+
+  if (!manager) return <Redirect href="/(app)" />;
 
   return (
     <Screen>

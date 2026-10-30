@@ -1,14 +1,12 @@
+const { canAccessAccounts } = require("./userRoles");
+
 function isFmbCategory(category) {
   return category?.isActive !== false && /\bfmb\b/i.test(String(category?.categoryName || ""));
 }
 
-function fmbCategoriesForUser(user, categories, assignedCategories = []) {
-  const role = String(user?.role || user?.roleName || "").toUpperCase().replace(/[\s-]+/g, "_");
+function fmbCategoriesForUser(user, categories) {
   const fmb = categories.filter(isFmbCategory);
-  if (["AAMIL", "AMIL", "ADMIN"].includes(role)) return fmb;
-  if (!["COMMITTEE_MEMBER", "COMMITTEEMEMBER", "FMB_USER", "FMBUSER", "FMB"].includes(role)) return [];
-  return fmb.filter(category => assignedCategories.some(item =>
-    String(item.categoryId) === String(category.categoryId)));
+  return canAccessAccounts(user) ? fmb : [];
 }
 
 function validateTakhmeen(form, categories, banks, paidAmount = 0) {
